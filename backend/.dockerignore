@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+meridian.db
+meridian.db-journal
+voyant.db
+voyant.db-journal
+_alembic_baseline.db
+*.log
+.env
+.env.local

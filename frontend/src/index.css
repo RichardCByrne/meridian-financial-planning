@@ -1,0 +1,290 @@
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  color: #1a1a1a;
+  background: #f7f7f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: #2563eb;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 24px 16px;
+}
+
+.sidebar h1 {
+  font-size: 18px;
+  margin: 0 0 24px 0;
+  letter-spacing: -0.01em;
+}
+
+.sidebar nav a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #cbd5e1;
+  margin-bottom: 4px;
+}
+
+.sidebar nav a:hover {
+  background: #1e293b;
+  text-decoration: none;
+}
+
+.sidebar nav a.active {
+  background: #2563eb;
+  color: white;
+}
+
+.main {
+  padding: 32px 40px;
+  max-width: 1200px;
+}
+
+.main h2 {
+  margin-top: 0;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn {
+  background: #2563eb;
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.btn:hover {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.btn-danger {
+  background: #dc2626;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field input,
+.field select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 13px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+th {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.helptip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+
+.helptip:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.helptip-bubble {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  width: max-content;
+  max-width: 280px;
+  text-align: left;
+  z-index: 50;
+  transition: opacity 0.1s ease;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.helptip:hover .helptip-bubble,
+.helptip:focus .helptip-bubble {
+  visibility: visible;
+  opacity: 1;
+}
+
+.jargon-term {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted #94a3b8;
+  cursor: help;
+  color: inherit;
+}
+
+.jargon-term:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.jargon-term:hover .helptip-bubble,
+.jargon-term:focus .helptip-bubble {
+  visibility: visible;
+  opacity: 1;
+}
+
+.timeline-track {
+  position: relative;
+  height: 56px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+@keyframes meridian-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    padding: 16px;
+  }
+  .main {
+    padding: 16px;
+    max-width: 100%;
+  }
+  .card {
+    padding: 14px;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+  .field input,
+  .field select {
+    width: 100%;
+  }
+  table {
+    font-size: 13px;
+  }
+  th,
+  td {
+    padding: 6px 4px;
+  }
+}
+

@@ -1,0 +1,262 @@
+import logging
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
+
+from app.db import Base, engine, get_db
+from app.models import register_all_models  # noqa: F401  ensure models import
+from app.routers import (
+    assets,
+    assumptions,
+    bequests,
+    expenses,
+    goals,
+    income,
+    invites,
+    liabilities,
+    members,
+    people,
+    plans,
+    projections,
+    scenarios,
+    tax_configs,
+)
+
+
+def _apply_lightweight_migrations() -> None:
+    """Bridge pre-Alembic SQLite files to the Alembic baseline.
+
+    Production (Postgres on Cloud Run) runs `alembic upgrade head` from the
+    Dockerfile entrypoint and never enters this function with a meaningful
+    diff. This is purely a local-dev convenience: if the SQLite file pre-dates
+    Alembic, add the few columns the old `_apply_lightweight_migrations` was
+    patching, then stamp `alembic_version` to head so future migrations apply.
+    """
+    insp = inspect(engine)
+    tables = insp.get_table_names()
+    if "assets" in tables:
+        cols = {c["name"] for c in insp.get_columns("assets")}
+        if "acquired_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE assets ADD COLUMN acquired_year INTEGER"))
+        if "annual_contribution" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN annual_contribution FLOAT NOT NULL DEFAULT 0.0"
+                ))
+        if "contribution_pct_of_net_income" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN "
+                    "contribution_pct_of_net_income FLOAT NOT NULL DEFAULT 0.0"
+                ))
+        if "contribution_pct_of_gross_income" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN "
+                    "contribution_pct_of_gross_income FLOAT NOT NULL DEFAULT 0.0"
+                ))
+        if "avc_annual" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN avc_annual FLOAT NOT NULL DEFAULT 0.0"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN avc_pct_of_gross FLOAT NOT NULL DEFAULT 0.0"
+                ))
+        if "contribution_start_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN contribution_start_year INTEGER"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN contribution_end_year INTEGER"
+                ))
+    if "people" in tables:
+        cols = {c["name"] for c in insp.get_columns("people")}
+        if "retirement_age" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE people ADD COLUMN retirement_age INTEGER"))
+    if "assumptions" in tables:
+        cols = {c["name"] for c in insp.get_columns("assumptions")}
+        if "state_pension_annual_amount" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE assumptions ADD COLUMN state_pension_annual_amount "
+                        "FLOAT NOT NULL DEFAULT 15044.0"
+                    )
+                )
+    if "income_sources" in tables:
+        cols = {c["name"] for c in insp.get_columns("income_sources")}
+        if "employer_pension_contribution_pct" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE income_sources ADD COLUMN "
+                        "employer_pension_contribution_pct FLOAT NOT NULL DEFAULT 0.0"
+                    )
+                )
+    if "plans" in tables:
+        cols = {c["name"] for c in insp.get_columns("plans")}
+        if "tax_config_id" not in cols:
+            with engine.begin() as conn:
+                # SQLite can't add a FK constraint inline post-hoc, but the
+                # plain INTEGER column is enough for the ORM to read/write.
+                conn.execute(text("ALTER TABLE plans ADD COLUMN tax_config_id INTEGER"))
+        if "filing_status" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE plans ADD COLUMN filing_status VARCHAR(20)"))
+    if "people" in tables:
+        cols = {c["name"] for c in insp.get_columns("people")}
+        if "claims_rent_credit" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE people ADD COLUMN "
+                        "claims_rent_credit BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+    if "assumptions" in tables:
+        cols = {c["name"] for c in insp.get_columns("assumptions")}
+        if "state_pension_escalation_rate" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE assumptions ADD COLUMN "
+                        "state_pension_escalation_rate FLOAT NOT NULL DEFAULT 0.015"
+                    )
+                )
+
+    # Re-stamp Alembic to head so a dev DB that's been kept up via these
+    # lightweight patches doesn't try to re-create tables on the next
+    # `alembic upgrade head`. Production never enters this path — it runs
+    # alembic from the Dockerfile entrypoint.
+    if tables:
+        try:
+            from alembic import command
+            from alembic.config import Config
+
+            from pathlib import Path
+
+            root = Path(__file__).resolve().parent.parent
+            cfg = Config(str(root / "alembic.ini"))
+            cfg.set_main_option("script_location", str(root / "alembic"))
+            command.stamp(cfg, "head")
+        except Exception as e:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Could not stamp Alembic version on legacy SQLite DB: %s", e
+            )
+
+
+def _seed_official_tax_config() -> None:
+    """Idempotently insert the IRELAND_2026_OFFICIAL row if missing."""
+    from app.config.tax_ie_2026 import IRELAND_2026_OFFICIAL
+    from app.db import SessionLocal
+    from app.models import TaxConfigRow
+
+    from sqlalchemy import select
+
+    with SessionLocal() as db:
+        existing = db.execute(
+            select(TaxConfigRow).where(
+                TaxConfigRow.is_official.is_(True),
+                TaxConfigRow.name == IRELAND_2026_OFFICIAL.name,
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            # Refresh the JSON payload so a constant tweak (e.g. PRSI rate change)
+            # propagates to existing deployments without manual intervention.
+            existing.config_json = IRELAND_2026_OFFICIAL.to_dict()
+            db.commit()
+            return
+        db.add(
+            TaxConfigRow(
+                name=IRELAND_2026_OFFICIAL.name,
+                is_official=True,
+                created_by_user_id=None,
+                config_json=IRELAND_2026_OFFICIAL.to_dict(),
+            )
+        )
+        db.commit()
+
+
+def _adopt_orphan_plans() -> None:
+    """In dev-mode, hand any pre-auth plans to the seeded dev user."""
+    from app.auth import assign_orphan_plans_to_dev_user
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        adopted = assign_orphan_plans_to_dev_user(db)
+        if adopted:
+            import logging
+
+            logging.getLogger(__name__).info(
+                "Phase 8 migration: assigned %d orphan plan(s) to the dev user.", adopted
+            )
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    register_all_models()
+    Base.metadata.create_all(bind=engine)
+    _apply_lightweight_migrations()
+    _seed_official_tax_config()
+    _adopt_orphan_plans()
+    yield
+
+
+app = FastAPI(
+    title="Meridian API",
+    version="0.1.0",
+    description="Meridian — financial planning API (Ireland 2026 tax engine).",
+    lifespan=lifespan,
+)
+
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/health")
+def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Liveness + DB readiness. Returns 503 if the DB is unreachable."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger(__name__).warning("Health check DB ping failed: %s", e)
+        raise HTTPException(status_code=503, detail=f"DB not reachable: {e}") from e
+    return {"status": "ok", "db": "ok"}
+
+
+app.include_router(plans.router, prefix="/api")
+app.include_router(bequests.router, prefix="/api")
+app.include_router(people.router, prefix="/api")
+app.include_router(assumptions.router, prefix="/api")
+app.include_router(income.router, prefix="/api")
+app.include_router(expenses.router, prefix="/api")
+app.include_router(assets.router, prefix="/api")
+app.include_router(liabilities.router, prefix="/api")
+app.include_router(goals.router, prefix="/api")
+app.include_router(scenarios.router, prefix="/api")
+app.include_router(members.router, prefix="/api")
+app.include_router(invites.router, prefix="/api")
+app.include_router(tax_configs.router, prefix="/api")
+app.include_router(projections.router, prefix="/api")

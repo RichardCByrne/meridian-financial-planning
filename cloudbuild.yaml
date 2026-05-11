@@ -1,0 +1,62 @@
+# Google Cloud Build pipeline: build the backend Docker image, push it to
+# Artifact Registry, deploy to Cloud Run.
+#
+# Required substitutions (set via gcloud or Cloud Build trigger):
+#   _REGION                — e.g. europe-west1
+#   _REPO                  — Artifact Registry repo name (e.g. meridian)
+#   _SERVICE               — Cloud Run service name (e.g. meridian-api)
+#   _CLOUD_SQL_INSTANCE    — fully-qualified Cloud SQL connection name
+#                            (PROJECT:REGION:INSTANCE)
+#
+# Secrets pulled from Secret Manager at deploy-time:
+#   DATABASE_URL                   — postgresql+psycopg://USER:PASS@/DB?host=/cloudsql/<inst>
+#   FIREBASE_SERVICE_ACCOUNT_JSON  — full JSON, mounted as a file at /secrets/firebase.json
+#   ALLOWED_ORIGINS                — comma-separated list of frontend origins
+
+steps:
+  # 1. Build the image (cached layers from prior builds via --cache-from).
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - backend
+
+  # 2. Push both tags.
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  # 3. Deploy to Cloud Run with Cloud SQL attached and secrets mounted.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --add-cloudsql-instances=${_CLOUD_SQL_INSTANCE}
+      - --set-env-vars=MERIDIAN_DEV_AUTH=false,FIREBASE_SERVICE_ACCOUNT_PATH=/secrets/firebase.json
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,ALLOWED_ORIGINS=ALLOWED_ORIGINS:latest
+      - --set-secrets=/secrets/firebase.json=FIREBASE_SERVICE_ACCOUNT_JSON:latest
+      - --cpu=1
+      - --memory=512Mi
+      - --max-instances=4
+      - --min-instances=0
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

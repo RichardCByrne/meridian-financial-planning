@@ -1,0 +1,336 @@
+from dataclasses import asdict
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.db import get_db
+from app.engine.scenario import apply_overrides
+from app.auth import get_current_user, require_plan_access
+from app.engine.simulator import (
+    AssetInput,
+    AssumptionsInput,
+    BequestInput,
+    ExpenseInput,
+    GoalInput,
+    IncomeInput,
+    LiabilityInput,
+    PersonInput,
+    PlanInput,
+    simulate,
+)
+from app.engine import montecarlo as _mc
+from app.engine.tax_config import TaxConfig
+from app.models import Assumptions, Bequest, IncomeSource, Plan, Scenario, TaxConfigRow, User
+from app.schemas.projection import (
+    MonteCarloResponse,
+    MonteCarloYearRow,
+    ProjectionResponse,
+    ProjectionSummary,
+    YearRowOut,
+)
+
+router = APIRouter(tags=["projection"])
+
+
+def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
+    people = [
+        PersonInput(
+            id=p.id,
+            name=p.name,
+            dob=p.dob,
+            is_primary=p.is_primary,
+            life_expectancy=p.life_expectancy,
+            retirement_age=p.retirement_age,
+            claims_rent_credit=p.claims_rent_credit,
+        )
+        for p in plan.people
+    ]
+    person_ids = [p.id for p in plan.people]
+    incomes_raw = list(
+        db.execute(
+            select(IncomeSource).where(IncomeSource.person_id.in_(person_ids or [-1]))
+        ).scalars()
+    )
+    incomes = [
+        IncomeInput(
+            id=i.id,
+            person_id=i.person_id,
+            kind=i.kind,
+            name=i.name,
+            gross_amount=i.gross_amount,
+            start_year=i.start_year,
+            end_year=i.end_year,
+            escalation_rate=i.escalation_rate,
+            pays_prsi=i.pays_prsi,
+            pays_usc=i.pays_usc,
+            pension_contribution_pct=i.pension_contribution_pct,
+            employer_pension_contribution_pct=i.employer_pension_contribution_pct,
+        )
+        for i in incomes_raw
+    ]
+    expenses = [
+        ExpenseInput(
+            id=e.id,
+            name=e.name,
+            category=e.category,
+            amount=e.amount,
+            start_year=e.start_year,
+            end_year=e.end_year,
+            escalation_rate=e.escalation_rate,
+        )
+        for e in plan.expenses
+    ]
+    assets = [
+        AssetInput(
+            id=a.id,
+            name=a.name,
+            kind=a.kind,
+            value=a.value,
+            growth_rate=a.growth_rate,
+            cost_basis=a.cost_basis,
+            acquired_year=a.acquired_year,
+            owner_person_id=a.owner_person_id,
+            annual_contribution=a.annual_contribution,
+            contribution_pct_of_net_income=a.contribution_pct_of_net_income,
+            contribution_pct_of_gross_income=a.contribution_pct_of_gross_income,
+            contribution_start_year=a.contribution_start_year,
+            contribution_end_year=a.contribution_end_year,
+            avc_annual=a.avc_annual,
+            avc_pct_of_gross=a.avc_pct_of_gross,
+        )
+        for a in plan.assets
+    ]
+    liabilities = [
+        LiabilityInput(
+            id=liability.id,
+            name=liability.name,
+            kind=liability.kind,
+            principal=liability.principal,
+            interest_rate=liability.interest_rate,
+            term_months=liability.term_months,
+            start_year=liability.start_year,
+            monthly_payment=liability.monthly_payment,
+        )
+        for liability in plan.liabilities
+    ]
+    goals = [
+        GoalInput(
+            id=g.id,
+            kind=g.kind,
+            name=g.name,
+            target_amount=g.target_amount,
+            target_year=g.target_year,
+            linked_person_id=g.linked_person_id,
+        )
+        for g in plan.goals
+    ]
+    a = plan.assumptions
+    assumptions = AssumptionsInput(
+        inflation_rate=a.inflation_rate if a else 0.025,
+        default_growth_rate=a.default_growth_rate if a else 0.05,
+        property_growth_rate=a.property_growth_rate if a else 0.03,
+        earnings_growth=a.earnings_growth if a else 0.03,
+        state_pension_age=a.state_pension_age if a else 66,
+        state_pension_annual_amount=a.state_pension_annual_amount if a else 15_563.0,
+        state_pension_escalation_rate=a.state_pension_escalation_rate if a else 0.015,
+    )
+    bequests_raw = list(
+        db.execute(select(Bequest).where(Bequest.plan_id == plan.id)).scalars()
+    )
+    bequests = [
+        BequestInput(
+            id=b.id,
+            from_person_id=b.from_person_id,
+            to_person_id=b.to_person_id,
+            cat_group=b.cat_group,
+            share_pct=b.share_pct,
+        )
+        for b in bequests_raw
+    ]
+    tax_config = _resolve_plan_tax_config(plan, db)
+    return PlanInput(
+        base_year=plan.base_year,
+        projection_years=plan.projection_years,
+        people=people,
+        incomes=incomes,
+        expenses=expenses,
+        assets=assets,
+        liabilities=liabilities,
+        goals=goals,
+        bequests=bequests,
+        assumptions=assumptions,
+        tax_config=tax_config,
+        filing_status=plan.filing_status,
+    )
+
+
+def _resolve_plan_tax_config(plan: Plan, db: Session) -> TaxConfig | None:
+    """Look up the plan's TaxConfigRow (if pinned) and convert to a TaxConfig
+    dataclass. Returns None if the plan has no pin — the simulator falls back
+    to the seeded official internally."""
+    if plan.tax_config_id is None:
+        return None
+    row = db.get(TaxConfigRow, plan.tax_config_id)
+    if row is None:
+        return None
+    try:
+        return TaxConfig.from_dict(row.config_json)
+    except Exception:
+        return None
+
+
+def _load_plan(plan_id: int, db: Session) -> Plan:
+    plan = db.execute(
+        select(Plan)
+        .where(Plan.id == plan_id)
+        .options(
+            selectinload(Plan.people),
+            selectinload(Plan.expenses),
+            selectinload(Plan.assets),
+            selectinload(Plan.liabilities),
+            selectinload(Plan.goals),
+            selectinload(Plan.assumptions),
+        )
+    ).scalar_one_or_none()
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if plan.assumptions is None:
+        plan.assumptions = Assumptions(plan_id=plan.id)
+        db.add(plan.assumptions)
+        db.commit()
+    return plan
+
+
+def _load_scenario(plan_id: int, scenario_id: int | None, db: Session) -> Scenario | None:
+    if scenario_id is None:
+        return None
+    s = db.get(Scenario, scenario_id)
+    if s is None or s.plan_id != plan_id:
+        raise HTTPException(status_code=404, detail="Scenario not found for this plan")
+    return s
+
+
+def _build_response(plan: Plan, scenario: Scenario | None, db: Session) -> ProjectionResponse:
+    plan_input = _load_plan_input(plan, db)
+    if scenario is not None:
+        plan_input = apply_overrides(plan_input, scenario.overrides_json)
+    rows = simulate(plan_input)
+
+    final_nw = rows[-1].net_worth if rows else 0.0
+    peak = max(rows, key=lambda r: r.net_worth) if rows else None
+    first_shortfall = next(
+        (r.year for r in rows if r.had_shortfall),
+        None,
+    )
+    lifetime_tax = sum(r.total_tax + r.investment_tax for r in rows)
+
+    summary = ProjectionSummary(
+        plan_id=plan.id,
+        base_year=plan.base_year,
+        projection_years=plan.projection_years,
+        final_net_worth=round(final_nw, 2),
+        peak_net_worth=round(peak.net_worth if peak else 0.0, 2),
+        peak_net_worth_year=peak.year if peak else plan.base_year,
+        first_shortfall_year=first_shortfall,
+        total_lifetime_tax=round(lifetime_tax, 2),
+    )
+    return ProjectionResponse(
+        summary=summary,
+        years=[YearRowOut(**asdict(r)) for r in rows],
+    )
+
+
+@router.get("/plans/{plan_id}/projection", response_model=ProjectionResponse)
+def get_projection(
+    plan_id: int,
+    scenario_id: int | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProjectionResponse:
+    require_plan_access(plan_id, user, db, min_role="viewer")
+    plan = _load_plan(plan_id, db)
+    scenario = _load_scenario(plan_id, scenario_id, db)
+    return _build_response(plan, scenario, db)
+
+
+@router.get("/plans/{plan_id}/compare")
+def compare_projections(
+    plan_id: int,
+    a: int | None = Query(default=None, description="Scenario id for series A; null = base"),
+    b: int | None = Query(default=None, description="Scenario id for series B; null = base"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Run the simulator twice and return aligned results plus a per-year delta strip.
+
+    Either side may be `null` to use the base plan; passing the same scenario id
+    on both sides is allowed and produces a flat zero delta.
+    """
+    require_plan_access(plan_id, user, db, min_role="viewer")
+    plan = _load_plan(plan_id, db)
+    scen_a = _load_scenario(plan_id, a, db)
+    scen_b = _load_scenario(plan_id, b, db)
+    proj_a = _build_response(plan, scen_a, db)
+    proj_b = _build_response(plan, scen_b, db)
+
+    delta = [
+        {
+            "year": ya.year,
+            "net_worth_delta": round(yb.net_worth - ya.net_worth, 2),
+            "net_income_delta": round(yb.net_income_total - ya.net_income_total, 2),
+            "total_tax_delta": round(
+                (yb.total_tax + yb.investment_tax) - (ya.total_tax + ya.investment_tax), 2
+            ),
+            "expenses_delta": round(yb.expenses_total - ya.expenses_total, 2),
+        }
+        for ya, yb in zip(proj_a.years, proj_b.years)
+    ]
+    return {
+        "a": {"scenario_id": a, "scenario_name": scen_a.name if scen_a else "Base", "projection": proj_a},
+        "b": {"scenario_id": b, "scenario_name": scen_b.name if scen_b else "Base", "projection": proj_b},
+        "delta": delta,
+    }
+
+
+@router.get("/plans/{plan_id}/projection/montecarlo", response_model=MonteCarloResponse)
+def get_montecarlo(
+    plan_id: int,
+    n: int = Query(default=200, ge=10, le=1000, description="Number of simulation runs"),
+    scenario_id: int | None = Query(default=None),
+    seed: int | None = Query(default=None, description="Optional RNG seed for reproducible runs"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MonteCarloResponse:
+    """Run N perturbed simulations and return per-year net-worth percentile bands.
+
+    Each run perturbs asset growth rates and macro assumptions once (persistent
+    shock model). Returns p5 / p10 / p25 / p50 / p75 / p90 / p95 bands plus
+    the probability of at least one shortfall occurring across all runs.
+    """
+    require_plan_access(plan_id, user, db, min_role="viewer")
+    plan = _load_plan(plan_id, db)
+    scenario = _load_scenario(plan_id, scenario_id, db)
+    plan_input = _load_plan_input(plan, db)
+    if scenario is not None:
+        plan_input = apply_overrides(plan_input, scenario.overrides_json)
+
+    result = _mc.run(plan_input, n_runs=n, seed=seed)
+    return MonteCarloResponse(
+        runs=result.runs,
+        years=[
+            MonteCarloYearRow(
+                year=y.year,
+                p5=y.p5,
+                p10=y.p10,
+                p25=y.p25,
+                p50=y.p50,
+                p75=y.p75,
+                p90=y.p90,
+                p95=y.p95,
+            )
+            for y in result.years
+        ],
+        shortfall_probability=result.shortfall_probability,
+        median_final_net_worth=result.median_final_net_worth,
+    )

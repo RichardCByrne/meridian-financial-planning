@@ -1,0 +1,42 @@
+[project]
+name = "meridian-backend"
+version = "0.7.0"
+description = "Meridian — financial planning API (Ireland 2026 tax engine)"
+requires-python = ">=3.11"
+# Lower bounds tightened in v0.7 to current latest, so a fresh install picks up
+# all known security fixes. Keep these in sync with `pip list --outdated`.
+dependencies = [
+    "fastapi>=0.121",
+    "uvicorn[standard]>=0.40",
+    "sqlalchemy>=2.0.45",
+    "pydantic>=2.13.4",
+    "alembic>=1.18",
+    "python-dateutil>=2.9",
+    "firebase-admin>=7.0",
+    # psycopg (v3) for production Postgres on Cloud SQL. Local dev still uses SQLite.
+    "psycopg[binary]>=3.2",
+    "email-validator>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "httpx>=0.28",
+    "ruff>=0.14",
+    "pip-audit>=2.9",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["app/tests"]

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Local SQLite DB
+backend/meridian.db
+backend/meridian.db-journal
+# Legacy filename (pre-rename); kept ignored so old clones don't accidentally commit it.
+backend/voyant.db
+backend/voyant.db-journal
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Env files (use *.example for templates)
+.env
+.env.local
+.env.*.local
+
+# Local Alembic temp DBs
+backend/_alembic_baseline.db
+backend/_alembic_baseline.db-journal
+
+# Firebase tooling
+.firebase/
+
+# Cloud Build local artefacts
+build-logs/
+
+# Claude
+.claude/

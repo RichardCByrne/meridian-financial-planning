@@ -8,6 +8,9 @@ __pycache__/
 # Local SQLite DB
 backend/meridian.db
 backend/meridian.db-journal
+# Test SQLite DB (created by backend/conftest.py)
+backend/test_meridian.db
+backend/test_meridian.db-journal
 # Legacy filename (pre-rename); kept ignored so old clones don't accidentally commit it.
 backend/voyant.db
 backend/voyant.db-journal

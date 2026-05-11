@@ -549,7 +549,10 @@ function NarrativeSummary({
     }
   }
 
-  const peakSentence = `Peak net worth: ${peakStr} in ${summary.peak_net_worth_year}; final net worth ${finalStr} at ${finalYear}${suffix}.`;
+  const peakSentence =
+    summary.peak_net_worth_year === finalYear
+      ? `Net worth grows throughout, peaking at ${finalStr} in ${finalYear}${suffix}.`
+      : `Peak net worth: ${peakStr} in ${summary.peak_net_worth_year}; final net worth ${finalStr} at ${finalYear}${suffix}.`;
 
   const colors = {
     good: { bg: "#ecfdf5", border: "#10b981", icon: "✅" },
@@ -613,12 +616,17 @@ function SummaryStrip({
         label={`Net worth ${finalYear}${suffix}`}
         value={fmtMoney(deflate(summary.final_net_worth, finalYear))}
       />
+      {summary.peak_net_worth_year !== finalYear && (
+        <Stat
+          label={`Peak net worth${suffix}`}
+          value={fmtMoney(deflate(summary.peak_net_worth, summary.peak_net_worth_year))}
+          sub={`in ${summary.peak_net_worth_year}`}
+        />
+      )}
       <Stat
-        label={`Peak net worth${suffix}`}
-        value={fmtMoney(deflate(summary.peak_net_worth, summary.peak_net_worth_year))}
-        sub={`in ${summary.peak_net_worth_year}`}
+        label={`Lifetime tax${realMode ? " (nominal €)" : ""}`}
+        value={fmtMoney(summary.total_lifetime_tax)}
       />
-      <Stat label="Lifetime tax" value={fmtMoney(summary.total_lifetime_tax)} sub={realMode ? "nominal" : undefined} />
       <Stat
         label="First shortfall"
         value={summary.first_shortfall_year ? String(summary.first_shortfall_year) : "—"}
@@ -792,6 +800,13 @@ function YearDetailCard({
             />
           )}
           <Row label="Net worth" value={fy(row.net_worth)} bold />
+          {row.accessible_net_worth < row.net_worth - 1 && (
+            <Row
+              label="Accessible (ex-locked pensions)"
+              value={fy(row.accessible_net_worth)}
+              muted
+            />
+          )}
           {estateRows.length > 0 && (
             <>
               <h4 style={{ margin: "10px 0 4px 0", color: "#475569", fontSize: 13 }}>

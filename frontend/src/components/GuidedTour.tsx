@@ -147,6 +147,9 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
   const firstPlanId = plans && plans.length > 0 ? plans[0].id : null;
   const step = STEPS[idx];
   const isLast = idx === STEPS.length - 1;
+  // Step 1 ("Start with a plan") gates further pane steps: bodies describe
+  // panes only visible inside a plan, so block Next until a plan exists.
+  const needsPlanGate = idx === 1 && !firstPlanId;
 
   useEffect(() => {
     if (step.navigate) {
@@ -165,7 +168,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
         inset: 0,
         background: "rgba(15, 23, 42, 0.55)",
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: "center",
         justifyContent: "center",
         zIndex: 9000,
         padding: 16,
@@ -182,7 +185,6 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
           maxWidth: 480,
           width: "100%",
           boxShadow: "0 12px 40px rgba(15, 23, 42, 0.25)",
-          marginBottom: 24,
         }}
       >
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -207,6 +209,22 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
         </div>
         <h3 style={{ margin: "8px 0 6px 0" }}>{step.title}</h3>
         <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.5 }}>{step.body}</div>
+        {needsPlanGate && (
+          <p
+            style={{
+              fontSize: 13,
+              color: "#92400e",
+              background: "#fef3c7",
+              padding: "8px 10px",
+              borderRadius: 6,
+              marginTop: 10,
+              marginBottom: 0,
+            }}
+          >
+            Create a plan (or hit <strong>Try a sample plan</strong>) to continue — the next steps
+            walk through panes inside the plan.
+          </p>
+        )}
         <div
           style={{
             display: "flex",
@@ -249,11 +267,13 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               className="btn"
+              disabled={needsPlanGate}
               onClick={() => {
                 if (isLast) onClose();
                 else setIdx((i) => i + 1);
               }}
               style={{ fontSize: 13 }}
+              title={needsPlanGate ? "Create a plan first" : undefined}
             >
               {isLast ? "Got it" : "Next"}
             </button>

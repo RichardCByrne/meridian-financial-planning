@@ -1036,12 +1036,12 @@ function AddIncomeForm({
           />
         </div>
         <div className="field">
-          <label>Escalation</label>
+          <label>Escalation %</label>
           <input
             type="number"
-            step="0.005"
-            value={escalation}
-            onChange={(e) => setEscalation(Number(e.target.value))}
+            step="0.5"
+            value={escalation * 100}
+            onChange={(e) => setEscalation(Number(e.target.value) / 100)}
           />
         </div>
       </div>
@@ -1129,12 +1129,12 @@ function AddExpenseForm({ onSubmit }: { onSubmit: (payload: AddedExpense) => voi
               />
             </div>
             <div className="field">
-              <label>Escalation</label>
+              <label>Escalation %</label>
               <input
                 type="number"
-                step="0.005"
-                value={escalation}
-                onChange={(e) => setEscalation(Number(e.target.value))}
+                step="0.5"
+                value={escalation * 100}
+                onChange={(e) => setEscalation(Number(e.target.value) / 100)}
               />
             </div>
           </>

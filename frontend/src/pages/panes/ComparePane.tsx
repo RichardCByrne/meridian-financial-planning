@@ -27,6 +27,10 @@ export function ComparePane({ planId }: { planId: number }) {
   const [a, setA] = useState<number | null>(null); // null = base
   const [b, setB] = useState<number | null>(null);
   const { data, isLoading, error } = useCompare(planId, a, b);
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+
+  const opacityFor = (key: string) => (focusKey && focusKey !== key ? 0.2 : 1);
+  const widthFor = (key: string) => (focusKey === key ? 3 : 1.5);
 
   const series = useMemo(() => {
     if (!data) return [];
@@ -172,18 +176,29 @@ export function ComparePane({ planId }: { planId: number }) {
 
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Expenses & tax over time</h4>
+            <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+              Dotted lines = expenses. Solid lines = total tax (income + investment). Hover a
+              legend entry to focus its line.
+            </p>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={series} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtMoney(Number(v))} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} />
-                <Legend />
+                <Legend
+                  onMouseEnter={(o) =>
+                    setFocusKey(typeof o.dataKey === "string" ? o.dataKey : null)
+                  }
+                  onMouseLeave={() => setFocusKey(null)}
+                />
                 <Line
                   type="monotone"
                   dataKey="a_expenses"
                   stroke={COLOR_A}
                   strokeDasharray="4 4"
+                  strokeOpacity={opacityFor("a_expenses")}
+                  strokeWidth={widthFor("a_expenses")}
                   dot={false}
                   name={`${data.a.scenario_name} · expenses`}
                 />
@@ -192,6 +207,8 @@ export function ComparePane({ planId }: { planId: number }) {
                   dataKey="b_expenses"
                   stroke={COLOR_B}
                   strokeDasharray="4 4"
+                  strokeOpacity={opacityFor("b_expenses")}
+                  strokeWidth={widthFor("b_expenses")}
                   dot={false}
                   name={`${data.b.scenario_name} · expenses`}
                 />
@@ -199,6 +216,8 @@ export function ComparePane({ planId }: { planId: number }) {
                   type="monotone"
                   dataKey="a_tax"
                   stroke={COLOR_A}
+                  strokeOpacity={opacityFor("a_tax")}
+                  strokeWidth={widthFor("a_tax")}
                   dot={false}
                   name={`${data.a.scenario_name} · tax`}
                 />
@@ -206,6 +225,8 @@ export function ComparePane({ planId }: { planId: number }) {
                   type="monotone"
                   dataKey="b_tax"
                   stroke={COLOR_B}
+                  strokeOpacity={opacityFor("b_tax")}
+                  strokeWidth={widthFor("b_tax")}
                   dot={false}
                   name={`${data.b.scenario_name} · tax`}
                 />

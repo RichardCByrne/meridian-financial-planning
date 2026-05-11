@@ -155,54 +155,20 @@ Deferred: PDF export, AI walkthrough, AI chatbot.
 - **Schema is managed by `Base.metadata.create_all`** + lightweight ALTER TABLE in the FastAPI lifespan. Alembic comes in Phase 9.
 - **Inspired by Voyant AdviserGo, not affiliated with Voyant Inc.** No Voyant code or assets are included.
 
-## Production deploy (GCP)
+## Production deploy
 
-Meridian deploys as a single Cloud Run service (FastAPI + Alembic) backed by Cloud SQL Postgres, with the static frontend on Firebase Hosting. The `cloudbuild.yaml` and `firebase.json` configs are wired in this repo; you supply the GCP project and secrets.
+Meridian deploys as a single Cloud Run service (FastAPI + Alembic) backed by **Neon serverless Postgres** (free tier, autosuspends on idle), with the static frontend on Firebase Hosting. The `cloudbuild.yaml` and `firebase.json` configs are wired in this repo; you supply the GCP project, the Neon connection string, and the Firebase auth secrets.
 
-### One-time GCP setup
-1. Create a Firebase project (which is also a GCP project). Enable Authentication → Google + Email/Password.
-2. **Cloud SQL Postgres**: create a small instance (`db-f1-micro` for dev, `db-g1-small`+ for shared traffic). Note the connection name — it looks like `myproject:europe-west1:meridian-db`. Create a database (e.g. `meridian`) and a user.
-3. **Artifact Registry**: create a Docker repo (e.g. `meridian` in `europe-west1`).
-4. **Secret Manager**: create three secrets and grant the Cloud Run service account read access:
-   - `DATABASE_URL` → `postgresql+psycopg://USER:PASSWORD@/meridian?host=/cloudsql/PROJECT:REGION:INSTANCE`
-   - `FIREBASE_SERVICE_ACCOUNT_JSON` → contents of the service-account JSON (downloaded from Firebase console → Project Settings → Service Accounts)
-   - `ALLOWED_ORIGINS` → comma-separated list, e.g. `https://meridian.example.com`
-5. Enable the **Cloud SQL Admin API** and **Cloud Run API** for the project.
+**See [`DEPLOY.md`](./DEPLOY.md) for the full step-by-step walkthrough** — including prerequisites, Neon project setup, Firebase Auth wiring, Cloud Run deploy, frontend deploy, and a troubleshooting table. Cloud SQL Postgres is documented as an alternative in Appendix A of that file (one-line `DATABASE_URL` swap, no code change).
 
-### Backend deploy (Cloud Build → Cloud Run)
-```bash
-gcloud builds submit --config cloudbuild.yaml \
-  --substitutions \
-    _REGION=europe-west1,\
-_REPO=meridian,\
-_SERVICE=meridian-api,\
-_CLOUD_SQL_INSTANCE=PROJECT:europe-west1:meridian-db
+Quick reference for the impatient:
+```powershell
+# After §1-§5 of DEPLOY.md (project + Neon + Firebase + secrets created)
+gcloud builds submit --config cloudbuild.yaml `
+  --substitutions "_REGION=europe-west1,_REPO=meridian,_SERVICE=meridian-api"
+
+cd frontend; npm run build; firebase deploy --only hosting
 ```
-The build runs `alembic upgrade head` from the Dockerfile entrypoint, so each release migrates before serving.
-
-### Frontend deploy (Firebase Hosting)
-```bash
-cd frontend
-# Set production env (creates .env.production, gitignored).
-cat > .env.production <<EOF
-VITE_DEV_AUTH=false
-VITE_API_URL=https://meridian-api-XXXX-ew.a.run.app/api
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_APP_ID=...
-EOF
-
-npm run build
-firebase login            # one-time
-firebase use YOUR_PROJECT  # writes to .firebaserc
-firebase deploy --only hosting
-```
-
-### Verify
-- `curl https://YOUR_API/api/health` → `{"status":"ok","db":"ok"}` (or `503` if Cloud SQL is unreachable).
-- Sign in via the Firebase Hosting URL with Google; create a plan; confirm the chip in the sidebar shows your real name/email.
-- Check Cloud Run logs for `Phase 8 migration: assigned ... orphan plan(s)` — should be `0` on a fresh prod DB.
 
 ## Firebase setup (local dev with real Firebase Auth)
 

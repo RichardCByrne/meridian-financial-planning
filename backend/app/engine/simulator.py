@@ -193,6 +193,11 @@ class YearRow:
     estate_transfers: dict[int, float] = field(default_factory=dict)
     asset_contributions: float = 0.0
     had_shortfall: bool = False
+    # Net worth minus assets locked to a person's pre-retirement pension wrappers
+    # (prsa / occupational_pension / avc). ARF balances are always accessible since
+    # they only exist post-retirement and are drawn down automatically. Property,
+    # cash, investments stay accessible regardless of age.
+    accessible_net_worth: float = 0.0
 
 
 def _age_in_year(dob: date, year: int) -> int:
@@ -816,6 +821,28 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         debt_outstanding = sum(liability_snapshot.values())
         net_worth = sum(balances_snapshot.values()) - debt_outstanding
 
+        # Accessible net worth: subtract pension wrappers owned by anyone still
+        # pre-retirement this year. PRSA/occupational/AVC are inaccessible until
+        # the owner hits retirement_age (or 50/55 minimums in real Irish rules,
+        # but we follow the per-person retirement_age the user set). ARFs only
+        # exist post-retirement so always counted. Property is liquid via the
+        # liquidation order so kept in.
+        locked = 0.0
+        for aid, bal in balances_snapshot.items():
+            st = states[aid]
+            if st.kind not in ("prsa", "occupational_pension", "avc"):
+                continue
+            if st.owner is None:
+                continue
+            owner_age = ages.get(st.owner)
+            owner = next((p for p in plan.people if p.id == st.owner), None)
+            if owner_age is None or owner is None:
+                continue
+            retire_age = _retirement_age_for(owner, plan.assumptions.state_pension_age)
+            if owner_age < retire_age:
+                locked += bal
+        accessible_net_worth = net_worth - locked
+
         # ----- 7. Goal status for this year -----
         goal_status: dict[int, str] = {}
         for g in plan.goals:
@@ -831,7 +858,9 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             if g.kind == "retirement":
                 status = "achieved"
             elif g.kind == "net_worth":
-                status = "met" if net_worth >= g.target_amount else "below_target"
+                # Grade against accessible (non-locked-pension) net worth so a
+                # high PRSA balance doesn't falsely satisfy a pre-retirement target.
+                status = "met" if accessible_net_worth >= g.target_amount else "below_target"
             elif g.kind in _COST_BEARING_GOAL_KINDS:
                 status = "missed" if had_shortfall else "achieved"
             else:
@@ -858,6 +887,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 asset_balances_by_kind={k: round(v, 2) for k, v in balances_by_kind.items()},
                 withdrawals_by_asset={k: round(v, 2) for k, v in withdrawals.items()},
                 net_worth=round(net_worth, 2),
+                accessible_net_worth=round(accessible_net_worth, 2),
                 liability_balances=liability_snapshot,
                 debt_outstanding=round(debt_outstanding, 2),
                 investment_tax=round(investment_tax, 2),

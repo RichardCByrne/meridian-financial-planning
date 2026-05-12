@@ -205,8 +205,12 @@ def _adopt_orphan_plans() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     register_all_models()
-    Base.metadata.create_all(bind=engine)
-    _apply_lightweight_migrations()
+    # SQLite dev path only. Production runs alembic upgrade head from the
+    # Dockerfile entrypoint; running create_all + stamp again on Postgres can
+    # stall the lifespan past Cloud Run's startup probe budget.
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(bind=engine)
+        _apply_lightweight_migrations()
     _seed_official_tax_config()
     _adopt_orphan_plans()
     yield

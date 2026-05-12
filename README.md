@@ -2,6 +2,8 @@
 
 A financial-planning app with an **Ireland 2026** tax/pension engine. Inspired by Voyant AdviserGo. Currently single-user / local; multi-user with shared plans and Cloud Run deployment is the next phase.
 
+**Repository:** https://github.com/RichardCByrne/meridian-financial-planning
+
 ## Status: Phase 13 complete — Monte Carlo probability bands
 
 Phase 12 added CAT / inheritance modelling. Phase 13 adds probabilistic outcomes via Monte Carlo. A new `engine/montecarlo.py` module wraps `simulate()` and runs N independent simulations (default 200), each time applying a once-per-run Gaussian shock to every asset's growth rate (σ by asset kind: 12% for equities/ETFs, 10% for pensions, 6% for property, 0% for cash) and to the household's inflation and earnings-growth assumptions. Per-year net-worth values are collected across all runs and the 5th/10th/25th/50th/75th/90th/95th percentiles are returned alongside the probability of at least one shortfall occurring. The new `GET /plans/{id}/projection/montecarlo?n=200` endpoint accepts 10–1,000 runs and respects scenario overrides. The Let's See chart gains a **Probability bands** toggle: when active it switches to a fan chart (stacked Area layers p5→p25→p75→p95 with two shades of blue) overlaid with a median line and the original deterministic dashed line. Two new summary stats appear: median final net worth and shortfall probability. The MC query is cached for 60 seconds (re-running on demand is expensive). **132/132 backend tests passing**. Phase 14 (AI walkthrough) is next.
@@ -32,7 +34,7 @@ Roadmap: Phase 8 (Firebase Auth + multi-user backbone), Phase 9 (Postgres + Alem
 - **Python 3.11+** (tested on 3.14.2).
 - **Node.js 18.x with npm** (tested on v18.6.0).
 
-> **Note:** `nvm` users — make sure your active Node has npm bundled. Node 25.x as installed on this machine ships without npm, so the dev runner uses Node 18 explicitly.
+> **Note:** `fnm` users — make sure your active Node has npm bundled. Node 25.x as installed on this machine ships without npm, so the dev runner uses Node 18 explicitly via `fnm`.
 
 ## First-time setup
 

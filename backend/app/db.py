@@ -30,6 +30,14 @@ if _legacy.exists() and not DB_PATH.exists():
 # Cloud SQL connection URL (postgresql+psycopg://user:pass@/db?host=/cloudsql/...).
 DATABASE_URL = os.environ.get("DATABASE_URL") or f"sqlite:///{DB_PATH}"
 
+# Force psycopg v3 driver for any bare postgres URL. Neon's copy-paste URL is
+# `postgresql://...` which SQLAlchemy maps to the legacy `psycopg2` driver — not
+# installed (we ship `psycopg[binary]` v3 in pyproject.toml).
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
+
 # SQLite needs check_same_thread=False because FastAPI dependency injection
 # may pass the session across threads. Postgres has no such requirement.
 _connect_args: dict = (

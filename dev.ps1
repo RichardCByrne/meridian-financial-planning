@@ -8,10 +8,21 @@ $root = $PSScriptRoot
 $backend = Join-Path $root "backend"
 $frontend = Join-Path $root "frontend"
 
-# Use Node 18 from nvm if available — Node 25.x on this machine ships without npm.
-$node18 = "C:\Users\Richard\AppData\Roaming\nvm\v18.6.0"
-if (Test-Path $node18) {
-    $env:Path = "$node18;$env:Path"
+# Use latest installed Node LTS from fnm.
+$fnmCmd = Get-Command fnm -ErrorAction SilentlyContinue
+if (-not $fnmCmd) {
+    $fnmCandidates = @(
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Schniz.fnm_Microsoft.Winget.Source_8wekyb3d8bbwe\fnm.exe",
+        "$env:LOCALAPPDATA\fnm\fnm.exe"
+    )
+    $fnmPath = $fnmCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($fnmPath) { $fnmCmd = Get-Command $fnmPath }
+}
+if ($fnmCmd) {
+    & $fnmCmd.Source env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+    & $fnmCmd.Source use lts-latest | Out-Null
+} else {
+    Write-Warning "fnm not found on PATH - falling back to system node."
 }
 
 Write-Host "Starting backend on http://127.0.0.1:8000 ..." -ForegroundColor Cyan

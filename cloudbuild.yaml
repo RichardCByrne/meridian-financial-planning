@@ -5,8 +5,6 @@
 #   _REGION                — e.g. europe-west1
 #   _REPO                  — Artifact Registry repo name (e.g. meridian)
 #   _SERVICE               — Cloud Run service name (e.g. meridian-api)
-#   _CLOUD_SQL_INSTANCE    — fully-qualified Cloud SQL connection name
-#                            (PROJECT:REGION:INSTANCE)
 #
 # Secrets pulled from Secret Manager at deploy-time:
 #   DATABASE_URL                   — postgresql+psycopg://USER:PASS@/DB?host=/cloudsql/<inst>
@@ -20,7 +18,7 @@ steps:
     args:
       - build
       - --tag
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
       - --tag
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
       - backend
@@ -41,11 +39,10 @@ steps:
       - run
       - deploy
       - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
       - --region=${_REGION}
       - --platform=managed
       - --allow-unauthenticated
-      - --add-cloudsql-instances=${_CLOUD_SQL_INSTANCE}
       - --set-env-vars=MERIDIAN_DEV_AUTH=false,FIREBASE_SERVICE_ACCOUNT_PATH=/secrets/firebase.json
       - --set-secrets=DATABASE_URL=DATABASE_URL:latest,ALLOWED_ORIGINS=ALLOWED_ORIGINS:latest
       - --set-secrets=/secrets/firebase.json=FIREBASE_SERVICE_ACCOUNT_JSON:latest
@@ -55,8 +52,13 @@ steps:
       - --min-instances=0
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+substitutions:
+  _REGION: europe-west1
+  _REPO: meridian-financial-planning
+  _SERVICE: meridian-api
 
 options:
   logging: CLOUD_LOGGING_ONLY

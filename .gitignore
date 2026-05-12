@@ -37,6 +37,8 @@ backend/_alembic_baseline.db-journal
 
 # Firebase tooling
 .firebase/
+meridian-financial-planner-firebase-adminsdk-fbsvc-a0e3390895.json
+firebase-config.json
 
 # Cloud Build local artefacts
 build-logs/

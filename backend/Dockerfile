@@ -41,4 +41,4 @@ USER meridian
 EXPOSE 8000
 
 # Run migrations, then start the app. `exec` lets SIGTERM from Cloud Run reach uvicorn.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -120,7 +120,7 @@ gcloud services enable `
    const firebaseConfig = {
      apiKey: "AIza…",
      authDomain: "meridian-prod.firebaseapp.com",
-     projectId: "meridian-prod",
+     projectId: "meridian-financial-planner",
      appId: "1:1234:web:abcdef",
      // …
    };

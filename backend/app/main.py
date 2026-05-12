@@ -164,16 +164,18 @@ def _seed_official_tax_config() -> None:
     from sqlalchemy import select
 
     with SessionLocal() as db:
-        existing = db.execute(
+        rows = db.execute(
             select(TaxConfigRow).where(
                 TaxConfigRow.is_official.is_(True),
                 TaxConfigRow.name == IRELAND_2026_OFFICIAL.name,
-            )
-        ).scalar_one_or_none()
-        if existing is not None:
-            # Refresh the JSON payload so a constant tweak (e.g. PRSI rate change)
-            # propagates to existing deployments without manual intervention.
-            existing.config_json = IRELAND_2026_OFFICIAL.to_dict()
+            ).order_by(TaxConfigRow.id)
+        ).scalars().all()
+        if rows:
+            # Keep the oldest row, drop any duplicates from earlier crashed boots.
+            keeper, *dupes = rows
+            for d in dupes:
+                db.delete(d)
+            keeper.config_json = IRELAND_2026_OFFICIAL.to_dict()
             db.commit()
             return
         db.add(

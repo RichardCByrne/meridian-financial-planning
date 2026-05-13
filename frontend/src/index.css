@@ -8,6 +8,10 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -15,6 +19,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 a {
@@ -247,6 +252,7 @@ th {
   background: #f8fafc;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
+  touch-action: none;
 }
 
 @keyframes meridian-skeleton {
@@ -276,8 +282,23 @@ th {
     flex-wrap: wrap;
   }
   .field input,
-  .field select {
+  .field select,
+  .field textarea {
     width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  button,
+  .btn {
+    min-height: 44px;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+  .helptip-bubble {
+    max-width: min(280px, calc(100vw - 24px));
   }
   table {
     font-size: 13px;
@@ -285,6 +306,18 @@ th {
   th,
   td {
     padding: 6px 4px;
+  }
+}
+
+@media (max-width: 375px) {
+  body {
+    font-size: 15px;
+  }
+  .main {
+    padding: 12px;
+  }
+  .card {
+    padding: 12px;
   }
 }
 

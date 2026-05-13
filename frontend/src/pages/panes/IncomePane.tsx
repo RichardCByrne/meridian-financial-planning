@@ -12,6 +12,8 @@ import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { JargonTerm } from "../../components/JargonTerm";
 import { NumericInput } from "../../components/NumericInput";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { fmtMoney, fmtPctDisplay } from "../../lib/format";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
@@ -171,88 +173,94 @@ function PersonIncomeBlock({
         />
       )}
       {data && data.length > 0 && (
-        <table style={{ marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Gross / yr</th>
-              <th>Years</th>
-              <th>Escal.</th>
-              <th>
-                Pension %
-                <HelpTip>
-                  Employee pension contribution as a % of gross. Tax-relievable up to age-based caps
-                  (15% under 30 → 40% age 60+) and the €115k earnings cap.
-                </HelpTip>
-              </th>
-              <th>
-                Employer %
-                <HelpTip>
-                  Employer's contribution to the pension wrapper, on top of yours. Doesn't reduce
-                  your taxable income, doesn't count against the employee's age cap (but does count
-                  toward the Standard Fund Threshold).
-                </HelpTip>
-              </th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((i) =>
-              editingId === i.id ? (
-                <tr key={i.id}>
-                  <td colSpan={8}>
-                    <FormFields form={editForm} setForm={setEditForm} />
-                    <div className="row" style={{ marginTop: 8 }}>
-                      <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                        Save
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setEditingId(null)}
-                        type="button"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={i.id}>
-                  <td>{i.name}</td>
-                  <td className="muted">{KINDS.find((k) => k.value === i.kind)?.label ?? i.kind}</td>
-                  <td>{fmtMoney(i.gross_amount)}</td>
-                  <td>
-                    {i.start_year}
-                    {i.end_year ? `–${i.end_year}` : "→"}
-                  </td>
-                  <td>{fmtPctDisplay(i.escalation_rate)}</td>
-                  <td>
-                    {i.pension_contribution_pct > 0 ? fmtPctDisplay(i.pension_contribution_pct) : "—"}
-                  </td>
-                  <td>
-                    {i.employer_pension_contribution_pct > 0
-                      ? fmtPctDisplay(i.employer_pension_contribution_pct)
-                      : "—"}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ marginRight: 6 }}
-                      onClick={() => setEditingId(i.id)}
-                    >
-                      Edit
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => softDelete(i, i.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ),
+        <div style={{ marginTop: 12 }}>
+          <ResponsiveTable<IncomeSource>
+            rows={data}
+            getKey={(i) => i.id}
+            cardTitle={(i) => i.name}
+            columns={[
+              { header: "Name", cell: (i) => i.name, hideOnMobile: true },
+              {
+                header: "Type",
+                cell: (i) => (
+                  <span className="muted">
+                    {KINDS.find((k) => k.value === i.kind)?.label ?? i.kind}
+                  </span>
+                ),
+              },
+              { header: "Gross / yr", cell: (i) => fmtMoney(i.gross_amount) },
+              {
+                header: "Years",
+                cell: (i) => `${i.start_year}${i.end_year ? `–${i.end_year}` : "→"}`,
+              },
+              { header: "Escal.", cell: (i) => fmtPctDisplay(i.escalation_rate) },
+              {
+                header: "Pension %",
+                cell: (i) =>
+                  i.pension_contribution_pct > 0
+                    ? fmtPctDisplay(i.pension_contribution_pct)
+                    : "—",
+                thExtra: (
+                  <HelpTip>
+                    Employee pension contribution as a % of gross. Tax-relievable up to age-based caps
+                    (15% under 30 → 40% age 60+) and the €115k earnings cap.
+                  </HelpTip>
+                ),
+              },
+              {
+                header: "Employer %",
+                cell: (i) =>
+                  i.employer_pension_contribution_pct > 0
+                    ? fmtPctDisplay(i.employer_pension_contribution_pct)
+                    : "—",
+                thExtra: (
+                  <HelpTip>
+                    Employer's contribution to the pension wrapper, on top of yours. Doesn't reduce
+                    your taxable income, doesn't count against the employee's age cap (but does count
+                    toward the Standard Fund Threshold).
+                  </HelpTip>
+                ),
+              },
+            ]}
+            renderActions={(i) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(i.id)}
+                >
+                  Edit
+                </button>
+                <button className="btn btn-secondary" onClick={() => softDelete(i, i.id)}>
+                  Remove
+                </button>
+              </>
             )}
-          </tbody>
-        </table>
+          />
+        </div>
       )}
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit income"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields form={editForm} setForm={setEditForm} />
+      </EditModal>
     </div>
   );
 }

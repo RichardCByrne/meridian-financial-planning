@@ -12,6 +12,8 @@ import type { Bequest, BequestCreate, CatGroup } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { JargonTerm } from "../../components/JargonTerm";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 import { fmtMoney as fmt, fmtPctDisplay } from "../../lib/format";
 
@@ -141,137 +143,53 @@ export function LegacyPane({ planId }: { planId: number }) {
             )}
 
             {myBequests.length > 0 && (
-              <table style={{ marginBottom: 12 }}>
-                <thead>
-                  <tr>
-                    <th>To</th>
-                    <th>Share</th>
-                    <th><JargonTerm term="CAT" /> group</th>
-                    <th>Notes</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myBequests.map((b) =>
-                    editingId === b.id ? (
-                      <tr key={b.id}>
-                        <td>
-                          <select
-                            value={editDraft.to_person_id ?? ""}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({
-                                ...d,
-                                to_person_id: e.target.value === "" ? null : Number(e.target.value),
-                              }))
-                            }
-                            style={{ padding: "3px 6px" }}
-                          >
-                            <option value="">External</option>
-                            {people
-                              .filter((p) => p.id !== person.id)
-                              .map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}
-                                </option>
-                              ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={editDraft.share_pct ?? b.share_pct}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, share_pct: Number(e.target.value) }))
-                            }
-                            style={{ width: 70, padding: "3px 6px" }}
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={editDraft.cat_group ?? b.cat_group}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({
-                                ...d,
-                                cat_group: e.target.value as CatGroup,
-                              }))
-                            }
-                            style={{ padding: "3px 6px" }}
-                          >
-                            {CAT_GROUP_OPTIONS.map((g) => (
-                              <option key={g} value={g}>
-                                {g}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={editDraft.notes ?? (b.notes || "")}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, notes: e.target.value || null }))
-                            }
-                            style={{ padding: "3px 6px", width: 160 }}
-                          />
-                        </td>
-                        <td>
-                          <div className="row" style={{ gap: 4 }}>
-                            <button className="btn" onClick={onSaveEdit}>
-                              Save
-                            </button>
-                            <button
-                              className="btn btn-secondary"
-                              onClick={() => {
-                                setEditingId(null);
-                                setEditDraft({});
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={b.id}>
-                        <td>{personName(b.to_person_id)}</td>
-                        <td>{fmtPctDisplay(b.share_pct)}</td>
-                        <td title={CAT_GROUP_LABELS[b.cat_group as CatGroup]}>
-                          {b.cat_group}
-                        </td>
-                        <td className="muted">{b.notes || "—"}</td>
-                        <td>
-                          <div className="row" style={{ gap: 4 }}>
-                            <button
-                              className="btn btn-secondary"
-                              onClick={() => {
-                                setEditingId(b.id);
-                                setEditDraft({
-                                  to_person_id: b.to_person_id,
-                                  share_pct: b.share_pct,
-                                  cat_group: b.cat_group as CatGroup,
-                                  notes: b.notes,
-                                });
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ color: "#dc2626" }}
-                              onClick={() => softDelete(b, b.id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
+              <div style={{ marginBottom: 12 }}>
+                <ResponsiveTable<Bequest>
+                  rows={myBequests}
+                  getKey={(b) => b.id}
+                  cardTitle={(b) => personName(b.to_person_id)}
+                  columns={[
+                    { header: "To", cell: (b) => personName(b.to_person_id), hideOnMobile: true },
+                    { header: "Share", cell: (b) => fmtPctDisplay(b.share_pct) },
+                    {
+                      header: "CAT group",
+                      cell: (b) => (
+                        <span title={CAT_GROUP_LABELS[b.cat_group as CatGroup]}>{b.cat_group}</span>
+                      ),
+                    },
+                    {
+                      header: "Notes",
+                      cell: (b) => <span className="muted">{b.notes || "—"}</span>,
+                    },
+                  ]}
+                  renderActions={(b) => (
+                    <>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ marginRight: 6 }}
+                        onClick={() => {
+                          setEditingId(b.id);
+                          setEditDraft({
+                            to_person_id: b.to_person_id,
+                            share_pct: b.share_pct,
+                            cat_group: b.cat_group as CatGroup,
+                            notes: b.notes,
+                          });
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ color: "#dc2626" }}
+                        onClick={() => softDelete(b, b.id)}
+                      >
+                        Delete
+                      </button>
+                    </>
                   )}
-                </tbody>
-              </table>
+                />
+              </div>
             )}
 
             {/* Add new bequest form for this person */}
@@ -378,6 +296,110 @@ export function LegacyPane({ planId }: { planId: number }) {
           />
         </div>
       )}
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => {
+          setEditingId(null);
+          setEditDraft({});
+        }}
+        title="Edit bequest"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setEditingId(null);
+                setEditDraft({});
+              }}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={updateBequest.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        {editingId !== null && (() => {
+          const editing = bequests.find((b) => b.id === editingId);
+          if (!editing) return null;
+          const fromPerson = people.find((p) => p.id === editing.from_person_id);
+          return (
+            <div>
+              <p className="muted" style={{ margin: "0 0 12px" }}>
+                From <strong>{fromPerson?.name ?? "—"}</strong>
+              </p>
+              <div className="field">
+                <label>To</label>
+                <select
+                  value={editDraft.to_person_id ?? ""}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({
+                      ...d,
+                      to_person_id: e.target.value === "" ? null : Number(e.target.value),
+                    }))
+                  }
+                >
+                  <option value="">External</option>
+                  {people
+                    .filter((p) => p.id !== editing.from_person_id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Share (0–1)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={editDraft.share_pct ?? editing.share_pct}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({ ...d, share_pct: Number(e.target.value) }))
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>
+                  <JargonTerm term="CAT" /> group
+                </label>
+                <select
+                  value={editDraft.cat_group ?? editing.cat_group}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({
+                      ...d,
+                      cat_group: e.target.value as CatGroup,
+                    }))
+                  }
+                >
+                  {CAT_GROUP_OPTIONS.map((g) => (
+                    <option key={g} value={g}>
+                      {CAT_GROUP_LABELS[g]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Notes</label>
+                <input
+                  type="text"
+                  value={editDraft.notes ?? (editing.notes || "")}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({ ...d, notes: e.target.value || null }))
+                  }
+                />
+              </div>
+            </div>
+          );
+        })()}
+      </EditModal>
     </div>
   );
 }

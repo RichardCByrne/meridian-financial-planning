@@ -11,6 +11,8 @@ import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { fmtPctDisplay } from "../../lib/format";
 import { NumericInput } from "../../components/NumericInput";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { TableSkeleton } from "../../components/Skeleton";
 import { fmtMoney } from "../../lib/format";
 import { useSoftDelete } from "../../lib/useSoftDelete";
@@ -141,78 +143,79 @@ export function ExpensesPane({ planId }: { planId: number }) {
           />
         )}
         {data && data.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>
-                  Category
+          <ResponsiveTable<Expense>
+            rows={data}
+            getKey={(e) => e.id}
+            cardTitle={(e) => e.name}
+            columns={[
+              { header: "Name", cell: (e) => e.name, hideOnMobile: true },
+              {
+                header: "Category",
+                cell: (e) => (
+                  <span className="muted">
+                    {CATEGORIES.find((c) => c.value === e.category)?.label ?? e.category}
+                  </span>
+                ),
+                thExtra: (
                   <HelpTip>
                     Basic = essentials (rent, food). Discretionary = lifestyle (holidays).
                     Single-year = one-off (car). Legacy = gifts/charity.
                   </HelpTip>
-                </th>
-                <th>Amount / yr</th>
-                <th>Years</th>
-                <th>Esc.</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((e) =>
-                editingId === e.id ? (
-                  <tr key={e.id}>
-                    <td colSpan={6}>
-                      <FormFields form={editForm} setForm={setEditForm} />
-                      <div className="row" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                          Save
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setEditingId(null)}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={e.id}>
-                    <td>{e.name}</td>
-                    <td className="muted">
-                      {CATEGORIES.find((c) => c.value === e.category)?.label ?? e.category}
-                    </td>
-                    <td>{fmtMoney(e.amount)}</td>
-                    <td>
-                      {e.start_year}
-                      {e.category === "single_year"
-                        ? ""
-                        : e.end_year
-                        ? `–${e.end_year}`
-                        : "→"}
-                    </td>
-                    <td>{fmtPctDisplay(e.escalation_rate)}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ marginRight: 6 }}
-                        onClick={() => setEditingId(e.id)}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => softDelete(e, e.id)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
                 ),
-              )}
-            </tbody>
-          </table>
+              },
+              { header: "Amount / yr", cell: (e) => fmtMoney(e.amount) },
+              {
+                header: "Years",
+                cell: (e) =>
+                  `${e.start_year}${
+                    e.category === "single_year"
+                      ? ""
+                      : e.end_year
+                      ? `–${e.end_year}`
+                      : "→"
+                  }`,
+              },
+              { header: "Esc.", cell: (e) => fmtPctDisplay(e.escalation_rate) },
+            ]}
+            renderActions={(e) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(e.id)}
+                >
+                  Edit
+                </button>
+                <button className="btn btn-secondary" onClick={() => softDelete(e, e.id)}>
+                  Remove
+                </button>
+              </>
+            )}
+          />
         )}
       </div>
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit expense"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields form={editForm} setForm={setEditForm} />
+      </EditModal>
     </div>
   );
 }

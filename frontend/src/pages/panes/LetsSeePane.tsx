@@ -28,6 +28,7 @@ import type { Goal, MonteCarloResponse, YearRow } from "../../api/types";
 import { fmtMoney } from "../../lib/format";
 import { JargonTerm } from "../../components/JargonTerm";
 import { ChartSkeleton } from "../../components/Skeleton";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 type ChartKind = "net_worth" | "cash_flow" | "income_vs_expenses" | "tax";
 
@@ -51,6 +52,8 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const { data: people } = usePeople(planId);
   const { data: goals } = useGoals(planId);
   const { data: assets } = useAssets(planId);
+  const isMobile = useIsMobile();
+  const tooltipTrigger = isMobile ? "click" : "hover";
   const [chart, setChart] = useState<ChartKind>("net_worth");
   const [hoverYear, setHoverYear] = useState<number | null>(null);
   const [showMonteCarlo, setShowMonteCarlo] = useState(false);
@@ -297,7 +300,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
           <GoalStrip goals={goals} years={data.years} />
         )}
 
-        <div style={{ height: 380, marginTop: 12 }}>
+        <div style={{ height: isMobile ? 240 : 380, marginTop: 12 }}>
           <ResponsiveContainer width="100%" height="100%">
             {chart === "net_worth" ? (
               showMonteCarlo && mcData ? (
@@ -310,6 +313,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip
+                    trigger={tooltipTrigger}
                     content={<McTooltip mcData={mcData} deflate={deflate} />}
                     labelFormatter={(l) => `Year ${l}`}
                   />
@@ -339,7 +343,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
-                  <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
+                  <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                   <Area
                     type="monotone"
                     dataKey="net_worth"

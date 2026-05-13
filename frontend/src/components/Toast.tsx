@@ -71,13 +71,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         style={{
           position: "fixed",
-          bottom: 16,
+          bottom: "calc(16px + env(safe-area-inset-bottom))",
           right: 16,
+          left: 16,
           display: "flex",
           flexDirection: "column-reverse",
+          alignItems: "flex-end",
           gap: 8,
           zIndex: 9999,
           maxWidth: "calc(100vw - 32px)",
+          pointerEvents: "none",
         }}
         aria-live="polite"
       >
@@ -109,9 +112,10 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         display: "flex",
         gap: 12,
         alignItems: "center",
-        minWidth: 260,
+        minWidth: 0,
         maxWidth: 420,
         fontSize: 13,
+        pointerEvents: "auto",
       }}
     >
       <span style={{ flex: 1 }}>{toast.message}</span>

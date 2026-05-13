@@ -98,7 +98,7 @@ export function LegacyPane({ planId }: { planId: number }) {
 
   return (
     <div>
-      <div className="card">
+      <div className="card pane-intro-card">
         <h3 style={{ marginTop: 0 }}>
           Legacy &amp; inheritance
           <HelpTip>
@@ -108,7 +108,7 @@ export function LegacyPane({ planId }: { planId: number }) {
             the "exempt" group for a spouse — no CAT regardless of amount.
           </HelpTip>
         </h3>
-        <p className="muted" style={{ marginTop: 0 }}>
+        <p className="muted pane-intro-prose" style={{ marginTop: 0 }}>
           Allocate shares of each person's projected estate to beneficiaries. Unallocated shares
           leave the plan. Internal beneficiaries (people in this plan) receive the net amount after{" "}
           <JargonTerm term="CAT" />; external beneficiaries remove the value from the plan entirely.

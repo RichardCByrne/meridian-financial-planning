@@ -116,7 +116,7 @@ export function ScenariosPane({ planId }: { planId: number }) {
 
   return (
     <div>
-      <div className="card">
+      <div className="card pane-intro-card">
         <h3 style={{ marginTop: 0 }}>
           Scenarios
           <HelpTip>
@@ -124,7 +124,7 @@ export function ScenariosPane({ planId }: { planId: number }) {
             scenarios on the Compare tab to see the impact on net worth and tax.
           </HelpTip>
         </h3>
-        <p className="muted">
+        <p className="muted pane-intro-prose">
           Two ways to diverge from the base plan:
           <br />
           <strong>1. Override an existing field</strong> (e.g. retire 5 years earlier; change inflation

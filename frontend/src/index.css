@@ -333,19 +333,19 @@ th {
 }
 
 @media (max-width: 720px) {
-  html,
+  html {
+    overflow-x: clip;
+  }
   body {
-    overflow-x: hidden;
+    overflow-x: clip;
   }
   .app-shell {
     grid-template-columns: 1fr;
     max-width: 100vw;
-    overflow-x: hidden;
   }
   .main {
     min-width: 0;
     max-width: 100%;
-    overflow-x: hidden;
   }
   .card {
     min-width: 0;
@@ -441,6 +441,20 @@ th {
   th,
   td {
     padding: 6px 4px;
+  }
+}
+
+@media (max-width: 720px) {
+  .pane-intro-prose {
+    display: none;
+  }
+  .pane-intro-card {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .pane-intro-card h3 {
+    margin-bottom: 0;
+    font-size: 15px;
   }
 }
 

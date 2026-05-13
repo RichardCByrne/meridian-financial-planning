@@ -16,6 +16,7 @@ import {
 
 import { useCompare, useScenarios } from "../../api/hooks";
 import { fmtMoney } from "../../lib/format";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 const COLOR_A = "#2563eb";
 const COLOR_B = "#7c3aed";
@@ -28,9 +29,24 @@ export function ComparePane({ planId }: { planId: number }) {
   const [b, setB] = useState<number | null>(null);
   const { data, isLoading, error } = useCompare(planId, a, b);
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [stickyFocus, setStickyFocus] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  const tooltipTrigger = isMobile ? "click" : "hover";
+  const activeFocus = stickyFocus ?? focusKey;
 
-  const opacityFor = (key: string) => (focusKey && focusKey !== key ? 0.2 : 1);
-  const widthFor = (key: string) => (focusKey === key ? 3 : 1.5);
+  const opacityFor = (key: string) => (activeFocus && activeFocus !== key ? 0.2 : 1);
+  const widthFor = (key: string) => (activeFocus === key ? 3 : 1.5);
+
+  const legendKey = (o: { dataKey?: unknown }): string | null =>
+    typeof o.dataKey === "string" ? o.dataKey : null;
+  const onLegendClick = (o: { dataKey?: unknown }) => {
+    const k = legendKey(o);
+    setStickyFocus((prev) => (prev === k ? null : k));
+  };
+  const onLegendPointerEnter = (o: { dataKey?: unknown }) => {
+    setFocusKey(legendKey(o));
+  };
+  const onLegendPointerLeave = () => setFocusKey(null);
 
   const series = useMemo(() => {
     if (!data) return [];
@@ -126,12 +142,12 @@ export function ComparePane({ planId }: { planId: number }) {
         <>
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Net worth</h4>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={isMobile ? 220 : 300}>
               <LineChart data={series} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtMoney(Number(v))} />
-                <Tooltip formatter={(v) => fmtMoney(Number(v))} />
+                <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -155,12 +171,12 @@ export function ComparePane({ planId }: { planId: number }) {
 
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Net-worth delta (B − A)</h4>
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={isMobile ? 110 : 140}>
               <BarChart data={series} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtMoney(Number(v))} />
-                <Tooltip formatter={(v) => fmtMoney(Number(v))} />
+                <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} />
                 <ReferenceLine y={0} stroke="#94a3b8" />
                 <Bar dataKey="net_worth_delta" name="Delta">
                   {series.map((s) => (
@@ -177,20 +193,19 @@ export function ComparePane({ planId }: { planId: number }) {
           <div className="card">
             <h4 style={{ marginTop: 0 }}>Expenses & tax over time</h4>
             <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
-              Dotted lines = expenses. Solid lines = total tax (income + investment). Hover a
-              legend entry to focus its line.
+              Dotted lines = expenses. Solid lines = total tax (income + investment). Tap (or
+              hover) a legend entry to focus its line; tap again to clear.
             </p>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
               <LineChart data={series} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
                 <CartesianGrid stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtMoney(Number(v))} />
-                <Tooltip formatter={(v) => fmtMoney(Number(v))} />
+                <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} />
                 <Legend
-                  onMouseEnter={(o) =>
-                    setFocusKey(typeof o.dataKey === "string" ? o.dataKey : null)
-                  }
-                  onMouseLeave={() => setFocusKey(null)}
+                  onClick={onLegendClick}
+                  onPointerEnter={onLegendPointerEnter}
+                  onPointerLeave={onLegendPointerLeave}
                 />
                 <Line
                   type="monotone"

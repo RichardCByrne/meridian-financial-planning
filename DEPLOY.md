@@ -394,6 +394,94 @@ gcloud run services update-traffic $SERVICE --region=$REGION --to-revisions=<PRE
 
 ---
 
+## 12. CI/CD via GitHub Actions
+
+`.github/workflows/deploy.yml` ships both sides on every successful `Tests + audits` run on `main`, with a manual `workflow_dispatch` button (target = `both` | `backend` | `frontend`) for re-deploys.
+
+Auth uses **Workload Identity Federation** — no JSON keys in GitHub Secrets.
+
+### 12.1. One-time GCP setup
+
+```powershell
+$PROJECT_ID     = "meridian-financial-planner"
+$PROJECT_NUMBER = gcloud projects describe $PROJECT_ID --format="value(projectNumber)"
+$REPO           = "RichardCByrne/meridian-financial-planning"
+$SA             = "gh-actions-deploy@$PROJECT_ID.iam.gserviceaccount.com"
+
+# 1. Service account
+gcloud iam service-accounts create gh-actions-deploy --display-name="GitHub Actions deploy"
+
+# 2. Roles (least-privilege for Cloud Build + Cloud Run + Firebase Hosting)
+foreach ($role in @(
+  "roles/run.admin",
+  "roles/cloudbuild.builds.editor",
+  "roles/iam.serviceAccountUser",
+  "roles/storage.admin",
+  "roles/artifactregistry.writer",
+  "roles/firebasehosting.admin",
+  "roles/firebase.viewer"
+)) {
+  gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:$SA" --role=$role
+}
+
+# 3. Workload Identity Pool + Provider
+gcloud iam workload-identity-pools create github-pool --location=global --display-name="GitHub Actions"
+gcloud iam workload-identity-pools providers create-oidc github-provider `
+  --location=global --workload-identity-pool=github-pool `
+  --display-name="GitHub OIDC" `
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" `
+  --attribute-condition="assertion.repository == '$REPO'" `
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+# 4. Bind GH repo → SA impersonation
+$POOL = "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool"
+gcloud iam service-accounts add-iam-policy-binding $SA `
+  --role=roles/iam.workloadIdentityUser `
+  --member="principalSet://iam.googleapis.com/$POOL/attribute.repository/$REPO"
+
+# 5. Print the values to paste into GitHub
+"WIF_PROVIDER = projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+"WIF_SERVICE_ACCOUNT = $SA"
+```
+
+### 12.2. GitHub configuration
+
+Repo → **Settings → Secrets and variables → Actions**.
+
+**Secrets** (sensitive):
+
+| Name                  | Value                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `WIF_PROVIDER`        | The full `projects/.../providers/github-provider` string from §12.1 step 5                         |
+| `WIF_SERVICE_ACCOUNT` | `gh-actions-deploy@meridian-financial-planner.iam.gserviceaccount.com`                             |
+
+**Variables** (build-time, public — `VITE_*` end up in the JS bundle):
+
+| Name                          | Value                                                                |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `GCP_PROJECT_ID`              | `meridian-financial-planner`                                         |
+| `VITE_API_URL`                | `https://meridian-api-XXXX-ew.a.run.app/api` (your Cloud Run URL)    |
+| `VITE_FIREBASE_API_KEY`       | from Firebase console → Project settings → Web app config            |
+| `VITE_FIREBASE_AUTH_DOMAIN`   | `meridian-financial-planner.firebaseapp.com`                         |
+| `VITE_FIREBASE_PROJECT_ID`    | `meridian-financial-planner`                                         |
+| `VITE_FIREBASE_APP_ID`        | from Firebase console → Project settings → Web app config            |
+
+### 12.3. Trigger model
+
+- **Auto**: push to `main` → `Tests + audits` runs → on success, `Deploy` fires both jobs in parallel.
+- **Manual**: Actions tab → Deploy → Run workflow → pick `target`.
+- **Negative**: failed tests do not deploy (gate job's `if:` requires `workflow_run.conclusion == 'success'`).
+
+### 12.4. Verifying
+
+After §12.1 + §12.2:
+
+1. Actions tab → Deploy → Run workflow → target=`backend`. Expect a green run + new Cloud Run revision in `gcloud run revisions list`.
+2. Same for target=`frontend`. Expect a green run + new bundle hash on `https://meridian-financial-planner.web.app`.
+3. Push a no-op commit to `main`. Watch `Tests + audits` → `Deploy` chain in the Actions UI.
+
+---
+
 ## Appendix A. Cloud SQL as an alternative to Neon
 
 If you later need always-on low-latency reads, larger storage, or VPC-only networking, swap Neon for Cloud SQL. Only three things change.

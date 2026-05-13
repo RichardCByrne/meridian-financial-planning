@@ -12,6 +12,8 @@ import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { JargonTerm } from "../../components/JargonTerm";
 import { NumericInput } from "../../components/NumericInput";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { useToast } from "../../components/Toast";
 import { fmtMoney, fmtPctDisplay } from "../../lib/format";
 
@@ -269,88 +271,95 @@ export function AssetsPane({ planId }: { planId: number }) {
           />
         )}
         {data && data.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Growth</th>
-                <th>Monthly</th>
-                <th>Owner</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((a) =>
-                editingId === a.id ? (
-                  <tr key={a.id}>
-                    <td colSpan={7}>
-                      <FormFields
-                        form={editForm}
-                        setForm={setEditForm}
-                        onKindChange={(k) => onKindChange(k, editForm, setEditForm)}
-                        people={people ?? []}
-                      />
-                      <div className="row" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                          Save
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setEditingId(null)}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={a.id}>
-                    <td>{a.name}</td>
-                    <td className="muted">
-                      {KINDS.find((k) => k.value === a.kind)?.label ?? a.kind}
-                    </td>
-                    <td>{fmtMoney(a.value)}</td>
-                    <td>{fmtPctDisplay(a.growth_rate)}</td>
-                    <td className="muted">
-                      {a.avc_pct_of_gross > 0
-                        ? `AVC ${fmtPctDisplay(a.avc_pct_of_gross)} gross`
-                        : a.avc_annual > 0
-                        ? `AVC ${fmtMoney(a.avc_annual)}/yr`
-                        : a.contribution_pct_of_gross_income > 0
-                        ? `${fmtPctDisplay(a.contribution_pct_of_gross_income)} gross`
-                        : a.contribution_pct_of_net_income > 0
-                        ? `${fmtPctDisplay(a.contribution_pct_of_net_income)} net`
-                        : a.annual_contribution > 0
-                        ? `${fmtMoney(a.annual_contribution / 12)}/mo`
-                        : "—"}
-                    </td>
-                    <td className="muted">
-                      {a.owner_person_id
-                        ? people?.find((p) => p.id === a.owner_person_id)?.name ?? "—"
-                        : "Joint"}
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ marginRight: 6 }}
-                        onClick={() => setEditingId(a.id)}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => softDeleteAsset(a)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
+          <ResponsiveTable<Asset>
+            rows={data}
+            getKey={(a) => a.id}
+            cardTitle={(a) => a.name}
+            columns={[
+              { header: "Name", cell: (a) => a.name, hideOnMobile: true },
+              {
+                header: "Type",
+                cell: (a) => (
+                  <span className="muted">
+                    {KINDS.find((k) => k.value === a.kind)?.label ?? a.kind}
+                  </span>
                 ),
-              )}
-            </tbody>
-          </table>
+              },
+              { header: "Value", cell: (a) => fmtMoney(a.value) },
+              { header: "Growth", cell: (a) => fmtPctDisplay(a.growth_rate) },
+              {
+                header: "Monthly",
+                cell: (a) => (
+                  <span className="muted">
+                    {a.avc_pct_of_gross > 0
+                      ? `AVC ${fmtPctDisplay(a.avc_pct_of_gross)} gross`
+                      : a.avc_annual > 0
+                      ? `AVC ${fmtMoney(a.avc_annual)}/yr`
+                      : a.contribution_pct_of_gross_income > 0
+                      ? `${fmtPctDisplay(a.contribution_pct_of_gross_income)} gross`
+                      : a.contribution_pct_of_net_income > 0
+                      ? `${fmtPctDisplay(a.contribution_pct_of_net_income)} net`
+                      : a.annual_contribution > 0
+                      ? `${fmtMoney(a.annual_contribution / 12)}/mo`
+                      : "—"}
+                  </span>
+                ),
+              },
+              {
+                header: "Owner",
+                cell: (a) => (
+                  <span className="muted">
+                    {a.owner_person_id
+                      ? people?.find((p) => p.id === a.owner_person_id)?.name ?? "—"
+                      : "Joint"}
+                  </span>
+                ),
+              },
+            ]}
+            renderActions={(a) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(a.id)}
+                >
+                  Edit
+                </button>
+                <button className="btn btn-secondary" onClick={() => softDeleteAsset(a)}>
+                  Remove
+                </button>
+              </>
+            )}
+          />
         )}
       </div>
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit asset"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields
+          form={editForm}
+          setForm={setEditForm}
+          onKindChange={(k) => onKindChange(k, editForm, setEditForm)}
+          people={people ?? []}
+        />
+      </EditModal>
     </div>
   );
 }

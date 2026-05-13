@@ -13,6 +13,8 @@ import {
 import type { FilingStatus, Person, PersonCreate } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
 type FormState = {
@@ -174,83 +176,84 @@ export function PeoplePane({ planId }: { planId: number }) {
           />
         )}
         {people && people.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>DOB</th>
-                <th>Life expectancy</th>
-                <th>
-                  Retire @
+          <ResponsiveTable<Person>
+            rows={people}
+            getKey={(p) => p.id}
+            cardTitle={(p) => p.name}
+            columns={[
+              { header: "Name", cell: (p) => p.name, hideOnMobile: true },
+              { header: "DOB", cell: (p) => p.dob },
+              { header: "Life expectancy", cell: (p) => p.life_expectancy },
+              {
+                header: "Retire @",
+                cell: (p) => p.retirement_age ?? "—",
+                thExtra: (
                   <HelpTip>
                     Age this person retires. At this age the engine crystallises their pension wrappers
                     (25% lump sum + 75% to ARF) and stops applying employer/PRSI charges to earnings.
                   </HelpTip>
-                </th>
-                <th>
-                  Primary
+                ),
+              },
+              {
+                header: "Primary",
+                cell: (p) => (p.is_primary ? "Yes" : ""),
+                thExtra: (
                   <HelpTip>
                     Head of household. Currently used as the default owner of joint expenses and as the
                     anchor for joint-assessment tax bands when there are two adults in the plan.
                   </HelpTip>
-                </th>
-                <th>
-                  Rent credit
+                ),
+              },
+              {
+                header: "Rent credit",
+                cell: (p) => (p.claims_rent_credit ? "Yes" : ""),
+                thExtra: (
                   <HelpTip>
                     Per-person Irish Rent Tax Credit (€1,000/yr). Apply only to renters paying for
                     their primary residence.
                   </HelpTip>
-                </th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((p) =>
-                editingId === p.id ? (
-                  <tr key={p.id}>
-                    <td colSpan={7}>
-                      <FormFields form={editForm} setForm={setEditForm} />
-                      <div className="row" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                          Save
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setEditingId(null)}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td>{p.dob}</td>
-                    <td>{p.life_expectancy}</td>
-                    <td>{p.retirement_age ?? "—"}</td>
-                    <td>{p.is_primary ? "Yes" : ""}</td>
-                    <td>{p.claims_rent_credit ? "Yes" : ""}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ marginRight: 6 }}
-                        onClick={() => setEditingId(p.id)}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => softDelete(p, p.id)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
                 ),
-              )}
-            </tbody>
-          </table>
+              },
+            ]}
+            renderActions={(p) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(p.id)}
+                >
+                  Edit
+                </button>
+                <button className="btn btn-secondary" onClick={() => softDelete(p, p.id)}>
+                  Remove
+                </button>
+              </>
+            )}
+          />
         )}
       </div>
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit person"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields form={editForm} setForm={setEditForm} />
+      </EditModal>
     </div>
   );
 }

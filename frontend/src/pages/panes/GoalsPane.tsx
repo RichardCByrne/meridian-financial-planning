@@ -14,6 +14,8 @@ import {
 import type { Goal, GoalCreate, GoalKind } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { fmtMoney } from "../../lib/format";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
@@ -169,16 +171,39 @@ export function GoalsPane({ planId }: { planId: number }) {
           />
         )}
         {data && data.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Target</th>
-                <th>Year</th>
-                <th>Linked</th>
-                <th>
-                  Status
+          <ResponsiveTable<Goal>
+            rows={data}
+            getKey={(g) => g.id}
+            cardTitle={(g) => g.name}
+            columns={[
+              { header: "Name", cell: (g) => g.name, hideOnMobile: true },
+              {
+                header: "Type",
+                cell: (g) => (
+                  <span className="muted">
+                    {KINDS.find((k) => k.value === g.kind)?.label ?? g.kind}
+                  </span>
+                ),
+              },
+              {
+                header: "Target",
+                cell: (g) => (g.target_amount > 0 ? fmtMoney(g.target_amount) : "—"),
+              },
+              { header: "Year", cell: (g) => g.target_year },
+              {
+                header: "Linked",
+                cell: (g) => (
+                  <span className="muted">
+                    {g.linked_person_id
+                      ? people?.find((p) => p.id === g.linked_person_id)?.name ?? "—"
+                      : "—"}
+                  </span>
+                ),
+              },
+              {
+                header: "Status",
+                cell: (g) => <StatusBadge status={statusForGoal(g.id, g.target_year)} />,
+                thExtra: (
                   <HelpTip>
                     Resolves at target year and stays sticky thereafter. Cost-bearing goals
                     (milestone, education, gift, pre-retirement spend): <strong>Achieved</strong> if
@@ -187,63 +212,53 @@ export function GoalsPane({ planId }: { planId: number }) {
                     <strong> Below target</strong> otherwise — this is a snapshot, not a guarantee
                     you stay above the threshold afterward.
                   </HelpTip>
-                </th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((g) =>
-                editingId === g.id ? (
-                  <tr key={g.id}>
-                    <td colSpan={7}>
-                      <FormFields form={editForm} setForm={setEditForm} people={people ?? []} horizon={horizon} />
-                      <div className="row" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                          Save
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setEditingId(null)}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={g.id}>
-                    <td>{g.name}</td>
-                    <td className="muted">{KINDS.find((k) => k.value === g.kind)?.label ?? g.kind}</td>
-                    <td>{g.target_amount > 0 ? fmtMoney(g.target_amount) : "—"}</td>
-                    <td>{g.target_year}</td>
-                    <td className="muted">
-                      {g.linked_person_id
-                        ? people?.find((p) => p.id === g.linked_person_id)?.name ?? "—"
-                        : "—"}
-                    </td>
-                    <td>
-                      <StatusBadge status={statusForGoal(g.id, g.target_year)} />
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ marginRight: 6 }}
-                        onClick={() => setEditingId(g.id)}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => softDelete(g, g.id)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
                 ),
-              )}
-            </tbody>
-          </table>
+              },
+            ]}
+            renderActions={(g) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(g.id)}
+                >
+                  Edit
+                </button>
+                <button className="btn btn-secondary" onClick={() => softDelete(g, g.id)}>
+                  Remove
+                </button>
+              </>
+            )}
+          />
         )}
       </div>
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit goal"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields
+          form={editForm}
+          setForm={setEditForm}
+          people={people ?? []}
+          horizon={horizon}
+        />
+      </EditModal>
     </div>
   );
 }

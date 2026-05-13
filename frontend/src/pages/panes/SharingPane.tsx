@@ -8,9 +8,10 @@ import {
   useRevokeInvite,
   useUpdateMemberRole,
 } from "../../api/hooks";
-import type { PlanInvite, PlanRole } from "../../api/types";
+import type { PlanInvite, PlanMember, PlanRole } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
 import { HelpTip } from "../../components/HelpTip";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { TableSkeleton } from "../../components/Skeleton";
 import { useToast } from "../../components/Toast";
 import { useSoftDelete } from "../../lib/useSoftDelete";
@@ -96,65 +97,90 @@ export function SharingPane({ planId }: { planId: number }) {
         </p>
         {isLoading && <TableSkeleton rows={2} />}
         {members && members.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Joined</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const isMe = !!myEmail && m.email?.toLowerCase() === myEmail.toLowerCase();
-                return (
-                  <tr key={m.user_id}>
-                    <td>
+          <ResponsiveTable<PlanMember>
+            rows={members}
+            getKey={(m) => m.user_id}
+            cardTitle={(m) => {
+              const isMe = !!myEmail && m.email?.toLowerCase() === myEmail.toLowerCase();
+              return (
+                <>
+                  {m.display_name || "—"}
+                  {isMe && <span className="muted" style={{ marginLeft: 6 }}>(you)</span>}
+                </>
+              );
+            }}
+            columns={[
+              {
+                header: "Name",
+                hideOnMobile: true,
+                cell: (m) => {
+                  const isMe = !!myEmail && m.email?.toLowerCase() === myEmail.toLowerCase();
+                  return (
+                    <>
                       {m.display_name || "—"}
                       {isMe && <span className="muted" style={{ marginLeft: 6 }}>(you)</span>}
-                    </td>
-                    <td className="muted">{m.email || "—"}</td>
-                    <td>
-                      {isOwner && !isMe ? (
-                        <select
-                          value={m.role}
-                          onChange={(e) =>
-                            updateRole.mutate({ userId: m.user_id, role: e.target.value as PlanRole })
-                          }
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r.value} value={r.value}>
-                              {r.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <RoleBadge role={m.role} />
-                      )}
-                    </td>
-                    <td className="muted">{new Date(m.created_at).toLocaleDateString()}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {(isOwner || isMe) && (
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            const label = isMe ? "leave this plan" : `remove ${m.display_name || m.email}`;
-                            if (confirm(`Are you sure you want to ${label}?`)) {
-                              removeMember.mutate(m.user_id);
-                            }
-                          }}
-                        >
-                          {isMe ? "Leave plan" : "Remove"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </>
+                  );
+                },
+              },
+              {
+                header: "Email",
+                cell: (m) => <span className="muted">{m.email || "—"}</span>,
+              },
+              {
+                header: "Role",
+                cell: (m) => {
+                  const isMe = !!myEmail && m.email?.toLowerCase() === myEmail.toLowerCase();
+                  return isOwner && !isMe ? (
+                    <select
+                      value={m.role}
+                      onChange={(e) =>
+                        updateRole.mutate({
+                          userId: m.user_id,
+                          role: e.target.value as PlanRole,
+                        })
+                      }
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <RoleBadge role={m.role} />
+                  );
+                },
+              },
+              {
+                header: "Joined",
+                cell: (m) => (
+                  <span className="muted">
+                    {new Date(m.created_at).toLocaleDateString()}
+                  </span>
+                ),
+              },
+            ]}
+            renderActions={(m) => {
+              const isMe = !!myEmail && m.email?.toLowerCase() === myEmail.toLowerCase();
+              if (!(isOwner || isMe)) return null;
+              return (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const label = isMe
+                      ? "leave this plan"
+                      : `remove ${m.display_name || m.email}`;
+                    if (confirm(`Are you sure you want to ${label}?`)) {
+                      removeMember.mutate(m.user_id);
+                    }
+                  }}
+                >
+                  {isMe ? "Leave plan" : "Remove"}
+                </button>
+              );
+            }}
+          />
         )}
       </div>
 
@@ -222,46 +248,54 @@ export function SharingPane({ planId }: { planId: number }) {
               <p className="muted">No outstanding invites.</p>
             )}
             {invites && invites.length > 0 && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Role</th>
-                    <th>Email lock</th>
-                    <th>Expires</th>
-                    <th>Link</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invites.map((inv) => {
-                    const link = `${window.location.origin}/invites/${inv.token}`;
-                    return (
-                      <tr key={inv.id}>
-                        <td>
-                          <RoleBadge role={inv.role} />
-                        </td>
-                        <td className="muted">{inv.email || "anyone-with-link"}</td>
-                        <td className="muted">
-                          {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : "never"}
-                        </td>
-                        <td>
-                          <button className="btn btn-secondary" onClick={() => onCopy(link)}>
-                            Copy link
-                          </button>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => softDeleteInvite(inv, inv.id)}
-                          >
-                            Revoke
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <ResponsiveTable<PlanInvite>
+                rows={invites}
+                getKey={(inv) => inv.id}
+                cardTitle={(inv) => <RoleBadge role={inv.role} />}
+                columns={[
+                  {
+                    header: "Role",
+                    cell: (inv) => <RoleBadge role={inv.role} />,
+                    hideOnMobile: true,
+                  },
+                  {
+                    header: "Email lock",
+                    cell: (inv) => (
+                      <span className="muted">{inv.email || "anyone-with-link"}</span>
+                    ),
+                  },
+                  {
+                    header: "Expires",
+                    cell: (inv) => (
+                      <span className="muted">
+                        {inv.expires_at
+                          ? new Date(inv.expires_at).toLocaleDateString()
+                          : "never"}
+                      </span>
+                    ),
+                  },
+                ]}
+                renderActions={(inv) => {
+                  const link = `${window.location.origin}/invites/${inv.token}`;
+                  return (
+                    <>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ marginRight: 6 }}
+                        onClick={() => onCopy(link)}
+                      >
+                        Copy link
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => softDeleteInvite(inv, inv.id)}
+                      >
+                        Revoke
+                      </button>
+                    </>
+                  );
+                }}
+              />
             )}
           </div>
         </>

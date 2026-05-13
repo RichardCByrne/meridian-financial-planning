@@ -9,6 +9,8 @@ import {
 import type { Liability, LiabilityCreate, LiabilityKind } from "../../api/types";
 import { NumericInput } from "../../components/NumericInput";
 import { EmptyState } from "../../components/EmptyState";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { EditModal } from "../../components/EditModal";
 import { fmtMoney } from "../../lib/format";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
@@ -147,73 +149,66 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
           />
         )}
         {data && data.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Principal</th>
-                <th>Rate</th>
-                <th>Term</th>
-                <th>Monthly</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((liability) =>
-                editingId === liability.id ? (
-                  <tr key={liability.id}>
-                    <td colSpan={7}>
-                      <FormFields form={editForm} setForm={setEditForm} />
-                      <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-                        New monthly payment: <strong>{fmtMoney(editPreview)}</strong>
-                      </p>
-                      <div className="row" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
-                          Save
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setEditingId(null)}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={liability.id}>
-                    <td>{liability.name}</td>
-                    <td className="muted">{liability.kind}</td>
-                    <td>{fmtMoney(liability.principal)}</td>
-                    <td>{(liability.interest_rate * 100).toFixed(2)}%</td>
-                    <td>
-                      {Math.round(liability.term_months / 12)}y ({liability.term_months}m)
-                    </td>
-                    <td>{fmtMoney(liability.monthly_payment)}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ marginRight: 6 }}
-                        onClick={() => setEditingId(liability.id)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => softDelete(liability, liability.id)}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
+          <ResponsiveTable<Liability>
+            rows={data}
+            getKey={(l) => l.id}
+            cardTitle={(l) => l.name}
+            columns={[
+              { header: "Name", cell: (l) => l.name, hideOnMobile: true },
+              { header: "Type", cell: (l) => <span className="muted">{l.kind}</span> },
+              { header: "Principal", cell: (l) => fmtMoney(l.principal) },
+              { header: "Rate", cell: (l) => `${(l.interest_rate * 100).toFixed(2)}%` },
+              {
+                header: "Term",
+                cell: (l) => `${Math.round(l.term_months / 12)}y (${l.term_months}m)`,
+              },
+              { header: "Monthly", cell: (l) => fmtMoney(l.monthly_payment) },
+            ]}
+            renderActions={(l) => (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ marginRight: 6 }}
+                  onClick={() => setEditingId(l.id)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => softDelete(l, l.id)}
+                >
+                  Remove
+                </button>
+              </>
+            )}
+          />
         )}
       </div>
+
+      <EditModal
+        open={editingId !== null}
+        onClose={() => setEditingId(null)}
+        title="Edit liability"
+        footer={
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setEditingId(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={onSaveEdit} disabled={update.isPending}>
+              Save
+            </button>
+          </div>
+        }
+      >
+        <FormFields form={editForm} setForm={setEditForm} />
+        <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+          New monthly payment: <strong>{fmtMoney(editPreview)}</strong>
+        </p>
+      </EditModal>
     </div>
   );
 }

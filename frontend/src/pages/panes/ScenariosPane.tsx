@@ -26,6 +26,7 @@ import type {
 } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { useToast } from "../../components/Toast";
 import { useIncomeForPeople } from "../../lib/useIncomeForPeople";
 
@@ -393,46 +394,57 @@ function ScenarioCard({
         <p className="muted">No overrides yet. Add one below to diverge from the base plan.</p>
       )}
       {overrideRows.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Bucket</th>
-              <th>Target</th>
-              <th>Field</th>
-              <th>Base value</th>
-              <th>Override value</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {overrideRows.map((r, idx) => {
-              const inst = instancesFor(r.bucket).find((i) => i.id === r.id);
-              return (
-                <tr key={`${r.bucket}-${r.id}-${r.field.name}-${idx}`}>
-                  <td className="muted">{BUCKET_LABELS[r.bucket]}</td>
-                  <td>{inst?.label ?? "?"}</td>
-                  <td>{r.field.label}</td>
-                  <td className="muted">{formatValue(r.field, baseValueFor(r.bucket, r.id, r.field.name))}</td>
-                  <td>
-                    <OverrideInput
-                      field={r.field}
-                      value={r.value}
-                      onChange={(v) => setOverride(r.bucket, r.id, r.field.name, v)}
-                    />
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => removeOverride(r.bucket, r.id, r.field.name)}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <ResponsiveTable
+          rows={overrideRows}
+          getKey={(r) => `${r.bucket}-${r.id}-${r.field.name}`}
+          cardTitle={(r) => {
+            const inst = instancesFor(r.bucket).find((i) => i.id === r.id);
+            return `${BUCKET_LABELS[r.bucket]} · ${inst?.label ?? "?"} · ${r.field.label}`;
+          }}
+          columns={[
+            {
+              header: "Bucket",
+              cell: (r) => <span className="muted">{BUCKET_LABELS[r.bucket]}</span>,
+              hideOnMobile: true,
+            },
+            {
+              header: "Target",
+              cell: (r) => instancesFor(r.bucket).find((i) => i.id === r.id)?.label ?? "?",
+              hideOnMobile: true,
+            },
+            {
+              header: "Field",
+              cell: (r) => r.field.label,
+              hideOnMobile: true,
+            },
+            {
+              header: "Base value",
+              cell: (r) => (
+                <span className="muted">
+                  {formatValue(r.field, baseValueFor(r.bucket, r.id, r.field.name))}
+                </span>
+              ),
+            },
+            {
+              header: "Override value",
+              cell: (r) => (
+                <OverrideInput
+                  field={r.field}
+                  value={r.value}
+                  onChange={(v) => setOverride(r.bucket, r.id, r.field.name, v)}
+                />
+              ),
+            },
+          ]}
+          renderActions={(r) => (
+            <button
+              className="btn btn-secondary"
+              onClick={() => removeOverride(r.bucket, r.id, r.field.name)}
+            >
+              Remove
+            </button>
+          )}
+        />
       )}
 
       <AddOverrideRow onAdd={(b, id, f) => setOverride(b, id, f, baseValueFor(b, id, f))} instancesFor={instancesFor} />
@@ -893,56 +905,73 @@ function AddedItemsSection({
       )}
 
       {(addedIncomes.length > 0 || addedExpenses.length > 0) && (
-        <table style={{ marginTop: 8 }}>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Name</th>
-              <th>Amount / year</th>
-              <th>Years</th>
-              <th>Detail</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {addedIncomes.map((inc, idx) => (
-              <tr key={`i-${idx}`}>
-                <td className="muted">Income</td>
-                <td>{inc.name}</td>
-                <td>€{Number(inc.gross_amount).toLocaleString()}</td>
-                <td>
-                  {inc.start_year}
-                  {inc.end_year ? `–${inc.end_year}` : "+"}
-                </td>
-                <td className="muted">
-                  {inc.kind} · {people.find((p) => p.id === inc.person_id)?.name ?? `person ${inc.person_id}`}
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <button className="btn btn-secondary" onClick={() => onRemoveAddedIncome(idx)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {addedExpenses.map((exp, idx) => (
-              <tr key={`e-${idx}`}>
-                <td className="muted">Expense</td>
-                <td>{exp.name}</td>
-                <td>€{Number(exp.amount).toLocaleString()}</td>
-                <td>
-                  {exp.start_year}
-                  {exp.category === "single_year" ? " (one-off)" : exp.end_year ? `–${exp.end_year}` : "+"}
-                </td>
-                <td className="muted">{exp.category}</td>
-                <td style={{ textAlign: "right" }}>
-                  <button className="btn btn-secondary" onClick={() => onRemoveAddedExpense(idx)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ marginTop: 8 }}>
+          <ResponsiveTable<
+            | { kind: "income"; idx: number; row: AddedIncome }
+            | { kind: "expense"; idx: number; row: AddedExpense }
+          >
+            rows={[
+              ...addedIncomes.map((row, idx) => ({ kind: "income" as const, idx, row })),
+              ...addedExpenses.map((row, idx) => ({ kind: "expense" as const, idx, row })),
+            ]}
+            getKey={(r) => `${r.kind}-${r.idx}`}
+            cardTitle={(r) => r.row.name}
+            columns={[
+              {
+                header: "Type",
+                cell: (r) => (
+                  <span className="muted">{r.kind === "income" ? "Income" : "Expense"}</span>
+                ),
+              },
+              { header: "Name", cell: (r) => r.row.name, hideOnMobile: true },
+              {
+                header: "Amount / year",
+                cell: (r) =>
+                  r.kind === "income"
+                    ? `€${Number(r.row.gross_amount).toLocaleString()}`
+                    : `€${Number(r.row.amount).toLocaleString()}`,
+              },
+              {
+                header: "Years",
+                cell: (r) =>
+                  r.kind === "income"
+                    ? `${r.row.start_year}${r.row.end_year ? `–${r.row.end_year}` : "+"}`
+                    : `${r.row.start_year}${
+                        r.row.category === "single_year"
+                          ? " (one-off)"
+                          : r.row.end_year
+                          ? `–${r.row.end_year}`
+                          : "+"
+                      }`,
+              },
+              {
+                header: "Detail",
+                cell: (r) => (
+                  <span className="muted">
+                    {r.kind === "income"
+                      ? `${r.row.kind} · ${
+                          people.find((p) => p.id === r.row.person_id)?.name ??
+                          `person ${r.row.person_id}`
+                        }`
+                      : r.row.category}
+                  </span>
+                ),
+              },
+            ]}
+            renderActions={(r) => (
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  r.kind === "income"
+                    ? onRemoveAddedIncome(r.idx)
+                    : onRemoveAddedExpense(r.idx)
+                }
+              >
+                Remove
+              </button>
+            )}
+          />
+        </div>
       )}
     </div>
   );

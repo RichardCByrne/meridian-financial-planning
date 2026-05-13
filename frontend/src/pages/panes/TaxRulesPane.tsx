@@ -11,6 +11,7 @@ import {
 import type { TaxConfigSummary } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
+import { ResponsiveTable } from "../../components/ResponsiveTable";
 
 // The fields surfaced as named inputs. Anything else is editable via the JSON
 // view at the bottom — kept narrow on purpose, so users edit the meaningful
@@ -178,35 +179,45 @@ export function TaxRulesPane({ planId }: { planId: number }) {
             above to fork it.
           </p>
         )}
-        <table>
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SCALAR_FIELDS.map((f) => {
-              const value = draft?.[f.key] ?? active.config[f.key];
-              return (
-                <tr key={f.key}>
-                  <td>
-                    {f.label}
-                    {f.help && <HelpTip>{f.help}</HelpTip>}
-                  </td>
-                  <td>
-                    <ScalarInput
-                      kind={f.kind}
-                      value={value}
-                      readOnly={!editable}
-                      onChange={(v) => setDraft((d) => ({ ...(d ?? active.config), [f.key]: v }))}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <ResponsiveTable
+          rows={SCALAR_FIELDS}
+          getKey={(f) => f.key}
+          cardTitle={(f) => (
+            <>
+              {f.label}
+              {f.help && <HelpTip>{f.help}</HelpTip>}
+            </>
+          )}
+          columns={[
+            {
+              header: "Field",
+              cell: (f) => (
+                <>
+                  {f.label}
+                  {f.help && <HelpTip>{f.help}</HelpTip>}
+                </>
+              ),
+              hideOnMobile: true,
+            },
+            {
+              header: "Value",
+              cell: (f) => {
+                const value = draft?.[f.key] ?? active.config[f.key];
+                return (
+                  <ScalarInput
+                    kind={f.kind}
+                    value={value}
+                    readOnly={!editable}
+                    onChange={(v) =>
+                      setDraft((d) => ({ ...(d ?? active.config), [f.key]: v }))
+                    }
+                  />
+                );
+              },
+            },
+          ]}
+        />
+
 
         <p style={{ marginTop: 16 }}>
           <button className="btn btn-secondary" onClick={() => setShowJson((s) => !s)}>
@@ -245,8 +256,13 @@ function ScalarInput({
   onChange: (v: unknown) => void;
 }) {
   const raw = Number(value ?? 0);
-  const style = { padding: "4px 8px", border: "1px solid #cbd5e1", borderRadius: 4,
-    width: kind === "percent" ? 130 : 160 };
+  const style = {
+    padding: "4px 8px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 4,
+    width: "100%",
+    maxWidth: kind === "percent" ? 130 : 160,
+  };
 
   if (kind === "percent") {
     return (

@@ -277,6 +277,28 @@ th {
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   touch-action: none;
+  min-width: 0;
+}
+
+.timeline-lane {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.timeline-lane-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .timeline-lane {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
 }
 
 @keyframes meridian-skeleton {
@@ -311,8 +333,23 @@ th {
 }
 
 @media (max-width: 720px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
   .app-shell {
     grid-template-columns: 1fr;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .main {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .card {
+    min-width: 0;
+    max-width: 100%;
   }
   .sidebar {
     padding: 10px 14px;

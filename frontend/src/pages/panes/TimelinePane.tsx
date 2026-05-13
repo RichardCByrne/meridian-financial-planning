@@ -216,18 +216,8 @@ export function TimelinePane({ planId }: { planId: number }) {
 
 function Lane({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "180px 1fr auto",
-        alignItems: "center",
-        marginBottom: 16,
-        gap: 12,
-      }}
-    >
-      <div className="muted" style={{ fontSize: 13, fontWeight: 600 }}>
-        {label}
-      </div>
+    <div className="timeline-lane">
+      <div className="timeline-lane-label muted">{label}</div>
       {children}
     </div>
   );

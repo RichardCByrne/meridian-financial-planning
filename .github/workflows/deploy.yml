@@ -1,0 +1,83 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["Tests + audits"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which side(s) to deploy"
+        type: choice
+        options: [both, backend, frontend]
+        default: both
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gate:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      backend:  ${{ steps.pick.outputs.backend }}
+      frontend: ${{ steps.pick.outputs.frontend }}
+      ref:      ${{ steps.pick.outputs.ref }}
+    steps:
+      - id: pick
+        run: |
+          target="${{ inputs.target || 'both' }}"
+          if [[ "$target" == "both" || "$target" == "backend" ]]; then echo "backend=true"  >> $GITHUB_OUTPUT; else echo "backend=false"  >> $GITHUB_OUTPUT; fi
+          if [[ "$target" == "both" || "$target" == "frontend" ]]; then echo "frontend=true" >> $GITHUB_OUTPUT; else echo "frontend=false" >> $GITHUB_OUTPUT; fi
+          echo "ref=${{ github.event.workflow_run.head_sha || github.sha }}" >> $GITHUB_OUTPUT
+
+  backend:
+    needs: gate
+    if: needs.gate.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.ref }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Submit Cloud Build
+        run: gcloud builds submit --config cloudbuild.yaml --project=${{ vars.GCP_PROJECT_ID }}
+
+  frontend:
+    needs: gate
+    if: needs.gate.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_DEV_AUTH:             "false"
+          VITE_API_URL:              ${{ vars.VITE_API_URL }}
+          VITE_FIREBASE_API_KEY:     ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID:  ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID:      ${{ vars.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - name: Deploy to Firebase Hosting
+        run: npx --yes firebase-tools deploy --only hosting --project=${{ vars.GCP_PROJECT_ID }} --non-interactive

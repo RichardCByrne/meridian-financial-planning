@@ -1,4 +1,5 @@
-import { NavLink, Route, Routes, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom";
 
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { useAuth } from "./auth/useAuth";
@@ -20,41 +21,64 @@ export function App() {
 
 function AppShell() {
   const tour = useTour();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <h1>Meridian</h1>
-        <nav>
-          <NavLink to="/plans" className={({ isActive }) => (isActive ? "active" : "")}>
-            Plans
-          </NavLink>
-          <NavLink to="/guide" className={({ isActive }) => (isActive ? "active" : "")}>
-            Guide
-          </NavLink>
+        <div className="sidebar-brand">
+          <h1>Meridian</h1>
           <button
             type="button"
-            onClick={tour.start}
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "8px 10px",
-              border: "1px solid #475569",
-              background: "transparent",
-              color: "#cbd5e1",
-              borderRadius: 6,
-              marginTop: 8,
-              fontSize: 13,
-              textAlign: "left",
-              cursor: "pointer",
-            }}
+            className="sidebar-toggle"
+            aria-expanded={menuOpen}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMenuOpen((o) => !o)}
           >
-            ✨ Take the tour
+            {menuOpen ? "✕" : "☰"}
           </button>
-        </nav>
-        <UserChip />
-        <p className="muted" style={{ marginTop: 16, color: "#64748b", fontSize: 12 }}>
-          Ireland 2026 tax engine · v0.8
-        </p>
+        </div>
+        <div className={"sidebar-menu" + (menuOpen ? " open" : "")}>
+          <nav>
+            <NavLink to="/plans" className={({ isActive }) => (isActive ? "active" : "")}>
+              Plans
+            </NavLink>
+            <NavLink to="/guide" className={({ isActive }) => (isActive ? "active" : "")}>
+              Guide
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                tour.start();
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "8px 10px",
+                border: "1px solid #475569",
+                background: "transparent",
+                color: "#cbd5e1",
+                borderRadius: 6,
+                marginTop: 8,
+                fontSize: 13,
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              ✨ Take the tour
+            </button>
+          </nav>
+          <UserChip />
+          <p className="muted" style={{ marginTop: 16, color: "#64748b", fontSize: 12 }}>
+            Ireland 2026 tax engine · v0.8
+          </p>
+        </div>
       </aside>
       <main className="main">
         <ErrorBoundary>

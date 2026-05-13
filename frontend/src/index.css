@@ -53,10 +53,34 @@ textarea {
   padding: 24px 16px;
 }
 
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sidebar h1 {
   font-size: 18px;
   margin: 0 0 24px 0;
   letter-spacing: -0.01em;
+}
+
+.sidebar-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sidebar-menu {
+  display: block;
 }
 
 .sidebar nav a {
@@ -264,12 +288,72 @@ th {
   }
 }
 
+.tabnav {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tabnav a {
+  padding: 10px 16px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: #475569;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.tabnav a.active {
+  border-bottom-color: #2563eb;
+  color: #2563eb;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
   .sidebar {
-    padding: 16px;
+    padding: 10px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .sidebar h1 {
+    margin: 0;
+  }
+  .sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sidebar-menu {
+    display: none;
+    margin-top: 10px;
+  }
+  .sidebar-menu.open {
+    display: block;
+  }
+  .tabnav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .tabnav a {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .tabnav .tabnav-advanced-toggle {
+    margin-left: 8px !important;
+    flex: 0 0 auto;
   }
   .main {
     padding: 16px;

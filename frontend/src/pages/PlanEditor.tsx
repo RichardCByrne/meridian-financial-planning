@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Route, Routes, useParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useIsMutating } from "@tanstack/react-query";
 
 import {
@@ -166,6 +166,7 @@ function FirstRunStepper({ planId }: { planId: number }) {
     { label: "Add assets", path: `/plans/${planId}/assets`, done: hasAssets },
     { label: "See projection", path: `/plans/${planId}`, done: false },
   ];
+  const doneCount = steps.filter((s) => s.done).length;
 
   return (
     <div
@@ -178,7 +179,8 @@ function FirstRunStepper({ planId }: { planId: number }) {
       }}
     >
       <div style={{ fontSize: 13, color: "#475569", marginBottom: 8 }}>
-        <strong>Getting started.</strong> Add the basics to see your projection.
+        <strong>Getting started ({doneCount}/{steps.length}).</strong> Add the basics to see your
+        projection.
       </div>
       <ol
         style={{
@@ -191,7 +193,7 @@ function FirstRunStepper({ planId }: { planId: number }) {
         }}
       >
         {steps.map((s, i) => (
-          <li key={s.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <li key={s.label}>
             <NavLink
               to={s.path}
               end={s.path === `/plans/${planId}`}
@@ -199,7 +201,7 @@ function FirstRunStepper({ planId }: { planId: number }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
-                padding: "4px 10px",
+                padding: "6px 12px",
                 borderRadius: 999,
                 background: s.done ? "#dcfce7" : "white",
                 color: s.done ? "#166534" : "#1e293b",
@@ -228,7 +230,6 @@ function FirstRunStepper({ planId }: { planId: number }) {
               </span>
               {s.label}
             </NavLink>
-            {i < steps.length - 1 && <span style={{ color: "#94a3b8" }}>→</span>}
           </li>
         ))}
       </ol>
@@ -246,6 +247,8 @@ function TabNav({ planId }: { planId: number }) {
       return false;
     }
   });
+  const navRef = useRef<HTMLElement | null>(null);
+  const location = useLocation();
   const toggle = () => {
     setAdvanced((v) => {
       const next = !v;
@@ -257,17 +260,16 @@ function TabNav({ planId }: { planId: number }) {
       return next;
     });
   };
+
+  useLayoutEffect(() => {
+    const el = navRef.current?.querySelector<HTMLAnchorElement>("a.active");
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    }
+  }, [location.pathname]);
+
   return (
-    <nav
-      className="row"
-      style={{
-        borderBottom: "1px solid #e2e8f0",
-        marginBottom: 16,
-        gap: 0,
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
-    >
+    <nav ref={navRef} className="tabnav">
       <TabLink to={`/plans/${planId}`} end>
         Let's See
       </TabLink>
@@ -292,6 +294,7 @@ function TabNav({ planId }: { planId: number }) {
         type="button"
         onClick={toggle}
         title="Toggle advanced tabs (assumptions, tax-rule editor)"
+        className="tabnav-advanced-toggle"
         style={{
           marginLeft: "auto",
           marginBottom: -1,
@@ -368,18 +371,7 @@ function TabLink({
   children: React.ReactNode;
 }) {
   return (
-    <NavLink
-      to={to}
-      end={end}
-      style={({ isActive }) => ({
-        padding: "10px 16px",
-        marginBottom: -1,
-        borderBottom: isActive ? "2px solid #2563eb" : "2px solid transparent",
-        color: isActive ? "#2563eb" : "#475569",
-        textDecoration: "none",
-        fontWeight: 500,
-      })}
-    >
+    <NavLink to={to} end={end} className={({ isActive }) => (isActive ? "active" : "")}>
       {children}
     </NavLink>
   );

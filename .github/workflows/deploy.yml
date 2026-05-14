@@ -1,9 +1,7 @@
 name: Deploy
 
 on:
-  workflow_run:
-    workflows: ["Tests + audits"]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -19,7 +17,6 @@ permissions:
 
 jobs:
   gate:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       backend:  ${{ steps.pick.outputs.backend }}
@@ -31,7 +28,7 @@ jobs:
           target="${{ inputs.target || 'both' }}"
           if [[ "$target" == "both" || "$target" == "backend" ]]; then echo "backend=true"  >> $GITHUB_OUTPUT; else echo "backend=false"  >> $GITHUB_OUTPUT; fi
           if [[ "$target" == "both" || "$target" == "frontend" ]]; then echo "frontend=true" >> $GITHUB_OUTPUT; else echo "frontend=false" >> $GITHUB_OUTPUT; fi
-          echo "ref=${{ github.event.workflow_run.head_sha || github.sha }}" >> $GITHUB_OUTPUT
+          echo "ref=${{ github.sha }}" >> $GITHUB_OUTPUT
 
   backend:
     needs: gate

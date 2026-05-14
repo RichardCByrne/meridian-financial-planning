@@ -335,3 +335,52 @@ def test_employer_contribution_does_not_reduce_household_cash_flow():
     cash_without = simulate(plan_without)[0].surplus_or_shortfall
     # Employer contribution is invisible to household cash flow.
     assert abs(cash_with - cash_without) < 1
+
+
+def test_employment_income_stops_at_retirement_even_with_open_end_year():
+    """Open-ended employment income must not pay past retirement_age."""
+    person = PersonInput(
+        id=1, name="Sinead", dob=date(1961, 1, 1),  # 65 in 2026
+        is_primary=True, life_expectancy=90, retirement_age=66,
+    )
+    salary = IncomeInput(
+        id=1, person_id=1, kind="employment", name="Salary",
+        gross_amount=80_000, start_year=2026, end_year=None,  # open
+        escalation_rate=0.0, pays_prsi=True, pays_usc=True,
+        pension_contribution_pct=0.0,
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=3,
+        people=[person], incomes=[salary], expenses=[], assets=[],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    # Year 0 (2026): age 65 — salary pays.
+    assert rows[0].income_by_kind.get("employment", 0) == 80_000
+    # Year 1 (2027): age 66 — retired, salary stops despite no end_year.
+    assert rows[1].income_by_kind.get("employment", 0) == 0
+    # Year 2 (2028): still no employment income.
+    assert rows[2].income_by_kind.get("employment", 0) == 0
+
+
+def test_rental_income_continues_past_retirement():
+    """Rental is passive — it must keep paying after retirement."""
+    person = PersonInput(
+        id=1, name="Brid", dob=date(1961, 1, 1),
+        is_primary=True, life_expectancy=90, retirement_age=66,
+    )
+    rental = IncomeInput(
+        id=1, person_id=1, kind="rental", name="Rental",
+        gross_amount=12_000, start_year=2026, end_year=None,
+        escalation_rate=0.0, pays_prsi=False, pays_usc=True,
+        pension_contribution_pct=0.0,
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=3,
+        people=[person], incomes=[rental], expenses=[], assets=[],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    assert rows[0].income_by_kind.get("rental", 0) == 12_000
+    assert rows[1].income_by_kind.get("rental", 0) == 12_000
+    assert rows[2].income_by_kind.get("rental", 0) == 12_000

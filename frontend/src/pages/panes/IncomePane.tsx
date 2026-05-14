@@ -48,10 +48,32 @@ export function IncomePane({ planId }: { planId: number }) {
   return (
     <div>
       {people.map((p) => (
-        <PersonIncomeBlock key={p.id} planId={planId} personId={p.id} personName={p.name} />
+        <PersonIncomeBlock
+          key={p.id}
+          planId={planId}
+          personId={p.id}
+          personName={p.name}
+          retirementYear={
+            p.retirement_age != null
+              ? new Date(p.dob).getFullYear() + p.retirement_age
+              : null
+          }
+        />
       ))}
     </div>
   );
+}
+
+const EARNED_KINDS: IncomeKind[] = ["employment", "self_employment"];
+
+function endsPastRetirement(
+  kind: IncomeKind,
+  endYear: number | null,
+  retirementYear: number | null,
+): boolean {
+  if (retirementYear == null) return false;
+  if (!EARNED_KINDS.includes(kind)) return false;
+  return endYear == null || endYear >= retirementYear;
 }
 
 type FormState = {
@@ -93,10 +115,12 @@ function PersonIncomeBlock({
   planId,
   personId,
   personName,
+  retirementYear,
 }: {
   planId: number;
   personId: number;
   personName: string;
+  retirementYear: number | null;
 }) {
   const { data, isLoading } = useIncomeFor(personId);
   const create = useCreateIncome(personId, planId);
@@ -154,6 +178,17 @@ function PersonIncomeBlock({
 
       <form onSubmit={onSubmit}>
         <FormFields form={form} setForm={setForm} />
+        {endsPastRetirement(
+          form.kind,
+          form.end_year === "" ? null : Number(form.end_year),
+          retirementYear,
+        ) && (
+          <RetirementOverlapWarning
+            retirementYear={retirementYear as number}
+            personName={personName}
+            inline
+          />
+        )}
         <button type="submit" className="btn" disabled={create.isPending}>
           Add
         </button>
@@ -191,7 +226,26 @@ function PersonIncomeBlock({
               { header: "Gross / yr", cell: (i) => fmtMoney(i.gross_amount) },
               {
                 header: "Years",
-                cell: (i) => `${i.start_year}${i.end_year ? `–${i.end_year}` : "→"}`,
+                cell: (i) => (
+                  <>
+                    {i.start_year}
+                    {i.end_year ? `–${i.end_year}` : "→"}
+                    {endsPastRetirement(i.kind, i.end_year, retirementYear) && (
+                      <span
+                        title={`${personName} retires in ${retirementYear}. Earned income is dropped at retirement regardless of end year.`}
+                        style={{
+                          marginLeft: 6,
+                          color: "#92400e",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "help",
+                        }}
+                      >
+                        ⚠
+                      </span>
+                    )}
+                  </>
+                ),
               },
               { header: "Escal.", cell: (i) => fmtPctDisplay(i.escalation_rate) },
               {
@@ -260,7 +314,48 @@ function PersonIncomeBlock({
         }
       >
         <FormFields form={editForm} setForm={setEditForm} />
+        {endsPastRetirement(
+          editForm.kind,
+          editForm.end_year === "" ? null : Number(editForm.end_year),
+          retirementYear,
+        ) && (
+          <RetirementOverlapWarning
+            retirementYear={retirementYear as number}
+            personName={personName}
+          />
+        )}
       </EditModal>
+    </div>
+  );
+}
+
+function RetirementOverlapWarning({
+  retirementYear,
+  personName,
+  inline,
+}: {
+  retirementYear: number;
+  personName: string;
+  inline?: boolean;
+}) {
+  return (
+    <div
+      role="note"
+      style={{
+        marginTop: inline ? 8 : 12,
+        marginBottom: inline ? 8 : 0,
+        padding: "8px 12px",
+        background: "#fef3c7",
+        border: "1px solid #fbbf24",
+        borderRadius: 6,
+        color: "#92400e",
+        fontSize: 13,
+      }}
+    >
+      <strong>Heads up:</strong> {personName} retires in {retirementYear}. Earned income (employment
+      and self-employment) is dropped at retirement regardless of end year, so this entry's
+      post-retirement years won't pay. Use rental, annuity, or "other" if you mean for income to
+      continue after retirement.
     </div>
   );
 }

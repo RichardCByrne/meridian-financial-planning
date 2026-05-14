@@ -1,4 +1,5 @@
 import logging
+import time
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -32,6 +33,43 @@ from app.schemas.projection import (
 )
 
 router = APIRouter(tags=["projection"])
+
+
+# --- Monte-Carlo response cache --------------------------------------------
+#
+# Each call to /projection/montecarlo runs `n` independent simulations, which
+# is the heaviest endpoint in the app. The same (plan, scenario, n, seed)
+# tuple is requested repeatedly when the user toggles the fan-chart on/off
+# or changes an unrelated chart selector, so caching the response for a
+# short window cuts that cost dramatically.
+#
+# Time-based TTL only — we do not invalidate on plan mutation. 60s is short
+# enough that stale results between an edit and the next chart fetch are
+# acceptable; the deterministic /projection endpoint reflects edits
+# immediately.
+
+_MC_CACHE_TTL_SECONDS = 60.0
+_mc_cache: dict[tuple[int, int | None, int, int | None], tuple[float, "MonteCarloResponse"]] = {}
+
+
+def _mc_cache_get(key: tuple[int, int | None, int, int | None]) -> "MonteCarloResponse | None":
+    entry = _mc_cache.get(key)
+    if entry is None:
+        return None
+    expires_at, value = entry
+    if expires_at < time.monotonic():
+        _mc_cache.pop(key, None)
+        return None
+    return value
+
+
+def _mc_cache_set(key: tuple[int, int | None, int, int | None], value: "MonteCarloResponse") -> None:
+    _mc_cache[key] = (time.monotonic() + _MC_CACHE_TTL_SECONDS, value)
+
+
+def _mc_cache_clear() -> None:
+    """Test hook — production code should never call this."""
+    _mc_cache.clear()
 
 
 def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
@@ -315,6 +353,11 @@ def get_montecarlo(
     the probability of at least one shortfall occurring across all runs.
     """
     require_plan_access(plan_id, user, db, min_role="viewer")
+    cache_key = (plan_id, scenario_id, n, seed)
+    cached = _mc_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     plan = _load_plan(plan_id, db)
     scenario = _load_scenario(plan_id, scenario_id, db)
     plan_input = _load_plan_input(plan, db)
@@ -322,7 +365,7 @@ def get_montecarlo(
         plan_input = apply_overrides(plan_input, scenario.overrides_json)
 
     result = _mc.run(plan_input, n_runs=n, seed=seed)
-    return MonteCarloResponse(
+    response = MonteCarloResponse(
         runs=result.runs,
         years=[
             MonteCarloYearRow(
@@ -340,3 +383,5 @@ def get_montecarlo(
         shortfall_probability=result.shortfall_probability,
         median_final_net_worth=result.median_final_net_worth,
     )
+    _mc_cache_set(cache_key, response)
+    return response

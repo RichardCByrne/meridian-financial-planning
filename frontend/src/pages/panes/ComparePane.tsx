@@ -50,10 +50,19 @@ export function ComparePane({ planId }: { planId: number }) {
 
   const series = useMemo(() => {
     if (!data) return [];
-    return data.a.projection.years.map((ya, i) => {
+    // Scenarios A and B may diverge in horizon length if one is shorter; only
+    // chart the overlapping prefix so we never dereference a missing year.
+    const overlap = Math.min(
+      data.a.projection.years.length,
+      data.b.projection.years.length,
+      data.delta.length,
+    );
+    const out = [];
+    for (let i = 0; i < overlap; i++) {
+      const ya = data.a.projection.years[i];
       const yb = data.b.projection.years[i];
       const d = data.delta[i];
-      return {
+      out.push({
         year: ya.year,
         a_net_worth: ya.net_worth,
         b_net_worth: yb.net_worth,
@@ -62,8 +71,9 @@ export function ComparePane({ planId }: { planId: number }) {
         a_tax: ya.total_tax + ya.investment_tax,
         b_tax: yb.total_tax + yb.investment_tax,
         net_worth_delta: d.net_worth_delta,
-      };
-    });
+      });
+    }
+    return out;
   }, [data]);
 
   const finalDelta = data?.delta[data.delta.length - 1];

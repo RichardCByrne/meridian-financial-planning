@@ -436,7 +436,8 @@ function pickDefaultYear(years: YearRow[], people: { retirement_age: number | nu
   if (shortfall) return shortfall;
   const retYears = people
     .filter((p) => p.retirement_age != null)
-    .map((p) => new Date(p.dob).getFullYear() + (p.retirement_age as number));
+    .map((p) => new Date(p.dob).getFullYear() + (p.retirement_age as number))
+    .filter((y) => Number.isFinite(y));
   if (retYears.length > 0) {
     const target = Math.min(...retYears);
     const hit = years.find((y) => y.year >= target);

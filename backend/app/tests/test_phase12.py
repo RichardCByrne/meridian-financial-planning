@@ -14,7 +14,6 @@ from app.engine.simulator import (
     AssetInput,
     AssumptionsInput,
     BequestInput,
-    ExpenseInput,
     IncomeInput,
     PersonInput,
     PlanInput,

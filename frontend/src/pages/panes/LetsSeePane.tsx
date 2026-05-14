@@ -5,7 +5,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   ComposedChart,
   Legend,
   Line,
@@ -31,6 +30,17 @@ import { ChartSkeleton } from "../../components/Skeleton";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
 type ChartKind = "net_worth" | "cash_flow" | "income_vs_expenses" | "tax";
+
+// Minimal subset of recharts' CategoricalChartState — just what we read.
+type ChartMouseState = { activeLabel?: string | number | null } | undefined;
+
+function toYear(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+type TooltipPayloadEntry = { dataKey?: string | number; value?: number };
 
 const CHART_OPTIONS: { value: ChartKind; label: string }[] = [
   { value: "net_worth", label: "Net worth" },
@@ -337,7 +347,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
               showMonteCarlo && mcData ? (
                 <ComposedChart
                   data={mcSeries}
-                  onMouseMove={(s: any) => setHoverYear(s?.activeLabel ?? null)}
+                  onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                   onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -368,7 +378,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
               ) : (
                 <AreaChart
                   data={series}
-                  onMouseMove={(s: any) => setHoverYear(s?.activeLabel ?? null)}
+                  onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                   onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -388,7 +398,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
             ) : chart === "cash_flow" ? (
               <ComposedChart
                 data={series}
-                onMouseMove={(s: any) => setHoverYear(s?.activeLabel ?? null)}
+                onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -410,7 +420,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
             ) : chart === "income_vs_expenses" ? (
               <BarChart
                 data={series}
-                onMouseMove={(s: any) => setHoverYear(s?.activeLabel ?? null)}
+                onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -431,7 +441,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
             ) : (
               <BarChart
                 data={series}
-                onMouseMove={(s: any) => setHoverYear(s?.activeLabel ?? null)}
+                onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -894,9 +904,6 @@ function YearDetailCard({
   );
 }
 
-// Cell is imported but only used inside specific charts conditionally; keep import to avoid unused warning.
-void Cell;
-
 function syntheticAssetName(id: number): string {
   if (id === -1) return "Cash";
   if (id <= -2000) return `ARF (person ${-(id + 2000)})`;
@@ -939,7 +946,7 @@ function Row({
 
 function McTooltip({ active, payload, label, mcData, deflate }: {
   active?: boolean;
-  payload?: any[];
+  payload?: TooltipPayloadEntry[];
   label?: number;
   mcData: MonteCarloResponse;
   deflate: (v: number, year: number) => number;

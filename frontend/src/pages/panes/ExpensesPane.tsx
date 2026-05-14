@@ -175,7 +175,7 @@ export function ExpensesPane({ planId }: { planId: number }) {
                       : "→"
                   }`,
               },
-              { header: "Esc.", cell: (e) => fmtPctDisplay(e.escalation_rate) },
+              { header: "Inflation", cell: (e) => fmtPctDisplay(e.escalation_rate) },
             ]}
             renderActions={(e) => (
               <>

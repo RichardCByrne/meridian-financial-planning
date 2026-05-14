@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import type {
   AssetCreate,
+  ExpenseCreate,
   FilingStatus,
   GoalCreate,
   IncomeSourceCreate,
@@ -18,6 +19,7 @@ export type WizardStepId =
   | "assets"
   | "properties"
   | "liabilities"
+  | "expenses"
   | "goals"
   | "review";
 
@@ -28,6 +30,7 @@ export const WIZARD_STEPS: WizardStepId[] = [
   "assets",
   "properties",
   "liabilities",
+  "expenses",
   "goals",
   "review",
 ];
@@ -63,6 +66,11 @@ export interface LiabilityDraft extends LiabilityCreate {
   linkedPropertyDraftId?: DraftId | null;
 }
 
+export interface ExpenseDraft extends ExpenseCreate {
+  draftId: DraftId;
+  ownerPersonDraftId?: DraftId | null;
+}
+
 export interface GoalDraft extends GoalCreate {
   draftId: DraftId;
   linkedPersonDraftId?: DraftId | null;
@@ -75,6 +83,7 @@ export interface WizardState {
   assets: AssetDraft[];
   properties: AssetDraft[];
   liabilities: LiabilityDraft[];
+  expenses: ExpenseDraft[];
   goals: GoalDraft[];
   currentStep: WizardStepId;
   dirty: boolean;
@@ -101,6 +110,10 @@ export interface WizardState {
   updateLiability: (id: DraftId, l: Partial<LiabilityDraft>) => void;
   removeLiability: (id: DraftId) => void;
 
+  addExpense: (e: Omit<ExpenseDraft, "draftId">) => DraftId;
+  updateExpense: (id: DraftId, e: Partial<ExpenseDraft>) => void;
+  removeExpense: (id: DraftId) => void;
+
   addGoal: (g: Omit<GoalDraft, "draftId">) => DraftId;
   updateGoal: (id: DraftId, g: Partial<GoalDraft>) => void;
   removeGoal: (id: DraftId) => void;
@@ -124,6 +137,7 @@ const initialState = (): Pick<
   | "assets"
   | "properties"
   | "liabilities"
+  | "expenses"
   | "goals"
   | "currentStep"
   | "dirty"
@@ -134,6 +148,7 @@ const initialState = (): Pick<
   assets: [],
   properties: [],
   liabilities: [],
+  expenses: [],
   goals: [],
   currentStep: "plan",
   dirty: false,
@@ -237,6 +252,19 @@ export const useWizard = create<WizardState>()(
           dirty: true,
         })),
 
+      addExpense: (e) => {
+        const draftId = newDraftId();
+        set((s) => ({ expenses: [...s.expenses, { ...e, draftId }], dirty: true }));
+        return draftId;
+      },
+      updateExpense: (id, e) =>
+        set((s) => ({
+          expenses: s.expenses.map((x) => (x.draftId === id ? { ...x, ...e } : x)),
+          dirty: true,
+        })),
+      removeExpense: (id) =>
+        set((s) => ({ expenses: s.expenses.filter((x) => x.draftId !== id), dirty: true })),
+
       addGoal: (g) => {
         const draftId = newDraftId();
         set((s) => ({ goals: [...s.goals, { ...g, draftId }], dirty: true }));
@@ -263,6 +291,7 @@ export const useWizard = create<WizardState>()(
         assets: s.assets,
         properties: s.properties,
         liabilities: s.liabilities,
+        expenses: s.expenses,
         goals: s.goals,
       }),
       version: 1,

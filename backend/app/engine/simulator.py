@@ -41,6 +41,16 @@ class PersonInput:
     # this at 25%; anything below leaves more in the ARF (more PAYE on drawdown,
     # bigger compounding base). Default 0.25 = previous hardcoded behaviour.
     lump_sum_pct: float = 0.25
+    # PRSI contribution history seeded at the start of the projection.
+    # The Total Contributions Approach (TCA) needs lifetime weeks to scale the
+    # state pension at retirement; the engine accumulates +52/yr while the
+    # person has any PRSI-paying income, but pre-base-year history is the
+    # caller's responsibility. Default 2080 = full TCA cap, matching legacy
+    # behaviour where everyone got the full state_pension_annual_amount.
+    prsi_weeks_at_base_year: int = 2080
+    # HomeCaring weeks already accrued before the projection starts. Capped
+    # at 1,040 (20 years) by the Department of Social Protection.
+    homecaring_weeks_at_base_year: int = 0
 
 
 @dataclass
@@ -293,6 +303,28 @@ def _amortise_year(
 
 _PENSION_WRAPPERS = ("prsa", "occupational_pension")
 
+# State-pension Total Contributions Approach (TCA) constants. From 2025 the
+# yearly-average method is being phased out (full TCA by 2034); we model the
+# TCA endpoint only — close enough for Budget 2026 base-year projections.
+_PRSI_WEEKS_FOR_FULL_PENSION = 2080  # 40 years
+_PRSI_WEEKS_MINIMUM = 520            # 10 years required to qualify at all
+_HOMECARING_WEEKS_CAP = 1040         # 20 years lifetime cap on HomeCaring credits
+
+
+def _state_pension_fraction(paid_weeks: int, homecaring_weeks: int) -> float:
+    """Fraction of the full state pension a person is entitled to under TCA.
+
+    Returns 0 if below the 520-week qualifying minimum.
+    Above the minimum, linearly scales to 1.0 at 2,080 paid+credited weeks.
+    HomeCaring credits count toward the scaling cap but NOT toward the 520
+    qualifying minimum.
+    """
+    if paid_weeks < _PRSI_WEEKS_MINIMUM:
+        return 0.0
+    credited = min(homecaring_weeks, _HOMECARING_WEEKS_CAP)
+    total = paid_weeks + credited
+    return min(1.0, total / _PRSI_WEEKS_FOR_FULL_PENSION)
+
 
 @dataclass
 class AssetState:
@@ -378,6 +410,15 @@ def simulate(plan: PlanInput) -> list[YearRow]:
     }
     retired_persons: set[int] = set()  # person ids who have already crystallised
     deceased_persons: set[int] = set()  # person ids who have already died
+    # PRSI contribution history for the Total Contributions Approach. Seeded
+    # from PersonInput.prsi_weeks_at_base_year; accumulates +52 per simulated
+    # year that the person earns any PRSI-paying income. HomeCaring weeks
+    # accumulate via income-kind "homecaring" (capped at 1,040 = 20 years).
+    prsi_weeks: dict[int, int] = {p.id: max(0, p.prsi_weeks_at_base_year) for p in plan.people}
+    homecaring_weeks: dict[int, int] = {
+        p.id: max(0, min(_HOMECARING_WEEKS_CAP, p.homecaring_weeks_at_base_year))
+        for p in plan.people
+    }
     # Cumulative lifetime inheritances per (beneficiary_person_id, cat_group) for CAT aggregation.
     lifetime_inheritances: dict[tuple[int, str], float] = {}
     goal_resolved: dict[int, str] = {}  # goal id -> last resolved status (sticks once set)
@@ -532,10 +573,16 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             earned_for_prsi = 0.0
             has_paye_income = False
             has_self_employment = False
+            has_homecaring_marker = False
             requested_pension_pct = 0.0
             employer_contribution_per_source: list[tuple[float, float]] = []
             for inc in plan.incomes:
                 if inc.person_id != person.id or not _income_active(inc, year):
+                    continue
+                # HomeCaring is a zero-gross marker — only used to credit weeks
+                # toward the state pension under TCA. Skip all monetary effects.
+                if inc.kind == "homecaring":
+                    has_homecaring_marker = True
                     continue
                 # Earned income stops at retirement even if end_year is open.
                 # Passive kinds (rental, annuity, other) keep flowing; state
@@ -561,6 +608,16 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 income_by_kind[inc.kind] = income_by_kind.get(inc.kind, 0.0) + amt
 
             gross_earned_by_person[person.id] = earned_for_it
+
+            # 3a-ii. PRSI / HomeCaring week accumulation for the state pension
+            # TCA fraction. Pre-retirement only; post-retirement is locked.
+            if not is_retired_now:
+                if earned_for_prsi > 0:
+                    prsi_weeks[person.id] += 52
+                if has_homecaring_marker:
+                    homecaring_weeks[person.id] = min(
+                        _HOMECARING_WEEKS_CAP, homecaring_weeks[person.id] + 52
+                    )
 
             # 3b. Pension contribution (pre-retirement, IT-deductible employee + employer top-up).
             pension_contribution = 0.0
@@ -666,20 +723,25 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                         income_by_kind.get("arf_drawdown", 0.0) + arf_drawdown
                     )
 
-            # 3e. State pension auto-injection.
+            # 3e. State pension auto-injection, scaled by TCA entitlement.
             state_pension_amt = 0.0
             if age >= plan.assumptions.state_pension_age:
                 # Escalate by the dedicated state pension rate (historically ~1.5–2%,
                 # much lower than general inflation due to frequent multi-year freezes).
-                state_pension_amt = _escalate(
+                full_amt = _escalate(
                     plan.assumptions.state_pension_annual_amount,
                     plan.assumptions.state_pension_escalation_rate,
                     year - plan.base_year,
                 )
-                state_pension_total += state_pension_amt
-                income_by_kind["state_pension"] = (
-                    income_by_kind.get("state_pension", 0.0) + state_pension_amt
+                fraction = _state_pension_fraction(
+                    prsi_weeks[person.id], homecaring_weeks[person.id]
                 )
+                state_pension_amt = full_amt * fraction
+                if state_pension_amt > 0:
+                    state_pension_total += state_pension_amt
+                    income_by_kind["state_pension"] = (
+                        income_by_kind.get("state_pension", 0.0) + state_pension_amt
+                    )
 
             # 3f. Tax computation.
             taxable_for_it = max(0.0, earned_for_it - pension_contribution) + arf_drawdown + state_pension_amt

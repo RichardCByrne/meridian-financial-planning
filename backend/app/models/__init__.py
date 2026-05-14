@@ -153,6 +153,12 @@ class Person(Base):
     # Fraction of pension pot taken as tax-free lump sum at retirement.
     # Irish rules cap at 25%; lower values leave more in the ARF.
     lump_sum_pct: Mapped[float] = mapped_column(Float, default=0.25, nullable=False)
+    # PRSI / HomeCaring weeks already accrued before the base year. The
+    # simulator accumulates +52/yr while income is being earned (or while a
+    # "homecaring" income marker is active). Default seeds reproduce the
+    # legacy full-state-pension behaviour.
+    prsi_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=2080, nullable=False)
+    homecaring_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="people")
     income_sources: Mapped[list["IncomeSource"]] = relationship(

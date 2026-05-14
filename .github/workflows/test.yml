@@ -40,6 +40,8 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Upgrade npm (need >=11.10 for min-release-age)
+        run: npm install -g npm@latest
       - name: Install
         working-directory: frontend
         run: npm ci

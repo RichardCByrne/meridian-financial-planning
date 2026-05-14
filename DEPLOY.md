@@ -583,7 +583,15 @@ Four ecosystems are watched: `npm` (frontend), `pip` (backend), `github-actions`
 4. Run `pip-audit` / `npm audit` — fail the PR if a new high-severity finding appears.
 5. PR with the pin diff + lockfile diff. Squash-merge.
 
-### B.5. Things deliberately not done
+### B.5. Release-age cooldown
+
+`frontend/.npmrc` sets `min-release-age=7`, refusing any package version published less than 7 days ago. Rationale: most compromised npm releases (e.g. Shai-Hulud, axios) are flagged and unpublished within a week, so a one-week cooldown automatically blocks freshly-uploaded malicious versions without slowing down considered upgrades.
+
+- Requires npm `>=11.10.0`. CI installs latest npm via `npm install -g npm@latest` before `npm ci` because Node 22 LTS still bundles npm 10.9.x. Local dev: fnm `lts-latest` (Node 24+) bundles npm 11.
+- Exceptions go in `.npmrc` as `min-release-age-exclude=<glob>` if a legitimate same-week patch is needed.
+- pip has no config-level equivalent yet. pip 26 added `--uploaded-prior-to` but it only accepts absolute timestamps, not a relative duration. The `==` pin + manual upgrade workflow in §B.4 fills the same role: a fresh malicious upload can't enter without an explicit human pin bump in a PR.
+
+### B.6. Things deliberately not done
 
 - **No `--ignore-scripts`** as a global default. Some deps need their postinstall (e.g. native binaries for `@vitejs/plugin-react`'s esbuild). The trade-off lives in the lockfile audit; switching to a global `ignore-scripts=true` would silently break the dev workflow.
 - **No package-manager swap (yarn/pnpm/bun).** The registry is the supply chain, not the install client; all three managers fetch from the same place and run the same lifecycle hooks. Bun specifically gains perf, not security.

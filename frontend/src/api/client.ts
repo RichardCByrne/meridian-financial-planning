@@ -1,6 +1,9 @@
 import { getCurrentUserForApi } from "../auth/useAuth";
+import { emitToast } from "../components/Toast";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
+
+let toastedUnauthorized = false;
 
 async function authHeader(): Promise<Record<string, string>> {
   const user = getCurrentUserForApi();
@@ -27,7 +30,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     // Token expired or missing — push the user back to login. The Firebase SDK
     // refreshes tokens transparently, so 401s usually mean a real sign-out.
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-      window.location.assign("/login");
+      // Toast once per page-load so the user understands why they were
+      // bounced. Without this the redirect feels like a random tab close.
+      if (!toastedUnauthorized) {
+        toastedUnauthorized = true;
+        emitToast({
+          kind: "error",
+          message: "Your session expired. Please sign in again.",
+        });
+      }
+      const here = window.location.pathname + window.location.search;
+      window.location.assign(`/login?next=${encodeURIComponent(here)}`);
     }
     throw new Error("Not authenticated");
   }

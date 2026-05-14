@@ -248,7 +248,7 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
         db.execute(text("SELECT 1"))
     except Exception as e:  # noqa: BLE001
         logging.getLogger(__name__).warning("Health check DB ping failed: %s", e)
-        raise HTTPException(status_code=503, detail=f"DB not reachable: {e}") from e
+        raise HTTPException(status_code=503, detail="Database not reachable") from e
     return {"status": "ok", "db": "ok"}
 
 

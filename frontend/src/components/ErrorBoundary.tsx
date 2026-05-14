@@ -18,12 +18,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
+    const showStack = import.meta.env.DEV;
     return (
       <div style={{ padding: 32, maxWidth: 720 }}>
         <h2 style={{ color: "#dc2626" }}>Something went wrong</h2>
         <p>
           The page hit an unexpected error and couldn't render. Your data is safe — try reloading.
-          If it keeps happening, the error message below may help debug it.
         </p>
         <pre
           style={{
@@ -37,8 +37,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           }}
         >
           {this.state.error.message}
-          {"\n\n"}
-          {this.state.error.stack}
+          {showStack && this.state.error.stack && (
+            <>
+              {"\n\n"}
+              {this.state.error.stack}
+            </>
+          )}
         </pre>
         <div style={{ marginTop: 16 }}>
           <button

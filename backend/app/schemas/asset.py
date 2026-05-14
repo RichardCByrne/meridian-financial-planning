@@ -13,41 +13,41 @@ ASSET_KINDS = (
 )
 
 
-_GROWTH_RATE = Field(default=0.04, ge=-0.5, le=1.0)
+_GROWTH_RATE = Field(default=0.04, ge=-0.5, le=1.0, allow_inf_nan=False)
 
 
 class AssetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     kind: str = Field(pattern="^(cash|deposit|investment_unwrapped|etf_fund|prsa|occupational_pension|arf|property_primary|property_btl)$")
-    value: float = Field(ge=0)
+    value: float = Field(ge=0, allow_inf_nan=False)
     growth_rate: float = _GROWTH_RATE
     owner_person_id: int | None = None
-    cost_basis: float = Field(default=0.0, ge=0)
+    cost_basis: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     acquired_year: int | None = Field(default=None, ge=1900, le=2200)
-    annual_contribution: float = Field(default=0.0, ge=0)
-    contribution_pct_of_net_income: float = Field(default=0.0, ge=0.0, le=1.0)
-    contribution_pct_of_gross_income: float = Field(default=0.0, ge=0.0, le=1.0)
+    annual_contribution: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    contribution_pct_of_net_income: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
+    contribution_pct_of_gross_income: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
     contribution_start_year: int | None = Field(default=None, ge=1900, le=2200)
     contribution_end_year: int | None = Field(default=None, ge=1900, le=2200)
-    avc_annual: float = Field(default=0.0, ge=0)
-    avc_pct_of_gross: float = Field(default=0.0, ge=0.0, le=1.0)
+    avc_annual: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    avc_pct_of_gross: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 class AssetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     kind: str | None = None
-    value: float | None = Field(default=None, ge=0)
-    growth_rate: float | None = Field(default=None, ge=-0.5, le=1.0)
+    value: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    growth_rate: float | None = Field(default=None, ge=-0.5, le=1.0, allow_inf_nan=False)
     owner_person_id: int | None = None
-    cost_basis: float | None = Field(default=None, ge=0)
+    cost_basis: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     acquired_year: int | None = Field(default=None, ge=1900, le=2200)
-    annual_contribution: float | None = Field(default=None, ge=0)
-    contribution_pct_of_net_income: float | None = Field(default=None, ge=0.0, le=1.0)
-    contribution_pct_of_gross_income: float | None = Field(default=None, ge=0.0, le=1.0)
+    annual_contribution: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    contribution_pct_of_net_income: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
+    contribution_pct_of_gross_income: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
     contribution_start_year: int | None = Field(default=None, ge=1900, le=2200)
     contribution_end_year: int | None = Field(default=None, ge=1900, le=2200)
-    avc_annual: float | None = Field(default=None, ge=0)
-    avc_pct_of_gross: float | None = Field(default=None, ge=0.0, le=1.0)
+    avc_annual: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    avc_pct_of_gross: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 class AssetRead(BaseModel):

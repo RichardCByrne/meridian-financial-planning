@@ -234,6 +234,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
                       marginTop: 4,
                       zIndex: 5,
                       minWidth: 220,
+                      // Bound to viewport so the overlay can't overflow the
+                      // screen on mobile when content grows.
+                      maxWidth: "calc(100vw - 24px)",
+                      maxHeight: "60vh",
+                      overflow: "auto",
                     }}
                   >
                     <label
@@ -300,7 +305,14 @@ export function LetsSeePane({ planId }: { planId: number }) {
           <GoalStrip goals={goals} years={data.years} />
         )}
 
-        <div style={{ height: isMobile ? 240 : 380, marginTop: 12 }}>
+        <div
+          style={{
+            // Fluid chart height: never below 240px, never above 380px, tracks
+            // viewport so tablet portrait isn't stuck on the mobile value.
+            height: `clamp(240px, ${isMobile ? "45vh" : "50vh"}, 380px)`,
+            marginTop: 12,
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             {chart === "net_worth" ? (
               showMonteCarlo && mcData ? (

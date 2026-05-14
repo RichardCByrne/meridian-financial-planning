@@ -54,7 +54,7 @@ Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run 
 ## Quickstart
 
 ### Prerequisites
-- **Python 3.11+** (tested on 3.14)
+- **Python 3.11+** (CI + production run on 3.13)
 - **Node.js 18+ with npm** (the dev runner uses `fnm` to pin Node LTS)
 
 ### First-time setup
@@ -85,7 +85,7 @@ OpenAPI docs: http://127.0.0.1:8000/docs
 
 ```powershell
 cd backend
-.\.venv\Scripts\python -m pytest -v        # ~5s, 132 tests
+.\.venv\Scripts\python -m pytest -v        # ~5s, 184 tests
 
 cd ..\frontend
 npm run lint                               # tsc --noEmit

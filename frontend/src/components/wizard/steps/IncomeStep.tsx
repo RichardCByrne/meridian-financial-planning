@@ -1,6 +1,7 @@
 import type { IncomeKind } from "../../../api/types";
 import { useWizard, type DraftId, type IncomeDraft } from "../../../wizard/store";
 import { HelpTip } from "../../HelpTip";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const INCOME_KINDS: { value: IncomeKind; label: string; description?: string }[] = [
@@ -145,21 +146,18 @@ function IncomeRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Gross (€/year)</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             value={income.gross_amount}
-            onChange={(e) => onChange({ gross_amount: Number(e.target.value) })}
+            onChange={(v) => onChange({ gross_amount: Number.isFinite(v) ? v : 0 })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Start year</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumericInput
+            integer
             value={income.start_year}
-            onChange={(e) => onChange({ start_year: Number(e.target.value) })}
+            onChange={(v) => onChange({ start_year: Number.isFinite(v) ? v : income.start_year })}
             style={inputStyle}
           />
         </label>
@@ -176,27 +174,20 @@ function IncomeRow({
               ignore this field.
             </HelpTip>
           </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={income.end_year ?? ""}
-            onChange={(e) =>
-              onChange({ end_year: e.target.value === "" ? null : Number(e.target.value) })
-            }
+          <NumericInput
+            integer
+            value={income.end_year ?? NaN}
+            onChange={(v) => onChange({ end_year: Number.isFinite(v) ? v : null })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Average annual growth (%)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
+          <NumericInput
             value={growthPct}
-            onChange={(e) => {
-              const pct = Number(e.target.value);
-              onChange({ escalation_rate: Number.isFinite(pct) ? pct / 100 : 0 });
-            }}
+            onChange={(v) =>
+              onChange({ escalation_rate: Number.isFinite(v) ? v / 100 : 0 })
+            }
             style={inputStyle}
           />
         </label>

@@ -1,11 +1,12 @@
 import type { AssetKind } from "../../../api/types";
 import { useWizard, type AssetDraft, type DraftId } from "../../../wizard/store";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const NON_PROPERTY_KINDS: { value: AssetKind; label: string; description?: string }[] = [
   { value: "cash", label: "Cash", description: "Current/instant access" },
   { value: "deposit", label: "Deposit", description: "Bank deposit, term account" },
-  { value: "investment_unwrapped", label: "Investment (unwrapped)", description: "CGT-bearing" },
+  { value: "investment_unwrapped", label: "Investment account", description: "Shares / funds held directly — CGT on disposal" },
   { value: "etf_fund", label: "ETF / fund", description: "8-year deemed disposal" },
   { value: "prsa", label: "PRSA", description: "Personal pension wrapper" },
   { value: "occupational_pension", label: "Occupational pension", description: "Employer scheme" },
@@ -100,22 +101,19 @@ export function AssetRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Value (€)</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             value={asset.value}
-            onChange={(e) => onChange({ value: Number(e.target.value) })}
+            onChange={(v) => onChange({ value: Number.isFinite(v) ? v : 0 })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>Growth rate (e.g. 0.04)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={asset.growth_rate ?? 0}
-            onChange={(e) => onChange({ growth_rate: Number(e.target.value) })}
+          <span style={{ fontWeight: 600 }}>Average annual growth (%)</span>
+          <NumericInput
+            value={Math.round(((asset.growth_rate ?? 0) * 100) * 100) / 100}
+            onChange={(v) =>
+              onChange({ growth_rate: Number.isFinite(v) ? v / 100 : 0 })
+            }
             style={inputStyle}
           />
         </label>

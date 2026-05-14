@@ -1,5 +1,6 @@
 import type { GoalKind } from "../../../api/types";
 import { useWizard, type GoalDraft } from "../../../wizard/store";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const KINDS: { value: GoalKind; label: string; description?: string }[] = [
@@ -100,21 +101,20 @@ function GoalRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Target amount (€)</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             value={goal.target_amount}
-            onChange={(e) => onChange({ target_amount: Number(e.target.value) })}
+            onChange={(v) => onChange({ target_amount: Number.isFinite(v) ? v : 0 })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Target year</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumericInput
+            integer
             value={goal.target_year}
-            onChange={(e) => onChange({ target_year: Number(e.target.value) })}
+            onChange={(v) =>
+              onChange({ target_year: Number.isFinite(v) ? v : goal.target_year })
+            }
             style={inputStyle}
           />
         </label>

@@ -1,5 +1,6 @@
 import type { FilingStatus } from "../../../api/types";
 import { useWizard } from "../../../wizard/store";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const FILING_OPTIONS: { value: FilingStatus; label: string; description: string }[] = [
@@ -32,21 +33,19 @@ export function PlanStep() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Base year</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={plan.base_year ?? ""}
-            onChange={(e) => setPlan({ base_year: Number(e.target.value) || undefined })}
+          <NumericInput
+            integer
+            value={plan.base_year ?? NaN}
+            onChange={(v) => setPlan({ base_year: Number.isFinite(v) ? v : undefined })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Projection years</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={plan.projection_years ?? ""}
-            onChange={(e) => setPlan({ projection_years: Number(e.target.value) || undefined })}
+          <NumericInput
+            integer
+            value={plan.projection_years ?? NaN}
+            onChange={(v) => setPlan({ projection_years: Number.isFinite(v) ? v : undefined })}
             style={inputStyle}
           />
         </label>

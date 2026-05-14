@@ -79,16 +79,16 @@ export function PlanEditorPage() {
               onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(false); }}
             />
           </div>
-          <div className="field" style={{ margin: 0, minWidth: 100 }}>
+          <div className="field" style={{ margin: 0, minWidth: 120 }}>
             <label style={{ fontSize: 12 }}>Base year</label>
             <input
               type="number"
               value={draftBaseYear}
               onChange={(e) => setDraftBaseYear(Number(e.target.value))}
-              style={{ padding: "4px 8px" }}
+              style={{ padding: "4px 8px", minWidth: 100 }}
             />
           </div>
-          <div className="field" style={{ margin: 0, minWidth: 120 }}>
+          <div className="field" style={{ margin: 0, minWidth: 140 }}>
             <label style={{ fontSize: 12 }}>Horizon (years)</label>
             <input
               type="number"
@@ -96,7 +96,7 @@ export function PlanEditorPage() {
               max={100}
               value={draftYears}
               onChange={(e) => setDraftYears(Number(e.target.value))}
-              style={{ padding: "4px 8px" }}
+              style={{ padding: "4px 8px", minWidth: 100 }}
             />
           </div>
           <button className="btn" onClick={saveEdit} disabled={updatePlan.isPending}>

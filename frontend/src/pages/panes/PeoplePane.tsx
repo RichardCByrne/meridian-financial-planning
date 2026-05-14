@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { NumericInput } from "../../components/NumericInput";
 
@@ -258,6 +258,8 @@ export function PeoplePane({ planId }: { planId: number }) {
   );
 }
 
+let _formFieldsSeq = 0;
+
 function FormFields({
   form,
   setForm,
@@ -267,22 +269,37 @@ function FormFields({
   setForm: (f: FormState) => void;
   placeholderName?: string;
 }) {
+  // Module-level counter gives a stable unique id for label/htmlFor pairing
+  // across two simultaneous FormFields (Add + Edit modal) without pulling in
+  // useId-specific React quirks for SSR.
+  const idRef = useRef<number | null>(null);
+  if (idRef.current === null) idRef.current = ++_formFieldsSeq;
+  const prefix = `person-form-${idRef.current}`;
+  const nameMissing = !form.name.trim();
+
   return (
     <div className="row" style={{ alignItems: "flex-end" }}>
       <div className="field" style={{ flex: 2 }}>
-        <label>Name</label>
+        <label htmlFor={`${prefix}-name`}>Name</label>
         <input
+          id={`${prefix}-name`}
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder={placeholderName}
+          required
+          aria-required="true"
+          aria-invalid={nameMissing || undefined}
         />
       </div>
       <div className="field" style={{ flex: 1 }}>
-        <label>Date of birth</label>
+        <label htmlFor={`${prefix}-dob`}>Date of birth</label>
         <input
+          id={`${prefix}-dob`}
           type="date"
           value={form.dob}
           onChange={(e) => setForm({ ...form, dob: e.target.value })}
+          required
+          aria-required="true"
         />
       </div>
       <div className="field" style={{ flex: 1 }}>

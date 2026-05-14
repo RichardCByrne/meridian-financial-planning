@@ -3,8 +3,12 @@
 # Multi-stage so the runtime layer doesn't carry pip / wheel cache. The runtime
 # stage runs `alembic upgrade head` before starting uvicorn so a deploy never
 # serves traffic against a half-migrated DB.
+#
+# Python 3.13 (not 3.14): most native deps (psycopg, cryptography) still ship
+# prebuilt wheels for 3.13, so pip skips source compilation. Saves ~2-3 min
+# per cold build.
 
-FROM python:3.14-slim AS builder
+FROM python:3.13-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -12,20 +16,30 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 WORKDIR /build
 
-# Copy only the manifest first so the layer cache survives app-code changes.
+# Install deps once, keyed only on pyproject.toml. A stub `app/` package lets
+# `pip install .` resolve the local project without pulling in the real source
+# yet — so the deps layer stays cached across app-code changes. Without this,
+# every commit busts the pip-install layer (which reinstalls fastapi /
+# sqlalchemy / psycopg / firebase-admin etc. from scratch).
 COPY pyproject.toml ./
+RUN mkdir -p app && touch app/__init__.py && \
+    pip install --upgrade pip && pip install .
+
+# Real source — layered AFTER deps so app-code changes don't invalidate the
+# install layer. site-packages still holds the empty stub; the runtime stage
+# below copies the real `app/` to /app/app, which sits earlier on sys.path
+# (CWD wins over site-packages) so imports resolve to the real code.
 COPY app ./app
-RUN pip install --upgrade pip && pip install .
 
 # ----------
 
-FROM python:3.14-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000
 
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 WORKDIR /app

@@ -57,11 +57,11 @@ export function AcceptInvitePage() {
               from the matching account.
             </p>
           )}
-          {preview.data.expires_at && (
-            <p className="muted">
-              Expires {new Date(preview.data.expires_at).toLocaleString()}
-            </p>
-          )}
+          {preview.data.expires_at && (() => {
+            const d = new Date(preview.data.expires_at);
+            if (Number.isNaN(d.getTime())) return null;
+            return <p className="muted">Expires {d.toLocaleString()}</p>;
+          })()}
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn" onClick={onAccept} disabled={accept.isPending}>
               {accept.isPending ? "Accepting…" : "Accept invite"}

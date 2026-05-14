@@ -99,8 +99,11 @@ function formatValue(field: FieldDef, raw: unknown): string {
 
 function parseValue(field: FieldDef, raw: string): unknown {
   if (raw === "") return null;
-  if (field.kind === "percent" || field.kind === "number") return Number(raw);
-  if (field.kind === "int") return Math.trunc(Number(raw));
+  if (field.kind === "percent" || field.kind === "number" || field.kind === "int") {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    return field.kind === "int" ? Math.trunc(n) : n;
+  }
   return raw;
 }
 

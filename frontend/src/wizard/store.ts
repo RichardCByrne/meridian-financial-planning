@@ -113,7 +113,7 @@ const defaultPlan = (): PlanDraft => ({
   name: "",
   base_year: new Date().getFullYear(),
   projection_years: 40,
-  filing_status: null as FilingStatus | null,
+  filing_status: "single" as FilingStatus,
 });
 
 const initialState = (): Pick<

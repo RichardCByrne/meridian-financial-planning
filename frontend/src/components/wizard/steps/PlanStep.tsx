@@ -2,11 +2,14 @@ import type { FilingStatus } from "../../../api/types";
 import { useWizard } from "../../../wizard/store";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
-const FILING_OPTIONS: { value: FilingStatus | "auto"; label: string; description: string }[] = [
-  { value: "auto", label: "Auto-detect", description: "Inferred from household structure" },
+const FILING_OPTIONS: { value: FilingStatus; label: string; description: string }[] = [
   { value: "single", label: "Single", description: "Assessed individually" },
   { value: "married", label: "Married / civil partnership", description: "Joint assessment" },
-  { value: "cohabiting", label: "Cohabiting", description: "Treated individually under Irish law" },
+  {
+    value: "cohabiting",
+    label: "Cohabiting",
+    description: "Living together, not married — taxed individually under Irish law",
+  },
 ];
 
 export function PlanStep() {
@@ -51,12 +54,15 @@ export function PlanStep() {
 
       <label style={{ display: "grid", gap: 4 }}>
         <span style={{ fontWeight: 600 }}>Filing status</span>
-        <ResponsiveSelect<FilingStatus | "auto">
-          value={(plan.filing_status as FilingStatus | null) ?? "auto"}
-          onChange={(v) => setPlan({ filing_status: v === "auto" ? null : v })}
+        <ResponsiveSelect<FilingStatus>
+          value={(plan.filing_status as FilingStatus | null) ?? "single"}
+          onChange={(v) => setPlan({ filing_status: v })}
           options={FILING_OPTIONS}
           label="Filing status"
         />
+        <span className="muted" style={{ fontSize: 12, color: "#64748b" }}>
+          You can change this later in the editor.
+        </span>
       </label>
     </div>
   );

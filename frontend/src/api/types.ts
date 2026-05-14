@@ -315,6 +315,22 @@ export interface BequestCreate {
 
 export type BequestUpdate = Partial<BequestCreate>;
 
+export interface Child {
+  id: number;
+  plan_id: number;
+  name: string;
+  dob: string;
+  primary_carer_id: number | null;
+}
+
+export interface ChildCreate {
+  name: string;
+  dob: string;
+  primary_carer_id?: number | null;
+}
+
+export type ChildUpdate = Partial<ChildCreate>;
+
 export interface YearRow {
   year: number;
   ages: Record<number, number>;

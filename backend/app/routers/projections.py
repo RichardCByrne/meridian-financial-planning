@@ -13,6 +13,7 @@ from app.engine.simulator import (
     AssetInput,
     AssumptionsInput,
     BequestInput,
+    ChildInput,
     ExpenseInput,
     GoalInput,
     IncomeInput,
@@ -23,7 +24,7 @@ from app.engine.simulator import (
 )
 from app.engine import montecarlo as _mc
 from app.engine.tax_config import TaxConfig
-from app.models import Assumptions, Bequest, IncomeSource, Plan, Scenario, TaxConfigRow, User
+from app.models import Assumptions, Bequest, Child, IncomeSource, Plan, Scenario, TaxConfigRow, User
 from app.schemas.projection import (
     MonteCarloResponse,
     MonteCarloYearRow,
@@ -190,6 +191,18 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         )
         for b in bequests_raw
     ]
+    children_raw = list(
+        db.execute(select(Child).where(Child.plan_id == plan.id)).scalars()
+    )
+    children = [
+        ChildInput(
+            id=c.id,
+            name=c.name,
+            dob=c.dob,
+            primary_carer_id=c.primary_carer_id,
+        )
+        for c in children_raw
+    ]
     tax_config = _resolve_plan_tax_config(plan, db)
     return PlanInput(
         base_year=plan.base_year,
@@ -201,6 +214,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         liabilities=liabilities,
         goals=goals,
         bequests=bequests,
+        children=children,
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,

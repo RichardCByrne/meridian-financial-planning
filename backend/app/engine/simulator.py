@@ -131,6 +131,16 @@ class GoalInput:
 
 
 @dataclass
+class ChildInput:
+    id: int
+    name: str
+    dob: date
+    # Person who receives the Child Benefit payment (typically the primary
+    # carer). None = pay to the plan's primary person.
+    primary_carer_id: int | None = None
+
+
+@dataclass
 class AssumptionsInput:
     inflation_rate: float = 0.025
     default_growth_rate: float = 0.05
@@ -153,6 +163,7 @@ class PlanInput:
     liabilities: list[LiabilityInput] = field(default_factory=list)
     goals: list[GoalInput] = field(default_factory=list)
     bequests: list[BequestInput] = field(default_factory=list)
+    children: list[ChildInput] = field(default_factory=list)
     # Tax-rule constants. None = use IRELAND_2026_OFFICIAL.
     tax_config: TaxConfig | None = None
     # Filing status override. None → auto (1 person → single, 2+ → married).
@@ -785,6 +796,26 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         total_prsi = sum(pr.prsi for pr in person_rows)
         total_tax = total_it + total_usc + total_prsi
         net_income = gross_income_total - total_tax
+
+        # ----- 3.4. Child Benefit (tax-free, paid to the primary carer) -----
+        # €140/mo × 12 per child under the age limit, escalated. Adds to
+        # household gross + net income; no IT / USC / PRSI charge.
+        child_benefit_total = 0.0
+        for child in plan.children:
+            child_age = year - child.dob.year
+            if 0 <= child_age < tax_config.child_benefit_age_limit:
+                annual = _escalate(
+                    tax_config.child_benefit_monthly * 12.0,
+                    tax_config.child_benefit_escalation,
+                    year - plan.base_year,
+                )
+                child_benefit_total += annual
+        if child_benefit_total > 0:
+            gross_income_total += child_benefit_total
+            net_income += child_benefit_total
+            income_by_kind["child_benefit"] = (
+                income_by_kind.get("child_benefit", 0.0) + child_benefit_total
+            )
 
         # ----- 3.5. Asset contributions (fixed / % net income / % gross income) -----
         # Funded from cash flow (deducted in step 5); cost basis rises by the amount contributed.

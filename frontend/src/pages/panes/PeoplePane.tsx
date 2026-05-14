@@ -294,8 +294,8 @@ function FormFields({
   const nameMissing = !form.name.trim();
 
   return (
-    <div className="row" style={{ alignItems: "flex-end" }}>
-      <div className="field" style={{ flex: 2 }}>
+    <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
+      <div className="field" style={{ flex: "2 1 200px", minWidth: 200 }}>
         <label htmlFor={`${prefix}-name`}>Name</label>
         <input
           id={`${prefix}-name`}
@@ -307,7 +307,7 @@ function FormFields({
           aria-invalid={nameMissing || undefined}
         />
       </div>
-      <div className="field" style={{ flex: 1 }}>
+      <div className="field" style={{ flex: "1 1 140px", minWidth: 140 }}>
         <label htmlFor={`${prefix}-dob`}>Date of birth</label>
         <input
           id={`${prefix}-dob`}
@@ -318,7 +318,7 @@ function FormFields({
           aria-required="true"
         />
       </div>
-      <div className="field" style={{ flex: 1 }}>
+      <div className="field" style={{ flex: "1 1 110px", minWidth: 110 }}>
         <label>Life expectancy</label>
         <NumericInput
           integer
@@ -326,7 +326,7 @@ function FormFields({
           onChange={(v) => Number.isFinite(v) && setForm({ ...form, life_expectancy: v })}
         />
       </div>
-      <div className="field" style={{ flex: 1 }}>
+      <div className="field" style={{ flex: "1 1 110px", minWidth: 110 }}>
         <label>Retirement age</label>
         <NumericInput
           integer
@@ -335,7 +335,7 @@ function FormFields({
           onChange={(v) => setForm({ ...form, retirement_age: Number.isFinite(v) ? v : "" })}
         />
       </div>
-      <div className="field" style={{ flex: 0 }}>
+      <div className="field" style={{ flex: "0 0 auto", minWidth: 70 }}>
         <label>
           Primary
           <HelpTip>Head of household. Default owner for joint expenses.</HelpTip>
@@ -346,7 +346,7 @@ function FormFields({
           onChange={(e) => setForm({ ...form, is_primary: e.target.checked })}
         />
       </div>
-      <div className="field" style={{ flex: 0 }}>
+      <div className="field" style={{ flex: "0 0 auto", minWidth: 90 }}>
         <label>
           Rent credit
           <HelpTip>
@@ -360,7 +360,7 @@ function FormFields({
           onChange={(e) => setForm({ ...form, claims_rent_credit: e.target.checked })}
         />
       </div>
-      <div className="field" style={{ flex: 1 }}>
+      <div className="field" style={{ flex: "1 1 110px", minWidth: 110 }}>
         <label>
           Lump sum %
           <HelpTip>

@@ -98,34 +98,36 @@ export function ResponsiveTable<T>({
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          {columns.map((c) => (
-            <th key={c.header} style={c.align ? { textAlign: c.align } : undefined}>
-              {c.header}
-              {c.thExtra}
-            </th>
-          ))}
-          {renderActions && <th />}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={getKey(r)}>
+    <div style={{ overflowX: "auto", width: "100%" }}>
+      <table>
+          <thead>
+          <tr>
             {columns.map((c) => (
-              <td key={c.header} style={c.align ? { textAlign: c.align } : undefined}>
-                {c.cell(r)}
-              </td>
+              <th key={c.header} style={c.align ? { textAlign: c.align } : undefined}>
+                {c.header}
+                {c.thExtra}
+              </th>
             ))}
-            {renderActions && (
-              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                {renderActions(r)}
-              </td>
-            )}
+            {renderActions && <th />}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={getKey(r)}>
+              {columns.map((c) => (
+                <td key={c.header} style={c.align ? { textAlign: c.align } : undefined}>
+                  {c.cell(r)}
+                </td>
+              ))}
+              {renderActions && (
+                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  {renderActions(r)}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

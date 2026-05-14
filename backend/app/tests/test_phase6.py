@@ -12,7 +12,6 @@ from app.engine.simulator import (
     ExpenseInput,
     GoalInput,
     IncomeInput,
-    LiabilityInput,
     PersonInput,
     PlanInput,
     simulate,

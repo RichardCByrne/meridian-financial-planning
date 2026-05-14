@@ -5,7 +5,6 @@ from datetime import date
 from app.engine.simulator import (
     AssetInput,
     AssumptionsInput,
-    ExpenseInput,
     IncomeInput,
     PersonInput,
     PlanInput,

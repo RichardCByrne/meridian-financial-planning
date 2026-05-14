@@ -7,7 +7,7 @@
 #   _SERVICE               — Cloud Run service name (e.g. meridian-api)
 #
 # Secrets pulled from Secret Manager at deploy-time:
-#   DATABASE_URL                   — postgresql+psycopg://USER:PASS@/DB?host=/cloudsql/<inst>
+#   DATABASE_URL                   — postgresql+psycopg://USER:PASS@HOST/DB?sslmode=require (Neon pooled)
 #   FIREBASE_SERVICE_ACCOUNT_JSON  — full JSON, mounted as a file at /secrets/firebase.json
 #   ALLOWED_ORIGINS                — comma-separated list of frontend origins
 
@@ -31,7 +31,7 @@ steps:
       - --all-tags
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
 
-  # 3. Deploy to Cloud Run with Cloud SQL attached and secrets mounted.
+  # 3. Deploy to Cloud Run with secrets mounted (Neon Postgres via plain TCP/TLS).
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: deploy
     entrypoint: gcloud

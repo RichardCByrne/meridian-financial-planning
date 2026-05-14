@@ -150,6 +150,9 @@ class Person(Base):
     # one spouse may rent their workplace digs while the other doesn't (joint
     # assessment then doubles the value via tax_ie._income_tax).
     claims_rent_credit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Fraction of pension pot taken as tax-free lump sum at retirement.
+    # Irish rules cap at 25%; lower values leave more in the ARF.
+    lump_sum_pct: Mapped[float] = mapped_column(Float, default=0.25, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="people")
     income_sources: Mapped[list["IncomeSource"]] = relationship(

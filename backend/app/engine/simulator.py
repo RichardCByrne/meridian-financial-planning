@@ -37,6 +37,10 @@ class PersonInput:
     life_expectancy: int
     retirement_age: int | None = None
     claims_rent_credit: bool = False
+    # Fraction of pension pot taken as lump sum at retirement. Irish rules cap
+    # this at 25%; anything below leaves more in the ARF (more PAYE on drawdown,
+    # bigger compounding base). Default 0.25 = previous hardcoded behaviour.
+    lump_sum_pct: float = 0.25
 
 
 @dataclass
@@ -611,7 +615,8 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                     if st.kind in _PENSION_WRAPPERS and st.owner == person.id and st.balance > 0
                 )
                 if pot > 0:
-                    lump_sum = 0.25 * pot
+                    lump_sum_pct = max(0.0, min(0.25, person.lump_sum_pct))
+                    lump_sum = lump_sum_pct * pot
                     arf_amount = pot - lump_sum
                     crystallised_lump_sum = lump_sum
                     crystallised_lump_sum_tax = pension_ie.lump_sum_tax(lump_sum, tax_config)

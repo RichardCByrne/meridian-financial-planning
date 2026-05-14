@@ -122,6 +122,57 @@ def test_retirement_creates_lump_sum_and_arf():
     assert abs(r1.asset_balances.get(-2001, 0) - 150_000 * (1 - 0.04)) < 5_000  # less the imputed drawdown
 
 
+def test_partial_lump_sum_pct_routes_more_to_arf():
+    """lump_sum_pct=0.10 → 10% lump, 90% ARF (vs. default 25/75)."""
+    person = PersonInput(
+        id=1, name="Niamh", dob=date(1961, 1, 1),
+        is_primary=True, life_expectancy=90, retirement_age=66,
+        lump_sum_pct=0.10,
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=2,
+        people=[person],
+        incomes=[],
+        expenses=[],
+        assets=[
+            AssetInput(id=1, name="Cash", kind="cash", value=10_000, growth_rate=0.0, cost_basis=0.0),
+            AssetInput(id=2, name="PRSA", kind="prsa", value=200_000, growth_rate=0.0,
+                       cost_basis=0.0, owner_person_id=1),
+        ],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    r1 = rows[1]
+    # 200k pot * 10% = 20k lump, 180k → ARF. Lump under 200k threshold → tax 0.
+    assert abs(r1.pension_lump_sum - 20_000) < 1
+    assert r1.pension_lump_sum_tax == 0
+    # ARF holds 180k less the year-1 imputed 4% drawdown.
+    assert abs(r1.asset_balances.get(-2001, 0) - 180_000 * (1 - 0.04)) < 5_000
+
+
+def test_lump_sum_pct_clamped_above_25_pct():
+    """Out-of-range lump_sum_pct values are clamped to the legal 0–25% range."""
+    person = PersonInput(
+        id=1, name="Greedy", dob=date(1961, 1, 1),
+        is_primary=True, life_expectancy=90, retirement_age=66,
+        lump_sum_pct=0.50,  # illegal, must clamp to 0.25
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=2,
+        people=[person],
+        incomes=[],
+        expenses=[],
+        assets=[
+            AssetInput(id=1, name="Cash", kind="cash", value=0, growth_rate=0.0, cost_basis=0.0),
+            AssetInput(id=2, name="PRSA", kind="prsa", value=200_000, growth_rate=0.0,
+                       cost_basis=0.0, owner_person_id=1),
+        ],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    assert abs(rows[1].pension_lump_sum - 50_000) < 1  # 25% of 200k
+
+
 def test_lump_sum_tax_above_200k_threshold():
     """Pot of 1M → lump sum 250k. Tax = 50k * 20% = 10k."""
     person = PersonInput(

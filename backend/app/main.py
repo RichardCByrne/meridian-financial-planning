@@ -121,6 +121,14 @@ def _apply_lightweight_migrations() -> None:
                         "claims_rent_credit BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
+        if "lump_sum_pct" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE people ADD COLUMN "
+                        "lump_sum_pct FLOAT NOT NULL DEFAULT 0.25"
+                    )
+                )
     if "assumptions" in tables:
         cols = {c["name"] for c in insp.get_columns("assumptions")}
         if "state_pension_escalation_rate" not in cols:

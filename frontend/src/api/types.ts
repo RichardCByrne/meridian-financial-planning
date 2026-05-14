@@ -55,6 +55,7 @@ export interface Person {
   gender_for_state_pension: string | null;
   retirement_age: number | null;
   claims_rent_credit: boolean;
+  lump_sum_pct: number;
 }
 
 export interface PersonCreate {
@@ -65,6 +66,7 @@ export interface PersonCreate {
   gender_for_state_pension?: string | null;
   retirement_age?: number | null;
   claims_rent_credit?: boolean;
+  lump_sum_pct?: number;
 }
 
 export interface Assumptions {

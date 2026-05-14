@@ -804,6 +804,38 @@ function YearDetailCard({
               muted
             />
           )}
+          {(row.arf_drawdowns > 0 || row.state_pension_total > 0) && (
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 8,
+                borderTop: "1px dashed #e2e8f0",
+              }}
+            >
+              <h5 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Monthly retirement income
+              </h5>
+              {row.arf_drawdowns > 0 && (
+                <Row
+                  label="ARF (gross)"
+                  value={`${fy(row.arf_drawdowns / 12)} / mo`}
+                  muted
+                />
+              )}
+              {row.state_pension_total > 0 && (
+                <Row
+                  label="State pension"
+                  value={`${fy(row.state_pension_total / 12)} / mo`}
+                  muted
+                />
+              )}
+              <Row
+                label="Total net income"
+                value={`${fy(row.net_income_total / 12)} / mo`}
+                bold
+              />
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Expenses</h4>

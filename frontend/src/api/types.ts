@@ -58,6 +58,7 @@ export interface Person {
   lump_sum_pct: number;
   prsi_weeks_at_base_year: number;
   homecaring_weeks_at_base_year: number;
+  arf_target_drawdown_pct: number | null;
 }
 
 export interface PersonCreate {
@@ -71,6 +72,7 @@ export interface PersonCreate {
   lump_sum_pct?: number;
   prsi_weeks_at_base_year?: number;
   homecaring_weeks_at_base_year?: number;
+  arf_target_drawdown_pct?: number | null;
 }
 
 export interface Assumptions {

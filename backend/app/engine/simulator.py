@@ -51,6 +51,11 @@ class PersonInput:
     # HomeCaring weeks already accrued before the projection starts. Capped
     # at 1,040 (20 years) by the Department of Social Protection.
     homecaring_weeks_at_base_year: int = 0
+    # Voluntary ARF drawdown rate. None = use statutory minimum only (4%/5%/6%).
+    # When set, engine draws max(statutory_minimum, target) each post-retirement
+    # year. Lets users model "I want 6% drawdown" or back-solve from a target
+    # monthly spend. Range [0.0, 1.0].
+    arf_target_drawdown_pct: float | None = None
 
 
 @dataclass
@@ -732,7 +737,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                     for st in states.values()
                     if st.kind == "arf" and st.owner == person.id
                 )
-                pct = pension_ie.arf_minimum_drawdown_pct(age, arf_total, tax_config)
+                min_pct = pension_ie.arf_minimum_drawdown_pct(age, arf_total, tax_config)
+                # Voluntary higher drawdown — take the bigger of the statutory
+                # minimum and the user's target. Clamped to 1.0 so we can't
+                # withdraw more than the pot in a single year.
+                target_pct = person.arf_target_drawdown_pct or 0.0
+                pct = min(1.0, max(min_pct, target_pct))
                 if pct > 0 and arf_total > 0:
                     arf_drawdown = arf_total * pct
                     # Pull pro-rata from each ARF owned by this person.

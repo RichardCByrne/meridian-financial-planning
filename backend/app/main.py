@@ -146,6 +146,11 @@ def _apply_lightweight_migrations() -> None:
                         "homecaring_weeks_at_base_year INTEGER NOT NULL DEFAULT 0"
                     )
                 )
+        if "arf_target_drawdown_pct" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE people ADD COLUMN arf_target_drawdown_pct FLOAT")
+                )
     # children table picked up by Base.metadata.create_all on the dev path.
     if "liabilities" in tables:
         cols = {c["name"] for c in insp.get_columns("liabilities")}

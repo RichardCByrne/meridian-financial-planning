@@ -1,5 +1,6 @@
 import type { IncomeKind } from "../../../api/types";
 import { useWizard, type DraftId, type IncomeDraft } from "../../../wizard/store";
+import { HelpTip } from "../../HelpTip";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const INCOME_KINDS: { value: IncomeKind; label: string; description?: string }[] = [
@@ -168,7 +169,16 @@ function IncomeRow({
       {!isBonus && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontWeight: 600 }}>End year (optional)</span>
+            <span style={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              End year (optional)
+              <HelpTip>
+                Leave blank to run indefinitely. Earned income (employment / self-employment) stops
+                automatically at the owner's retirement age regardless of what you set here.
+                Passive income (rental, annuity, other) keeps flowing past retirement unless you
+                set an end year. State pension and ARF drawdowns are injected by the engine
+                separately and ignore this field.
+              </HelpTip>
+            </span>
             <input
               type="number"
               inputMode="numeric"

@@ -13,6 +13,7 @@ from app.routers import (
     assets,
     assumptions,
     bequests,
+    children,
     expenses,
     goals,
     income,
@@ -145,6 +146,7 @@ def _apply_lightweight_migrations() -> None:
                         "homecaring_weeks_at_base_year INTEGER NOT NULL DEFAULT 0"
                     )
                 )
+    # children table picked up by Base.metadata.create_all on the dev path.
     if "assumptions" in tables:
         cols = {c["name"] for c in insp.get_columns("assumptions")}
         if "state_pension_escalation_rate" not in cols:
@@ -278,6 +280,7 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
 
 app.include_router(plans.router, prefix="/api")
 app.include_router(bequests.router, prefix="/api")
+app.include_router(children.router, prefix="/api")
 app.include_router(people.router, prefix="/api")
 app.include_router(assumptions.router, prefix="/api")
 app.include_router(income.router, prefix="/api")

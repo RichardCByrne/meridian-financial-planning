@@ -110,6 +110,16 @@ class TaxConfig:
     credit_age_married: float = 490.0
     age_credit_threshold_age: int = 65
 
+    # Child Benefit (tax-free social welfare payment to the primary carer of a
+    # child under 18). 2026 base rate: €140 / month per child. Escalation rate
+    # is a long-run geometric mean from 2002 (€117.60) to 2026 (€140), ≈ 0.73%
+    # — Child Benefit has been flat at €140 since 2016 but moved with Budget
+    # decisions before that. 0.0075 keeps projections honest without assuming
+    # CPI-style indexation that has never materialised.
+    child_benefit_monthly: float = 140.0
+    child_benefit_escalation: float = 0.0075
+    child_benefit_age_limit: int = 18
+
     def to_dict(self) -> dict[str, Any]:
         """JSON-serialisable representation. Tuples become lists."""
         d = asdict(self)

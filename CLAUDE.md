@@ -8,7 +8,7 @@ Repo: https://github.com/RichardCByrne/meridian-financial-planning
 
 Meridian is a single-repo financial planning app for Ireland with an in-house tax/pension engine (Budget 2026). FastAPI + SQLAlchemy backend, Vite + React 19 + TypeScript frontend. Local dev uses SQLite; production runs on Cloud Run with **Neon** serverless Postgres (free tier, autosuspends on idle) and Firebase Hosting for the static frontend. Cloud SQL is documented as a one-secret swap in `DEPLOY.md` Appendix A but not the default.
 
-The project is organised as numbered phases (1–13 done; Phase 14 = AI walkthrough is next). Backend tests are split per-phase under `backend/app/tests/test_phase*.py` plus engine-level tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`). Test count target: keep `pytest` green (currently 132/132).
+The project is organised as numbered phases (1–13 done; Phase 14 = AI walkthrough is next). Backend tests are split per-phase under `backend/app/tests/test_phase*.py` plus engine-level tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`). Test count target: keep `pytest` green (currently 184/184).
 
 ## Commands
 

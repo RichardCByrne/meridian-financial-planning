@@ -5,6 +5,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 
 import { App } from "./App";
 import { AuthProvider } from "./auth/useAuth";
+import { ConfirmDialogHost } from "./components/ConfirmDialog";
 import { ToastProvider, emitToast } from "./components/Toast";
 import "./index.css";
 
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <BrowserRouter>
           <AuthProvider>
             <App />
+            <ConfirmDialogHost />
           </AuthProvider>
         </BrowserRouter>
       </ToastProvider>

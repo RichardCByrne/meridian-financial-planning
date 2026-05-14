@@ -10,6 +10,7 @@ import {
 } from "../../api/hooks";
 import type { PlanInvite, PlanMember, PlanRole } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
+import { confirmDialog } from "../../components/ConfirmDialog";
 import { HelpTip } from "../../components/HelpTip";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { TableSkeleton } from "../../components/Skeleton";
@@ -167,13 +168,17 @@ export function SharingPane({ planId }: { planId: number }) {
               return (
                 <button
                   className="btn btn-secondary"
-                  onClick={() => {
+                  onClick={async () => {
                     const label = isMe
                       ? "leave this plan"
                       : `remove ${m.display_name || m.email}`;
-                    if (confirm(`Are you sure you want to ${label}?`)) {
-                      removeMember.mutate(m.user_id);
-                    }
+                    const ok = await confirmDialog({
+                      title: isMe ? "Leave plan?" : "Remove member?",
+                      message: `Are you sure you want to ${label}?`,
+                      confirmLabel: isMe ? "Leave" : "Remove",
+                      danger: true,
+                    });
+                    if (ok) removeMember.mutate(m.user_id);
                   }}
                 >
                   {isMe ? "Leave plan" : "Remove"}

@@ -13,7 +13,12 @@ export function LoginPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const fromPath = (location.state as { from?: string } | null)?.from ?? "/plans";
+  // Honour `state.from` (set by ProtectedRoute) first, then fall back to the
+  // `?next=` query param which is used when the API client triggers a full
+  // page reload via window.location.assign on a 401 response.
+  const queryNext = new URLSearchParams(location.search).get("next");
+  const fromPath =
+    (location.state as { from?: string } | null)?.from ?? queryNext ?? "/plans";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

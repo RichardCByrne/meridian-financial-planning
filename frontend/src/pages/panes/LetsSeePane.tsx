@@ -46,7 +46,7 @@ const REAL_TOGGLE_KEY = (id: number) => `meridian:letsSee:real:${id}`;
 const MC_N_KEY = (id: number) => `meridian:letsSee:mcN:${id}`;
 
 export function LetsSeePane({ planId }: { planId: number }) {
-  const { data, isLoading, error } = useProjection(planId);
+  const { data, isLoading, error, refetch, isFetching } = useProjection(planId);
   const { data: plan } = usePlan(planId);
   const { data: assumptions } = useAssumptions(planId);
   const { data: people } = usePeople(planId);
@@ -164,7 +164,26 @@ export function LetsSeePane({ planId }: { planId: number }) {
       </div>
     );
   if (error)
-    return <p style={{ color: "#dc2626" }}>Couldn't run projection: {String(error)}</p>;
+    return (
+      <div
+        className="card"
+        style={{ borderLeft: "4px solid #dc2626", background: "#fef2f2" }}
+        role="alert"
+      >
+        <p style={{ marginTop: 0, color: "#991b1b" }}>
+          <strong>Couldn't run projection.</strong>
+        </p>
+        <p style={{ color: "#7f1d1d", fontSize: 13, marginBottom: 12 }}>{String(error)}</p>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? "Retrying…" : "Retry"}
+        </button>
+      </div>
+    );
   if (!data) return null;
 
   const incomeKinds = Array.from(

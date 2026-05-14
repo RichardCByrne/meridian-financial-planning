@@ -26,6 +26,7 @@ export function buildSampleHouseholdPayload(): Record<string, unknown> {
         gender_for_state_pension: "female",
         retirement_age: 66,
         claims_rent_credit: false,
+        lump_sum_pct: 0.25,
         income_sources: [
           {
             kind: "employment",
@@ -50,6 +51,7 @@ export function buildSampleHouseholdPayload(): Record<string, unknown> {
         gender_for_state_pension: "male",
         retirement_age: 66,
         claims_rent_credit: false,
+        lump_sum_pct: 0.25,
         income_sources: [
           {
             kind: "employment",

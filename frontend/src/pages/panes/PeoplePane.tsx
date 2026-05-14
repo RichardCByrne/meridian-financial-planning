@@ -24,6 +24,7 @@ type FormState = {
   life_expectancy: number;
   retirement_age: number | "";
   claims_rent_credit: boolean;
+  lump_sum_pct: number; // whole-number percent, 0–25
 };
 
 const blankForm: FormState = {
@@ -33,6 +34,7 @@ const blankForm: FormState = {
   life_expectancy: 90,
   retirement_age: 66,
   claims_rent_credit: false,
+  lump_sum_pct: 25,
 };
 
 function fromPerson(p: Person): FormState {
@@ -43,6 +45,7 @@ function fromPerson(p: Person): FormState {
     life_expectancy: p.life_expectancy,
     retirement_age: p.retirement_age ?? "",
     claims_rent_credit: p.claims_rent_credit ?? false,
+    lump_sum_pct: Math.round((p.lump_sum_pct ?? 0.25) * 1000) / 10,
   };
 }
 
@@ -67,6 +70,7 @@ export function PeoplePane({ planId }: { planId: number }) {
       life_expectancy: p.life_expectancy,
       retirement_age: p.retirement_age,
       claims_rent_credit: p.claims_rent_credit,
+      lump_sum_pct: p.lump_sum_pct,
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -86,6 +90,7 @@ export function PeoplePane({ planId }: { planId: number }) {
     life_expectancy: f.life_expectancy,
     retirement_age: f.retirement_age === "" ? null : Number(f.retirement_age),
     claims_rent_credit: f.claims_rent_credit,
+    lump_sum_pct: Math.max(0, Math.min(0.25, f.lump_sum_pct / 100)),
   });
 
   const onFilingStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -211,6 +216,17 @@ export function PeoplePane({ planId }: { planId: number }) {
                   <HelpTip>
                     Per-person Irish Rent Tax Credit (€1,000/yr). Apply only to renters paying for
                     their primary residence.
+                  </HelpTip>
+                ),
+              },
+              {
+                header: "Lump sum",
+                cell: (p) => `${(((p.lump_sum_pct ?? 0.25) * 1000) | 0) / 10}%`,
+                thExtra: (
+                  <HelpTip>
+                    Fraction of pension pot taken as a lump sum at retirement. Irish rules cap this
+                    at 25%; lower values leave more in the ARF (more PAYE on drawdown, bigger
+                    compounding base).
                   </HelpTip>
                 ),
               },
@@ -342,6 +358,22 @@ function FormFields({
           type="checkbox"
           checked={form.claims_rent_credit}
           onChange={(e) => setForm({ ...form, claims_rent_credit: e.target.checked })}
+        />
+      </div>
+      <div className="field" style={{ flex: 1 }}>
+        <label>
+          Lump sum %
+          <HelpTip>
+            Fraction of pension pot taken as a lump sum at retirement. Irish rules cap at 25%.
+            Less means more in the ARF — bigger compounding base, but PAYE on drawdown.
+          </HelpTip>
+        </label>
+        <NumericInput
+          value={form.lump_sum_pct}
+          onChange={(v) =>
+            Number.isFinite(v) &&
+            setForm({ ...form, lump_sum_pct: Math.max(0, Math.min(25, v)) })
+          }
         />
       </div>
     </div>

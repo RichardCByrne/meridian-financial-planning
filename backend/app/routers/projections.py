@@ -83,6 +83,8 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             retirement_age=p.retirement_age,
             claims_rent_credit=p.claims_rent_credit,
             lump_sum_pct=p.lump_sum_pct,
+            prsi_weeks_at_base_year=p.prsi_weeks_at_base_year,
+            homecaring_weeks_at_base_year=p.homecaring_weeks_at_base_year,
         )
         for p in plan.people
     ]

@@ -27,6 +27,8 @@ class PersonCreate(BaseModel):
     retirement_age: int | None = Field(default=None, ge=40, le=85)
     claims_rent_credit: bool = False
     lump_sum_pct: float = Field(default=0.25, ge=0.0, le=0.25)
+    prsi_weeks_at_base_year: int = Field(default=2080, ge=0, le=2600)
+    homecaring_weeks_at_base_year: int = Field(default=0, ge=0, le=1040)
 
     @field_validator("dob")
     @classmethod
@@ -43,6 +45,8 @@ class PersonUpdate(BaseModel):
     retirement_age: int | None = Field(default=None, ge=40, le=85)
     claims_rent_credit: bool | None = None
     lump_sum_pct: float | None = Field(default=None, ge=0.0, le=0.25)
+    prsi_weeks_at_base_year: int | None = Field(default=None, ge=0, le=2600)
+    homecaring_weeks_at_base_year: int | None = Field(default=None, ge=0, le=1040)
 
     @field_validator("dob")
     @classmethod
@@ -63,3 +67,5 @@ class PersonRead(BaseModel):
     retirement_age: int | None
     claims_rent_credit: bool = False
     lump_sum_pct: float = 0.25
+    prsi_weeks_at_base_year: int = 2080
+    homecaring_weeks_at_base_year: int = 0

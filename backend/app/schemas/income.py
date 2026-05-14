@@ -7,12 +7,13 @@ INCOME_KINDS = (
     "state_pension",
     "private_pension_drawdown",
     "annuity",
+    "homecaring",
     "other",
 )
 
 
 class IncomeSourceCreate(BaseModel):
-    kind: str = Field(pattern="^(employment|self_employment|rental|state_pension|private_pension_drawdown|annuity|other)$")
+    kind: str = Field(pattern="^(employment|self_employment|rental|state_pension|private_pension_drawdown|annuity|homecaring|other)$")
     name: str = Field(min_length=1, max_length=200)
     gross_amount: float = Field(ge=0, allow_inf_nan=False)
     start_year: int = Field(ge=1900, le=2200)

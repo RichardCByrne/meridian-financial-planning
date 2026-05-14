@@ -24,6 +24,7 @@ const KINDS: { value: IncomeKind; label: string; defaultPaysPRSI: boolean; defau
   { value: "state_pension", label: "State pension", defaultPaysPRSI: false, defaultPaysUSC: false },
   { value: "private_pension_drawdown", label: "Private pension drawdown", defaultPaysPRSI: false, defaultPaysUSC: true },
   { value: "annuity", label: "Annuity", defaultPaysPRSI: false, defaultPaysUSC: true },
+  { value: "homecaring", label: "HomeCaring (state pension credit only)", defaultPaysPRSI: false, defaultPaysUSC: false },
   { value: "other", label: "Other", defaultPaysPRSI: false, defaultPaysUSC: true },
 ];
 

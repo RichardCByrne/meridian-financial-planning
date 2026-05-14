@@ -129,6 +129,22 @@ def _apply_lightweight_migrations() -> None:
                         "lump_sum_pct FLOAT NOT NULL DEFAULT 0.25"
                     )
                 )
+        if "prsi_weeks_at_base_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE people ADD COLUMN "
+                        "prsi_weeks_at_base_year INTEGER NOT NULL DEFAULT 2080"
+                    )
+                )
+        if "homecaring_weeks_at_base_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE people ADD COLUMN "
+                        "homecaring_weeks_at_base_year INTEGER NOT NULL DEFAULT 0"
+                    )
+                )
     if "assumptions" in tables:
         cols = {c["name"] for c in insp.get_columns("assumptions")}
         if "state_pension_escalation_rate" not in cols:

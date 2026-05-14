@@ -56,6 +56,8 @@ export interface Person {
   retirement_age: number | null;
   claims_rent_credit: boolean;
   lump_sum_pct: number;
+  prsi_weeks_at_base_year: number;
+  homecaring_weeks_at_base_year: number;
 }
 
 export interface PersonCreate {
@@ -67,6 +69,8 @@ export interface PersonCreate {
   retirement_age?: number | null;
   claims_rent_credit?: boolean;
   lump_sum_pct?: number;
+  prsi_weeks_at_base_year?: number;
+  homecaring_weeks_at_base_year?: number;
 }
 
 export interface Assumptions {
@@ -98,6 +102,7 @@ export type IncomeKind =
   | "state_pension"
   | "private_pension_drawdown"
   | "annuity"
+  | "homecaring"
   | "other";
 
 export interface IncomeSource {

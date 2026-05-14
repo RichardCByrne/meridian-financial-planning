@@ -25,6 +25,8 @@ type FormState = {
   retirement_age: number | "";
   claims_rent_credit: boolean;
   lump_sum_pct: number; // whole-number percent, 0–25
+  prsi_years_at_base_year: number; // years, converted to weeks on submit
+  homecaring_years_at_base_year: number;
 };
 
 const blankForm: FormState = {
@@ -35,6 +37,8 @@ const blankForm: FormState = {
   retirement_age: 66,
   claims_rent_credit: false,
   lump_sum_pct: 25,
+  prsi_years_at_base_year: 40,
+  homecaring_years_at_base_year: 0,
 };
 
 function fromPerson(p: Person): FormState {
@@ -46,6 +50,8 @@ function fromPerson(p: Person): FormState {
     retirement_age: p.retirement_age ?? "",
     claims_rent_credit: p.claims_rent_credit ?? false,
     lump_sum_pct: Math.round((p.lump_sum_pct ?? 0.25) * 1000) / 10,
+    prsi_years_at_base_year: Math.round((p.prsi_weeks_at_base_year ?? 2080) / 52),
+    homecaring_years_at_base_year: Math.round((p.homecaring_weeks_at_base_year ?? 0) / 52),
   };
 }
 
@@ -71,6 +77,8 @@ export function PeoplePane({ planId }: { planId: number }) {
       retirement_age: p.retirement_age,
       claims_rent_credit: p.claims_rent_credit,
       lump_sum_pct: p.lump_sum_pct,
+      prsi_weeks_at_base_year: p.prsi_weeks_at_base_year,
+      homecaring_weeks_at_base_year: p.homecaring_weeks_at_base_year,
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -91,6 +99,8 @@ export function PeoplePane({ planId }: { planId: number }) {
     retirement_age: f.retirement_age === "" ? null : Number(f.retirement_age),
     claims_rent_credit: f.claims_rent_credit,
     lump_sum_pct: Math.max(0, Math.min(0.25, f.lump_sum_pct / 100)),
+    prsi_weeks_at_base_year: Math.max(0, Math.min(2600, Math.round(f.prsi_years_at_base_year * 52))),
+    homecaring_weeks_at_base_year: Math.max(0, Math.min(1040, Math.round(f.homecaring_years_at_base_year * 52))),
   });
 
   const onFilingStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -373,6 +383,50 @@ function FormFields({
           onChange={(v) =>
             Number.isFinite(v) &&
             setForm({ ...form, lump_sum_pct: Math.max(0, Math.min(25, v)) })
+          }
+        />
+      </div>
+      <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+        <label>
+          PRSI years (start)
+          <HelpTip>
+            Years of PRSI-paying work this person has already completed before the base year.
+            Used for the Total Contributions Approach state-pension calculation: 40 years = full
+            pension; under 10 years = no entitlement. The engine adds +1 year per simulated year
+            of PRSI-paying income.
+          </HelpTip>
+        </label>
+        <NumericInput
+          integer
+          value={form.prsi_years_at_base_year}
+          onChange={(v) =>
+            Number.isFinite(v) &&
+            setForm({
+              ...form,
+              prsi_years_at_base_year: Math.max(0, Math.min(50, v)),
+            })
+          }
+        />
+      </div>
+      <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+        <label>
+          HomeCaring years (start)
+          <HelpTip>
+            Years already credited under the HomeCaring scheme (caring for a child under 12 or an
+            incapacitated person). Caps at 20 lifetime. Counts toward the 40-year TCA scaling but
+            NOT toward the 10-year qualifying minimum. Add a "HomeCaring" income entry to credit
+            additional years during the projection.
+          </HelpTip>
+        </label>
+        <NumericInput
+          integer
+          value={form.homecaring_years_at_base_year}
+          onChange={(v) =>
+            Number.isFinite(v) &&
+            setForm({
+              ...form,
+              homecaring_years_at_base_year: Math.max(0, Math.min(20, v)),
+            })
           }
         />
       </div>

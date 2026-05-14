@@ -69,11 +69,15 @@ const EARNED_KINDS: IncomeKind[] = ["employment", "self_employment"];
 
 function endsPastRetirement(
   kind: IncomeKind,
+  startYear: number,
   endYear: number | null,
   retirementYear: number | null,
 ): boolean {
   if (retirementYear == null) return false;
   if (!EARNED_KINDS.includes(kind)) return false;
+  // Income starts at/after retirement: engine drops it from year one, the
+  // warning is noise — user already knows it won't pay.
+  if (startYear >= retirementYear) return false;
   return endYear == null || endYear >= retirementYear;
 }
 
@@ -181,6 +185,7 @@ function PersonIncomeBlock({
         <FormFields form={form} setForm={setForm} />
         {endsPastRetirement(
           form.kind,
+          Number(form.start_year),
           form.end_year === "" ? null : Number(form.end_year),
           retirementYear,
         ) && (
@@ -231,7 +236,7 @@ function PersonIncomeBlock({
                   <>
                     {i.start_year}
                     {i.end_year ? `–${i.end_year}` : "→"}
-                    {endsPastRetirement(i.kind, i.end_year, retirementYear) && (
+                    {endsPastRetirement(i.kind, i.start_year, i.end_year, retirementYear) && (
                       <span
                         title={`${personName} retires in ${retirementYear}. Earned income is dropped at retirement regardless of end year.`}
                         style={{
@@ -317,6 +322,7 @@ function PersonIncomeBlock({
         <FormFields form={editForm} setForm={setEditForm} />
         {endsPastRetirement(
           editForm.kind,
+          Number(editForm.start_year),
           editForm.end_year === "" ? null : Number(editForm.end_year),
           retirementYear,
         ) && (

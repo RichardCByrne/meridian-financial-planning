@@ -132,6 +132,24 @@ class Plan(Base):
     bequests: Mapped[list["Bequest"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"
     )
+    children: Mapped[list["Child"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan"
+    )
+
+
+class Child(Base):
+    __tablename__ = "children"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    dob: Mapped[date] = mapped_column(Date, nullable=False)
+    # Person who receives Child Benefit. NULL = pay to plan's primary person.
+    primary_carer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("people.id", ondelete="SET NULL"), nullable=True
+    )
+
+    plan: Mapped[Plan] = relationship(back_populates="children")
 
 
 class Person(Base):

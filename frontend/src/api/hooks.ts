@@ -10,6 +10,9 @@ import type {
   Bequest,
   BequestCreate,
   BequestUpdate,
+  Child,
+  ChildCreate,
+  ChildUpdate,
   CompareResponse,
   MonteCarloResponse,
   Expense,
@@ -54,6 +57,7 @@ const keys = {
   goals: (planId: number) => ["plan", planId, "goals"] as const,
   scenarios: (planId: number) => ["plan", planId, "scenarios"] as const,
   bequests: (planId: number) => ["plan", planId, "bequests"] as const,
+  children: (planId: number) => ["plan", planId, "children"] as const,
   members: (planId: number) => ["plan", planId, "members"] as const,
   invites: (planId: number) => ["plan", planId, "invites"] as const,
   taxConfigs: () => ["tax-configs"] as const,
@@ -551,6 +555,53 @@ export function useDeleteBequest(planId: number) {
     mutationFn: (id: number) => api.del(`/bequests/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.bequests(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+// ---------- Children ----------
+
+export function useChildren(planId: number) {
+  return useQuery({
+    queryKey: keys.children(planId),
+    queryFn: () => api.get<Child[]>(`/plans/${planId}/children`),
+    enabled: Number.isFinite(planId),
+  });
+}
+
+export function useCreateChild(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (body: ChildCreate) => api.post<Child>(`/plans/${planId}/children`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.children(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useUpdateChild(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: ({ id, body }: { id: number; body: ChildUpdate }) =>
+      api.patch<Child>(`/children/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.children(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useDeleteChild(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (id: number) => api.del(`/children/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.children(planId) });
       invalidateProjection(qc, planId);
     },
   });

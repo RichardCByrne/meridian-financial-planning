@@ -10,6 +10,7 @@ import {
   useUpdatePlan,
 } from "../api/hooks";
 import { PeoplePane } from "./panes/PeoplePane";
+import { ChildrenPane } from "./panes/ChildrenPane";
 import { AssumptionsPane } from "./panes/AssumptionsPane";
 import { IncomePane } from "./panes/IncomePane";
 import { ExpensesPane } from "./panes/ExpensesPane";
@@ -132,6 +133,7 @@ export function PlanEditorPage() {
         <Route index element={<LetsSeePane planId={id} />} />
         <Route path="timeline" element={<TimelinePane planId={id} />} />
         <Route path="people" element={<PeoplePane planId={id} />} />
+        <Route path="children" element={<ChildrenPane planId={id} />} />
         <Route path="income" element={<IncomePane planId={id} />} />
         <Route path="expenses" element={<ExpensesPane planId={id} />} />
         <Route path="assets" element={<AssetsPane planId={id} />} />
@@ -275,6 +277,7 @@ function TabNav({ planId }: { planId: number }) {
       </TabLink>
       <TabLink to={`/plans/${planId}/timeline`}>Timeline</TabLink>
       <TabLink to={`/plans/${planId}/people`}>People</TabLink>
+      <TabLink to={`/plans/${planId}/children`}>Children</TabLink>
       <TabLink to={`/plans/${planId}/income`}>Income</TabLink>
       <TabLink to={`/plans/${planId}/expenses`}>Expenses</TabLink>
       <TabLink to={`/plans/${planId}/assets`}>Assets</TabLink>

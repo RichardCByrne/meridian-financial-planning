@@ -537,6 +537,11 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             for inc in plan.incomes:
                 if inc.person_id != person.id or not _income_active(inc, year):
                     continue
+                # Earned income stops at retirement even if end_year is open.
+                # Passive kinds (rental, annuity, other) keep flowing; state
+                # pension and ARF drawdowns are auto-injected elsewhere.
+                if is_retired_now and inc.kind in ("employment", "self_employment"):
+                    continue
                 amt = _escalate(inc.gross_amount, inc.escalation_rate, year - inc.start_year)
                 earned_for_it += amt
                 if inc.pays_usc:

@@ -9,7 +9,9 @@ import {
   useImportPlan,
   usePlans,
 } from "../api/hooks";
+import { confirmDialog } from "../components/ConfirmDialog";
 import { TableSkeleton } from "../components/Skeleton";
+import { emitToast } from "../components/Toast";
 import { buildSampleHouseholdPayload } from "../lib/sampleHousehold";
 
 export function PlansListPage() {
@@ -53,7 +55,7 @@ export function PlansListPage() {
       const plan = await importPlan.mutateAsync(buildSampleHouseholdPayload());
       navigate(`/plans/${plan.id}`);
     } catch (e) {
-      alert(`Couldn't create sample plan: ${e}`);
+      emitToast({ kind: "error", message: `Couldn't create sample plan: ${e}` });
     } finally {
       setSampleBusy(false);
     }
@@ -65,13 +67,13 @@ export function PlansListPage() {
     try {
       payload = JSON.parse(text);
     } catch {
-      alert("That file isn't valid JSON.");
+      emitToast({ kind: "error", message: "That file isn't valid JSON." });
       return;
     }
     try {
       await importPlan.mutateAsync(payload);
     } catch (e) {
-      alert(`Import failed: ${e}`);
+      emitToast({ kind: "error", message: `Import failed: ${e}` });
     }
   };
 
@@ -203,10 +205,14 @@ export function PlansListPage() {
                     </button>
                     <button
                       className="btn btn-secondary"
-                      onClick={() => {
-                        if (confirm(`Delete plan "${p.name}"? This is permanent.`)) {
-                          deletePlan.mutate(p.id);
-                        }
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          title: "Delete plan?",
+                          message: `Delete plan "${p.name}"? This is permanent.`,
+                          confirmLabel: "Delete",
+                          danger: true,
+                        });
+                        if (ok) deletePlan.mutate(p.id);
                       }}
                     >
                       Delete

@@ -9,6 +9,7 @@ import {
   useUpdateTaxConfig,
 } from "../../api/hooks";
 import type { TaxConfigSummary } from "../../api/types";
+import { confirmDialog, promptDialog } from "../../components/ConfirmDialog";
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
@@ -69,7 +70,12 @@ export function TaxRulesPane({ planId }: { planId: number }) {
 
   const onCloneActive = async () => {
     const suggested = `${active.name} (my copy)`;
-    const input = window.prompt("Name for the new tax-rule set:", suggested);
+    const input = await promptDialog({
+      title: "Clone tax rules",
+      message: "Name for the new tax-rule set:",
+      defaultValue: suggested,
+      confirmLabel: "Clone",
+    });
     if (input === null) return;
     const name = input.trim() || suggested;
     const created = await createConfig.mutateAsync({
@@ -95,7 +101,13 @@ export function TaxRulesPane({ planId }: { planId: number }) {
 
   const onDelete = async () => {
     if (!editable) return;
-    if (!confirm(`Delete tax config "${active.name}"? Plans pinned to it will fall back to the official.`)) return;
+    const ok = await confirmDialog({
+      title: "Delete tax rules?",
+      message: `Delete tax config "${active.name}"? Plans pinned to it will fall back to the official.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     await deleteConfig.mutateAsync(active.id);
   };
 

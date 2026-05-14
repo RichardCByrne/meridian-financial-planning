@@ -1,0 +1,65 @@
+# Dependabot config for Meridian — see DEPLOY.md §"Supply-chain policy".
+#
+# Direct dependencies are pinned exactly in package.json and pyproject.toml.
+# Dependabot opens grouped weekly PRs so the upgrade load is reviewable
+# rather than a constant trickle. Patches auto-group; minors/majors stay
+# separate so the diff is easy to read.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Dublin
+    open-pull-requests-limit: 5
+    groups:
+      patches:
+        update-types: [patch]
+      minors:
+        update-types: [minor]
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Dublin
+    open-pull-requests-limit: 5
+    groups:
+      patches:
+        update-types: [patch]
+      minors:
+        update-types: [minor]
+    labels:
+      - dependencies
+      - backend
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Dublin
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: docker
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Dublin
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - docker

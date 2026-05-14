@@ -545,3 +545,48 @@ gcloud builds submit --config cloudbuild.yaml `
 ### A.4. Decommission Neon (optional)
 
 Once Cloud SQL serves traffic and you're confident, delete the Neon project from its dashboard. There's no GCP-side cleanup.
+
+---
+
+## Appendix B. Supply-chain policy
+
+Meridian pulls from `registry.npmjs.org` and `pypi.org`. The threat model is registry-side compromise: a maintainer account hijack, a typosquat, or a malicious release of a dep you already trust. The controls below limit the blast radius.
+
+### B.1. Direct deps are pinned exactly
+
+- `frontend/package.json` — no `^`/`~` on direct deps. Every entry is an exact version.
+- `backend/pyproject.toml` — every direct dep uses `==`, not `>=`.
+
+Why: with `^1.2.3`, a fresh `npm install` (or `pip install` without a lockfile) can pull `1.99.0` published 30 seconds before the install ran. Exact pins make every install reproducible and force compromised releases to wait for an explicit human PR.
+
+Transitive deps are still resolved by the lockfile (`package-lock.json` SRI hashes; Python's resolver picks the latest matching). The lockfile is the second line of defence — CI runs `npm ci` (fails on drift) and `pip install` uses pinned direct deps.
+
+### B.2. Dependabot is grouped and weekly
+
+`.github/dependabot.yml` opens one PR per ecosystem per week, grouped:
+
+- **patches** — auto-mergeable after CI passes; review-only for the changelog
+- **minors** — review carefully, especially for `firebase`, `recharts`, `vite`
+- **majors** — manual, never grouped, expect codemods
+
+Four ecosystems are watched: `npm` (frontend), `pip` (backend), `github-actions` (CI workflows), `docker` (backend image base).
+
+### B.3. CI auditing
+
+- `npm audit --omit=dev` — already in `.github/workflows/test.yml`
+- `pip-audit` — already in the same workflow
+- Add **Socket** or **Snyk** if you want faster signal on newly-compromised packages (they flag in minutes; `npm audit` waits for an NVD CVE).
+
+### B.4. Upgrade workflow
+
+1. Bump the pin in `package.json` or `pyproject.toml`.
+2. Run the language's install (`npm install` regenerates lockfile; `pip install -e .[dev]` updates the venv).
+3. Run the full test suite: `pytest` (backend) and `npm run lint && npm run build` (frontend).
+4. Run `pip-audit` / `npm audit` — fail the PR if a new high-severity finding appears.
+5. PR with the pin diff + lockfile diff. Squash-merge.
+
+### B.5. Things deliberately not done
+
+- **No `--ignore-scripts`** as a global default. Some deps need their postinstall (e.g. native binaries for `@vitejs/plugin-react`'s esbuild). The trade-off lives in the lockfile audit; switching to a global `ignore-scripts=true` would silently break the dev workflow.
+- **No package-manager swap (yarn/pnpm/bun).** The registry is the supply chain, not the install client; all three managers fetch from the same place and run the same lifecycle hooks. Bun specifically gains perf, not security.
+- **No private npm/pypi mirror.** Setting one up is real ops work and only meaningful if combined with an allow-list curated by hand. Not justified for a one-engineer project; revisit if Meridian ever takes on a second maintainer.

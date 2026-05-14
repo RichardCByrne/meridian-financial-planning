@@ -7,6 +7,7 @@ import {
   useUpdateLiability,
 } from "../../api/hooks";
 import type { Liability, LiabilityCreate, LiabilityKind } from "../../api/types";
+import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
 import { EmptyState } from "../../components/EmptyState";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
@@ -33,6 +34,7 @@ type FormState = {
   interest_rate: number;
   term_months: number;
   start_year: number;
+  monthly_overpayment: number;
 };
 
 const blankForm: FormState = {
@@ -42,6 +44,7 @@ const blankForm: FormState = {
   interest_rate: 0.04,
   term_months: 300,
   start_year: 2026,
+  monthly_overpayment: 0,
 };
 
 function fromLiability(l: Liability): FormState {
@@ -52,6 +55,7 @@ function fromLiability(l: Liability): FormState {
     interest_rate: l.interest_rate,
     term_months: l.term_months,
     start_year: l.start_year,
+    monthly_overpayment: l.monthly_overpayment ?? 0,
   };
 }
 
@@ -75,6 +79,7 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
       term_months: l.term_months,
       start_year: l.start_year,
       monthly_payment: l.monthly_payment,
+      monthly_overpayment: l.monthly_overpayment,
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -103,6 +108,7 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
       interest_rate: f.interest_rate,
       term_months: f.term_months,
       start_year: f.start_year,
+      monthly_overpayment: Math.max(0, f.monthly_overpayment),
     };
     return includeMonthly
       ? { ...base, monthly_payment: amortisedPayment(f.principal, f.interest_rate, f.term_months) }
@@ -163,6 +169,10 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
                 cell: (l) => `${Math.round(l.term_months / 12)}y (${l.term_months}m)`,
               },
               { header: "Monthly", cell: (l) => fmtMoney(l.monthly_payment) },
+              {
+                header: "Overpay",
+                cell: (l) => (l.monthly_overpayment > 0 ? fmtMoney(l.monthly_overpayment) : "—"),
+              },
             ]}
             renderActions={(l) => (
               <>
@@ -307,6 +317,22 @@ function FormFields({
           integer
           value={form.start_year}
           onChange={(v) => Number.isFinite(v) && setForm({ ...form, start_year: v })}
+        />
+      </div>
+      <div className="field" style={{ flex: 1, minWidth: 130 }}>
+        <label>
+          Overpayment €/mo
+          <HelpTip>
+            Extra €/mo paid on top of the contracted monthly payment. Goes straight to capital,
+            so the loan ends earlier. Banks typically allow up to ±10% of your contracted payment
+            fee-free; check your specific terms.
+          </HelpTip>
+        </label>
+        <NumericInput
+          value={form.monthly_overpayment}
+          onChange={(v) =>
+            Number.isFinite(v) && setForm({ ...form, monthly_overpayment: Math.max(0, v) })
+          }
         />
       </div>
     </div>

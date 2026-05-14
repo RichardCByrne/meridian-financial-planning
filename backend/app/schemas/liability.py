@@ -11,6 +11,7 @@ class LiabilityCreate(BaseModel):
     term_months: int = Field(gt=0, le=600)
     start_year: int = Field(ge=1900, le=2200)
     monthly_payment: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    monthly_overpayment: float = Field(default=0.0, ge=0, le=100_000, allow_inf_nan=False)
 
 
 class LiabilityUpdate(BaseModel):
@@ -21,6 +22,7 @@ class LiabilityUpdate(BaseModel):
     term_months: int | None = Field(default=None, gt=0, le=600)
     start_year: int | None = Field(default=None, ge=1900, le=2200)
     monthly_payment: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    monthly_overpayment: float | None = Field(default=None, ge=0, le=100_000, allow_inf_nan=False)
 
 
 class LiabilityRead(BaseModel):
@@ -35,3 +37,4 @@ class LiabilityRead(BaseModel):
     term_months: int
     start_year: int
     monthly_payment: float
+    monthly_overpayment: float = 0.0

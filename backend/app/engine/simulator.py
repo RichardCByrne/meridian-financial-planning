@@ -109,6 +109,10 @@ class LiabilityInput:
     term_months: int
     start_year: int
     monthly_payment: float
+    # Extra €/mo applied directly to capital. Shortens the loan term. Banks
+    # typically allow ±10% of the contracted monthly_payment fee-free; we
+    # don't model the breakage-fee threshold — out of scope for most users.
+    monthly_overpayment: float = 0.0
 
 
 @dataclass
@@ -288,27 +292,35 @@ def _filing_status_for_person(
 
 
 def _amortise_year(
-    balance: float, monthly_rate: float, monthly_payment: float
+    balance: float,
+    monthly_rate: float,
+    monthly_payment: float,
+    monthly_overpayment: float = 0.0,
 ) -> tuple[float, float, float]:
     """Run up to 12 monthly steps. Returns (new_balance, total_interest_paid, total_paid).
+
+    `monthly_overpayment` is extra capital paid each month on top of the
+    contracted payment. Negative values are clamped to 0 — the engine does
+    not model underpayment / payment holidays.
 
     Loan may pay off mid-year — closed-form geometric solution is unsafe across
     that boundary, so iterate.
     """
+    extra = max(0.0, monthly_overpayment)
     interest_paid = 0.0
     paid = 0.0
     for _ in range(12):
         if balance <= 0:
             return balance, interest_paid, paid
         interest = balance * monthly_rate
-        principal = monthly_payment - interest
+        principal = monthly_payment - interest + extra
         if principal >= balance:
             interest_paid += interest
             paid += balance + interest
             return 0.0, interest_paid, paid
         balance -= principal
         interest_paid += interest
-        paid += monthly_payment
+        paid += monthly_payment + extra
     return balance, interest_paid, paid
 
 
@@ -882,7 +894,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 continue
             monthly_rate = liability.interest_rate / 12.0
             new_bal, _interest_paid, paid = _amortise_year(
-                bal, monthly_rate, liability.monthly_payment
+                bal, monthly_rate, liability.monthly_payment, liability.monthly_overpayment
             )
             liability_balances[liability.id] = new_bal
             debt_service += paid

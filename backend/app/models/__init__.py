@@ -262,6 +262,9 @@ class Liability(Base):
     term_months: Mapped[int] = mapped_column(Integer, nullable=False)
     start_year: Mapped[int] = mapped_column(Integer, nullable=False)
     monthly_payment: Mapped[float] = mapped_column(Float, nullable=False)
+    # Extra €/mo applied directly to capital. Banks typically allow ±10% of
+    # the contracted payment fee-free. Defaults to 0 for legacy rows.
+    monthly_overpayment: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="liabilities")
 

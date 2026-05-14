@@ -72,6 +72,84 @@ def test_mortgage_with_interest_amortises_correctly():
     assert rows[0].net_worth < rows[0].asset_balances[1]
 
 
+def test_overpayment_shortens_loan_and_reduces_balance():
+    """€200/mo extra capital paydown gets the balance lower year-by-year vs zero overpayment."""
+    payment = 200_000 * (0.04 / 12) / (1 - (1 + 0.04 / 12) ** -300)
+    base_plan = PlanInput(
+        base_year=2026, projection_years=5,
+        people=[_person()], incomes=[], expenses=[],
+        assets=[AssetInput(id=1, name="Cash", kind="cash", value=100_000, growth_rate=0.0, cost_basis=0.0)],
+        liabilities=[
+            LiabilityInput(
+                id=1, name="Mortgage", kind="mortgage", principal=200_000.0,
+                interest_rate=0.04, term_months=300, start_year=2026,
+                monthly_payment=payment,
+            )
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0),
+    )
+    overpay_plan = PlanInput(
+        base_year=2026, projection_years=5,
+        people=[_person()], incomes=[], expenses=[],
+        assets=[AssetInput(id=1, name="Cash", kind="cash", value=100_000, growth_rate=0.0, cost_basis=0.0)],
+        liabilities=[
+            LiabilityInput(
+                id=1, name="Mortgage", kind="mortgage", principal=200_000.0,
+                interest_rate=0.04, term_months=300, start_year=2026,
+                monthly_payment=payment, monthly_overpayment=200.0,
+            )
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0),
+    )
+    base_rows = simulate(base_plan)
+    over_rows = simulate(overpay_plan)
+    # Year-1 balance must be lower with overpayment.
+    assert over_rows[0].liability_balances[1] < base_rows[0].liability_balances[1]
+    # Approx €200/mo × 12 = €2,400 extra capital paid in year 1 (compounding effect
+    # rounds it up slightly via reduced interest).
+    diff = base_rows[0].liability_balances[1] - over_rows[0].liability_balances[1]
+    assert 2_400 < diff < 2_500
+    # Debt service line item rises by the overpayment amount.
+    assert (
+        over_rows[0].expenses_by_category["debt_service"]
+        - base_rows[0].expenses_by_category["debt_service"]
+    ) == 200 * 12
+
+
+def test_negative_overpayment_clamped_to_zero():
+    """Negative monthly_overpayment must not extend the loan or grow the balance."""
+    payment = 200_000 * (0.04 / 12) / (1 - (1 + 0.04 / 12) ** -300)
+    base_plan = PlanInput(
+        base_year=2026, projection_years=2,
+        people=[_person()], incomes=[], expenses=[],
+        assets=[AssetInput(id=1, name="Cash", kind="cash", value=50_000, growth_rate=0.0, cost_basis=0.0)],
+        liabilities=[
+            LiabilityInput(
+                id=1, name="Mortgage", kind="mortgage", principal=200_000.0,
+                interest_rate=0.04, term_months=300, start_year=2026,
+                monthly_payment=payment,
+            )
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0),
+    )
+    neg_plan = PlanInput(
+        base_year=2026, projection_years=2,
+        people=[_person()], incomes=[], expenses=[],
+        assets=[AssetInput(id=1, name="Cash", kind="cash", value=50_000, growth_rate=0.0, cost_basis=0.0)],
+        liabilities=[
+            LiabilityInput(
+                id=1, name="Mortgage", kind="mortgage", principal=200_000.0,
+                interest_rate=0.04, term_months=300, start_year=2026,
+                monthly_payment=payment, monthly_overpayment=-100.0,
+            )
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0),
+    )
+    base_rows = simulate(base_plan)
+    neg_rows = simulate(neg_plan)
+    assert abs(neg_rows[0].liability_balances[1] - base_rows[0].liability_balances[1]) < 0.5
+
+
 # --- CGT on unwrapped disposals ---------------------------------------------
 
 

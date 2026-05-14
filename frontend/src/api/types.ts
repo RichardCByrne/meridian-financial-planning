@@ -222,6 +222,7 @@ export interface Liability {
   term_months: number;
   start_year: number;
   monthly_payment: number;
+  monthly_overpayment: number;
 }
 
 export interface LiabilityCreate {
@@ -232,6 +233,7 @@ export interface LiabilityCreate {
   term_months: number;
   start_year: number;
   monthly_payment?: number | null;
+  monthly_overpayment?: number;
 }
 
 export type GoalKind =

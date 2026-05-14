@@ -147,6 +147,16 @@ def _apply_lightweight_migrations() -> None:
                     )
                 )
     # children table picked up by Base.metadata.create_all on the dev path.
+    if "liabilities" in tables:
+        cols = {c["name"] for c in insp.get_columns("liabilities")}
+        if "monthly_overpayment" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE liabilities ADD COLUMN "
+                        "monthly_overpayment FLOAT NOT NULL DEFAULT 0.0"
+                    )
+                )
     if "assumptions" in tables:
         cols = {c["name"] for c in insp.get_columns("assumptions")}
         if "state_pension_escalation_rate" not in cols:

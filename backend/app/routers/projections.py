@@ -154,6 +154,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             term_months=liability.term_months,
             start_year=liability.start_year,
             monthly_payment=liability.monthly_payment,
+            monthly_overpayment=liability.monthly_overpayment,
         )
         for liability in plan.liabilities
     ]

@@ -179,8 +179,8 @@ export function buildSampleHouseholdPayload(): Record<string, unknown> {
       property_growth_rate: 0.03,
       earnings_growth: 0.025,
       state_pension_age: 66,
-      state_pension_annual_amount: 14000,
-      state_pension_escalation_rate: 0.02,
+      state_pension_annual_amount: 15_563,
+      state_pension_escalation_rate: 0.015,
     },
   };
 }

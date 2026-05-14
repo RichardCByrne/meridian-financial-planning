@@ -1,5 +1,6 @@
 import type { LiabilityKind } from "../../../api/types";
 import { useWizard, type LiabilityDraft } from "../../../wizard/store";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const KINDS: { value: LiabilityKind; label: string; description?: string }[] = [
@@ -97,22 +98,19 @@ function LiabilityRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Principal (€)</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             value={liability.principal}
-            onChange={(e) => onChange({ principal: Number(e.target.value) })}
+            onChange={(v) => onChange({ principal: Number.isFinite(v) ? v : 0 })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>Interest rate (e.g. 0.04)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.001"
-            value={liability.interest_rate}
-            onChange={(e) => onChange({ interest_rate: Number(e.target.value) })}
+          <span style={{ fontWeight: 600 }}>Interest rate (%)</span>
+          <NumericInput
+            value={Math.round((liability.interest_rate ?? 0) * 100 * 100) / 100}
+            onChange={(v) =>
+              onChange({ interest_rate: Number.isFinite(v) ? v / 100 : 0 })
+            }
             style={inputStyle}
           />
         </label>
@@ -120,21 +118,23 @@ function LiabilityRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Term (months)</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumericInput
+            integer
             value={liability.term_months}
-            onChange={(e) => onChange({ term_months: Number(e.target.value) })}
+            onChange={(v) =>
+              onChange({ term_months: Number.isFinite(v) ? v : liability.term_months })
+            }
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Start year</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumericInput
+            integer
             value={liability.start_year}
-            onChange={(e) => onChange({ start_year: Number(e.target.value) })}
+            onChange={(v) =>
+              onChange({ start_year: Number.isFinite(v) ? v : liability.start_year })
+            }
             style={inputStyle}
           />
         </label>

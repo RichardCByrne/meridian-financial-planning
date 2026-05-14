@@ -1,5 +1,6 @@
 import type {
   AssetDraft,
+  ExpenseDraft,
   GoalDraft,
   IncomeDraft,
   LiabilityDraft,
@@ -60,6 +61,16 @@ export function validateLiability(l: LiabilityDraft): string[] {
   return errs;
 }
 
+export function validateExpense(e: ExpenseDraft): string[] {
+  const errs: string[] = [];
+  if (!e.name || !e.name.trim()) errs.push("Expense name is required");
+  if (!e.category) errs.push("Category is required");
+  if (!Number.isFinite(e.amount) || e.amount < 0) errs.push("Amount must be ≥ 0");
+  if (!Number.isFinite(e.start_year)) errs.push("Start year is required");
+  if (e.end_year != null && e.end_year < e.start_year) errs.push("End year must be ≥ start year");
+  return errs;
+}
+
 export function validateGoal(g: GoalDraft): string[] {
   const errs: string[] = [];
   if (!g.name || !g.name.trim()) errs.push("Goal name is required");
@@ -88,6 +99,8 @@ export function canAdvance(step: WizardStepId, s: WizardState): boolean {
       return s.properties.every((a) => validateAsset(a).length === 0);
     case "liabilities":
       return s.liabilities.every((l) => validateLiability(l).length === 0);
+    case "expenses":
+      return s.expenses.every((e) => validateExpense(e).length === 0);
     case "goals":
       return s.goals.every((g) => validateGoal(g).length === 0);
     case "review":
@@ -99,6 +112,7 @@ export function canAdvance(step: WizardStepId, s: WizardState): boolean {
         s.assets.every((a) => validateAsset(a).length === 0) &&
         s.properties.every((a) => validateAsset(a).length === 0) &&
         s.liabilities.every((l) => validateLiability(l).length === 0) &&
+        s.expenses.every((e) => validateExpense(e).length === 0) &&
         s.goals.every((g) => validateGoal(g).length === 0)
       );
   }

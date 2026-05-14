@@ -1,5 +1,7 @@
 import type { IncomeKind } from "../../../api/types";
 import { useWizard, type DraftId, type IncomeDraft } from "../../../wizard/store";
+import { HelpTip } from "../../HelpTip";
+import { NumericInput } from "../../NumericInput";
 import { ResponsiveSelect } from "../../ResponsiveSelect";
 
 const INCOME_KINDS: { value: IncomeKind; label: string; description?: string }[] = [
@@ -102,8 +104,9 @@ export function IncomeStep() {
         );
       })}
       <p className="muted" style={{ fontSize: 13, color: "#64748b" }}>
-        A bonus is added as one-year employment income so PAYE/USC/PRSI apply correctly. For a
-        non-taxable windfall (gift, inheritance), add it as a cash asset later.
+        A bonus is added as taxable other income so PAYE/USC/PRSI apply correctly. Defaults to a
+        single year — set a later end year to repeat it. For a non-taxable windfall (gift,
+        inheritance), add it as a cash asset later.
       </p>
     </div>
   );
@@ -118,7 +121,7 @@ function IncomeRow({
   onChange: (patch: Partial<IncomeDraft>) => void;
   onRemove: () => void;
 }) {
-  const isBonus = income.isBonus === true;
+  const growthPct = Math.round(((income.escalation_rate ?? 0) * 100) * 100) / 100;
   return (
     <div className="card" style={{ display: "grid", gap: 10 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -143,55 +146,52 @@ function IncomeRow({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Gross (€/year)</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             value={income.gross_amount}
-            onChange={(e) => onChange({ gross_amount: Number(e.target.value) })}
+            onChange={(v) => onChange({ gross_amount: Number.isFinite(v) ? v : 0 })}
             style={inputStyle}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontWeight: 600 }}>Start year</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumericInput
+            integer
             value={income.start_year}
-            onChange={(e) => {
-              const sy = Number(e.target.value);
-              onChange(isBonus ? { start_year: sy, end_year: sy } : { start_year: sy });
-            }}
+            onChange={(v) => onChange({ start_year: Number.isFinite(v) ? v : income.start_year })}
             style={inputStyle}
           />
         </label>
       </div>
-      {!isBonus && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontWeight: 600 }}>End year (optional)</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={income.end_year ?? ""}
-              onChange={(e) =>
-                onChange({ end_year: e.target.value === "" ? null : Number(e.target.value) })
-              }
-              style={inputStyle}
-            />
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontWeight: 600 }}>Escalation (e.g. 0.03)</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              value={income.escalation_rate ?? 0}
-              onChange={(e) => onChange({ escalation_rate: Number(e.target.value) })}
-              style={inputStyle}
-            />
-          </label>
-        </div>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            End year (optional)
+            <HelpTip>
+              Leave blank to run indefinitely. Earned income (employment / self-employment) stops
+              automatically at the owner's retirement age regardless of what you set here. Passive
+              income (rental, annuity, other) keeps flowing past retirement unless you set an end
+              year. State pension and ARF drawdowns are injected by the engine separately and
+              ignore this field.
+            </HelpTip>
+          </span>
+          <NumericInput
+            integer
+            value={income.end_year ?? NaN}
+            onChange={(v) => onChange({ end_year: Number.isFinite(v) ? v : null })}
+            style={inputStyle}
+          />
+        </label>
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontWeight: 600 }}>Average annual growth (%)</span>
+          <NumericInput
+            value={growthPct}
+            onChange={(v) =>
+              onChange({ escalation_rate: Number.isFinite(v) ? v / 100 : 0 })
+            }
+            style={inputStyle}
+          />
+        </label>
+      </div>
       <button
         type="button"
         className="btn btn-secondary"

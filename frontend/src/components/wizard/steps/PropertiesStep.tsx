@@ -1,5 +1,7 @@
 import type { AssetKind } from "../../../api/types";
 import { useWizard, type DraftId } from "../../../wizard/store";
+import { HelpTip } from "../../HelpTip";
+import { NumericInput } from "../../NumericInput";
 import { AssetRow } from "./AssetsStep";
 
 const PROPERTY_KINDS: { value: AssetKind; label: string; description?: string }[] = [
@@ -78,23 +80,31 @@ export function PropertiesStep() {
             extra={
               <div style={{ display: "grid", gap: 8 }}>
                 <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontWeight: 600 }}>Cost basis (€)</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
+                  <span style={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    Original purchase price (€)
+                    <HelpTip>
+                      What you paid for the property, including stamp duty and acquisition costs.
+                      Used to calculate Capital Gains Tax on any future sale — the gain is sale
+                      price minus this amount.
+                    </HelpTip>
+                  </span>
+                  <NumericInput
                     value={p.cost_basis ?? 0}
-                    onChange={(e) => updateProperty(p.draftId, { cost_basis: Number(e.target.value) })}
+                    onChange={(v) =>
+                      updateProperty(p.draftId, { cost_basis: Number.isFinite(v) ? v : 0 })
+                    }
                     style={inputStyle}
                   />
                 </label>
                 <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontWeight: 600 }}>Acquired year</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
+                  <span style={{ fontWeight: 600 }}>Year purchased</span>
+                  <NumericInput
+                    integer
                     value={p.acquired_year ?? baseYear}
-                    onChange={(e) =>
-                      updateProperty(p.draftId, { acquired_year: Number(e.target.value) })
+                    onChange={(v) =>
+                      updateProperty(p.draftId, {
+                        acquired_year: Number.isFinite(v) ? v : baseYear,
+                      })
                     }
                     style={inputStyle}
                   />

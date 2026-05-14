@@ -11,6 +11,7 @@ import { IncomeStep } from "../components/wizard/steps/IncomeStep";
 import { AssetsStep } from "../components/wizard/steps/AssetsStep";
 import { PropertiesStep } from "../components/wizard/steps/PropertiesStep";
 import { LiabilitiesStep } from "../components/wizard/steps/LiabilitiesStep";
+import { ExpensesStep } from "../components/wizard/steps/ExpensesStep";
 import { GoalsStep } from "../components/wizard/steps/GoalsStep";
 import { ReviewStep } from "../components/wizard/steps/ReviewStep";
 import { useWizard, WIZARD_STEPS, type WizardStepId } from "../wizard/store";
@@ -24,6 +25,7 @@ const STEP_META: Record<WizardStepId, { title: string; subtitle?: string }> = {
   assets: { title: "Assets", subtitle: "Cash, deposits, investments, and pensions" },
   properties: { title: "Properties", subtitle: "Homes and buy-to-lets" },
   liabilities: { title: "Liabilities", subtitle: "Mortgages and loans" },
+  expenses: { title: "Expenses", subtitle: "Annual living costs and one-off spends" },
   goals: { title: "Goals", subtitle: "What you want the projection to grade" },
   review: { title: "Review", subtitle: "Check and submit" },
 };
@@ -147,6 +149,7 @@ export function PlanWizardPage() {
         {step === "assets" && <AssetsStep />}
         {step === "properties" && <PropertiesStep />}
         {step === "liabilities" && <LiabilitiesStep />}
+        {step === "expenses" && <ExpensesStep />}
         {step === "goals" && <GoalsStep />}
         {step === "review" && <ReviewStep progress={progress} />}
       </WizardStep>

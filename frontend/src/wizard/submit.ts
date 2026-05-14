@@ -2,6 +2,8 @@ import { api } from "../api/client";
 import type {
   Asset,
   AssetCreate,
+  Expense,
+  ExpenseCreate,
   Goal,
   GoalCreate,
   IncomeSource,
@@ -22,6 +24,7 @@ export type SubmitPhase =
   | "income"
   | "assets"
   | "liabilities"
+  | "expenses"
   | "goals"
   | "done";
 
@@ -71,6 +74,10 @@ function toLiabilityCreate(d: WizardState["liabilities"][number]): LiabilityCrea
   const { draftId: _i, linkedPropertyDraftId: _p, ...rest } = d;
   return rest;
 }
+function toExpenseCreate(d: WizardState["expenses"][number]): ExpenseCreate {
+  const { draftId: _i, ownerPersonDraftId: _o, ...rest } = d;
+  return rest;
+}
 function toGoalCreate(d: WizardState["goals"][number]): GoalCreate {
   const { draftId: _i, linkedPersonDraftId: _p, ...rest } = d;
   return rest;
@@ -92,6 +99,7 @@ export async function submitWizard(
     state.assets.length +
     state.properties.length +
     state.liabilities.length +
+    state.expenses.length +
     state.goals.length;
   let completed = 0;
   const report = (phase: SubmitPhase) =>
@@ -213,6 +221,31 @@ export async function submitWizard(
       } finally {
         completed += 1;
         report("liabilities");
+      }
+    }),
+  );
+
+  // Phase: expenses (parallel)
+  await Promise.all(
+    state.expenses.map(async (e) => {
+      if (serverIds[e.draftId] != null) {
+        completed += 1;
+        report("expenses");
+        return;
+      }
+      const payload = toExpenseCreate(e);
+      if (e.ownerPersonDraftId) {
+        const ownerId = serverIds[e.ownerPersonDraftId];
+        if (ownerId != null) payload.owner_person_id = ownerId;
+      }
+      try {
+        const created = await api.post<Expense>(`/plans/${planId}/expenses`, payload);
+        serverIds[e.draftId] = created.id;
+      } catch (err) {
+        errors.push({ draftId: e.draftId, phase: "expenses", message: errMessage(err) });
+      } finally {
+        completed += 1;
+        report("expenses");
       }
     }),
   );

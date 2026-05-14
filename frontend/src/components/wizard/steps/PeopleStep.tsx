@@ -1,5 +1,6 @@
 import { useWizard, type DraftId, type PersonDraft } from "../../../wizard/store";
 import { validatePerson } from "../../../wizard/validation";
+import { NumericInput } from "../../NumericInput";
 
 export function PeopleStep() {
   const people = useWizard((s) => s.people);
@@ -94,13 +95,10 @@ function PersonRow({
 
       <label style={{ display: "grid", gap: 4 }}>
         <span style={{ fontWeight: 600 }}>Retirement age</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          value={person.retirement_age ?? ""}
-          onChange={(e) =>
-            onChange({ retirement_age: e.target.value === "" ? null : Number(e.target.value) })
-          }
+        <NumericInput
+          integer
+          value={person.retirement_age ?? NaN}
+          onChange={(v) => onChange({ retirement_age: Number.isFinite(v) ? v : null })}
           style={inputStyle}
         />
       </label>

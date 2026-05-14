@@ -16,11 +16,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          recharts: ["recharts"],
-          firebase: ["firebase/app", "firebase/auth"],
-          "react-query": ["@tanstack/react-query"],
-          router: ["react-router-dom"],
+        manualChunks(id) {
+          if (id.includes("node_modules/recharts")) return "recharts";
+          if (id.includes("node_modules/firebase")) return "firebase";
+          if (id.includes("node_modules/@tanstack/react-query")) return "react-query";
+          if (id.includes("node_modules/react-router-dom")) return "router";
         },
       },
     },

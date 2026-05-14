@@ -83,7 +83,8 @@ def update_member_role(
     db.commit()
     db.refresh(member)
     target = db.get(User, user_id)
-    assert target is not None
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
     return MemberRead(
         user_id=target.id,
         role=member.role,

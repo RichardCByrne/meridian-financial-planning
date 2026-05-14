@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -177,6 +178,11 @@ def _resolve_plan_tax_config(plan: Plan, db: Session) -> TaxConfig | None:
     try:
         return TaxConfig.from_dict(row.config_json)
     except Exception:
+        logging.getLogger(__name__).exception(
+            "Failed to load TaxConfig id=%s for plan id=%s — falling back to seeded official",
+            plan.tax_config_id,
+            plan.id,
+        )
         return None
 
 

@@ -15,6 +15,7 @@ Scenario overrides are applied to PlanInput before simulate() — see
 `engine.scenario.apply_overrides`.
 """
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -309,7 +310,49 @@ def _retirement_age_for(person: PersonInput, default: int) -> int:
     return person.retirement_age if person.retirement_age is not None else default
 
 
+def _ensure_finite(value: float, field_label: str) -> None:
+    """Reject NaN / ±inf at the engine entry-point.
+
+    The API boundary already enforces this via pydantic `allow_inf_nan=False`,
+    but the engine is also called from tests, scenario tooling, and (in
+    future) batch pipelines that bypass FastAPI. Failing loudly here means a
+    bad input surfaces as a clear ValueError instead of silent NaN drift
+    through Monte-Carlo bands.
+    """
+    if not math.isfinite(value):
+        raise ValueError(f"{field_label} must be finite, got {value!r}")
+
+
+def _validate_plan_input(plan: PlanInput) -> None:
+    for inc in plan.incomes:
+        _ensure_finite(inc.gross_amount, f"income[{inc.id}].gross_amount")
+        _ensure_finite(inc.escalation_rate, f"income[{inc.id}].escalation_rate")
+    for e in plan.expenses:
+        _ensure_finite(e.amount, f"expense[{e.id}].amount")
+        _ensure_finite(e.escalation_rate, f"expense[{e.id}].escalation_rate")
+    for a in plan.assets:
+        _ensure_finite(a.value, f"asset[{a.id}].value")
+        _ensure_finite(a.growth_rate, f"asset[{a.id}].growth_rate")
+        _ensure_finite(a.cost_basis, f"asset[{a.id}].cost_basis")
+        _ensure_finite(a.annual_contribution, f"asset[{a.id}].annual_contribution")
+    for liability in plan.liabilities:
+        _ensure_finite(liability.principal, f"liability[{liability.id}].principal")
+        _ensure_finite(liability.interest_rate, f"liability[{liability.id}].interest_rate")
+        if liability.monthly_payment is not None:
+            _ensure_finite(liability.monthly_payment, f"liability[{liability.id}].monthly_payment")
+    for g in plan.goals:
+        _ensure_finite(g.target_amount, f"goal[{g.id}].target_amount")
+    a = plan.assumptions
+    _ensure_finite(a.inflation_rate, "assumptions.inflation_rate")
+    _ensure_finite(a.default_growth_rate, "assumptions.default_growth_rate")
+    _ensure_finite(a.property_growth_rate, "assumptions.property_growth_rate")
+    _ensure_finite(a.earnings_growth, "assumptions.earnings_growth")
+    _ensure_finite(a.state_pension_annual_amount, "assumptions.state_pension_annual_amount")
+    _ensure_finite(a.state_pension_escalation_rate, "assumptions.state_pension_escalation_rate")
+
+
 def simulate(plan: PlanInput) -> list[YearRow]:
+    _validate_plan_input(plan)
     tax_config = _resolve_tax_config(plan.tax_config)
     years = range(plan.base_year, plan.base_year + plan.projection_years)
     states: dict[int, AssetState] = {

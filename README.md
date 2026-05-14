@@ -1,42 +1,63 @@
-# Meridian — Financial Planning App (Ireland)
+# Meridian
 
-A financial-planning app with an **Ireland 2026** tax/pension engine. Inspired by Voyant AdviserGo. Currently single-user / local; multi-user with shared plans and Cloud Run deployment is the next phase.
+**Financial planning for Ireland — with a tax/pension engine that actually knows the rules.**
+
+Meridian is a personal-finance forecasting app built around an in-house Ireland 2026 tax & pension engine. Model your household 30+ years out, see how income tax, USC, PRSI, PRSA contributions, ARF drawdowns, CGT, ETF exit tax and CAT interact, and compare scenarios side-by-side with Monte Carlo probability bands.
+
+Inspired by Voyant AdviserGo. Not affiliated with Voyant Inc.
 
 **Repository:** https://github.com/RichardCByrne/meridian-financial-planning
 
-## Status: Phase 13 complete — Monte Carlo probability bands
+---
 
-Phase 12 added CAT / inheritance modelling. Phase 13 adds probabilistic outcomes via Monte Carlo. A new `engine/montecarlo.py` module wraps `simulate()` and runs N independent simulations (default 200), each time applying a once-per-run Gaussian shock to every asset's growth rate (σ by asset kind: 12% for equities/ETFs, 10% for pensions, 6% for property, 0% for cash) and to the household's inflation and earnings-growth assumptions. Per-year net-worth values are collected across all runs and the 5th/10th/25th/50th/75th/90th/95th percentiles are returned alongside the probability of at least one shortfall occurring. The new `GET /plans/{id}/projection/montecarlo?n=200` endpoint accepts 10–1,000 runs and respects scenario overrides. The Let's See chart gains a **Probability bands** toggle: when active it switches to a fan chart (stacked Area layers p5→p25→p75→p95 with two shades of blue) overlaid with a median line and the original deterministic dashed line. Two new summary stats appear: median final net worth and shortfall probability. The MC query is cached for 60 seconds (re-running on demand is expensive). **132/132 backend tests passing**. Phase 14 (AI walkthrough) is next.
+## Why it exists
 
-Post-Phase-13 quality pass (no behaviour change): fixed a scenario-override bug that silently dropped bequests / `tax_config` / `filing_status`; collapsed six parallel per-asset dicts in the simulator into a single `dict[int, AssetState]`; consolidated `TaxConfig` defaulting into one `resolve()` helper; extracted a `progressive_tax(amount, bands)` helper reused by USC and pension lump-sum tax; replaced `notes` string-grepping for shortfall detection with a typed `YearRow.had_shortfall` flag; centralised `_X_or_404` patterns into `routers/_helpers.py::get_or_404`; migrated `db.query()` → `db.execute(select(...))` in production code; replaced deprecated `datetime.utcnow()` with an `app.db.utcnow()` helper.
+Most retail financial planners either ignore Irish tax entirely or apply a flat "effective rate" approximation. Meridian models the real thing:
 
-Post-Phase-13 polish (UX + a small simulator addition):
-- **`YearRow.accessible_net_worth`** — total `net_worth` minus balances in pre-retirement pension wrappers (PRSA / occupational / AVC). Pre-retirement those funds are locked and shouldn't count toward `net_worth`-kind goals, so goal grading now reads `accessible_net_worth`. ARF / property / cash / investments stay fully accessible. Surfaced on `YearRowOut` and on the year-detail card when it differs from headline net worth.
-- **`NarrativeSummary` / `SummaryStrip`** distinguish *peak* vs *final* net worth — peak is only highlighted when it occurs in a year other than the final projection year, avoiding the duplicate "peak == final" reading.
-- **`ComparePane`** scenario lines now respond to legend hover with a focus-and-fade highlight and inline copy explaining what each line means.
-- **`AddIncomeForm` / `AddExpenseForm`** escalation inputs display whole-number percentages (e.g. `2.5` rather than `0.025`) at 0.5-step granularity; conversion to the underlying decimal happens on submit.
-- **`GuidedTour`** is gated behind an existing plan — the tour no longer launches against an empty plans list.
+- **Income tax bands & credits, USC, PRSI** per Budget 2026 — single-source-of-truth `TaxConfig` dataclass.
+- **Age-based pension contribution caps** (15%–40%, €115k earnings cap) with PRSA/occupational wrapper auto-creation.
+- **Retirement crystallisation**: 25% tax-free lump sum (with band logic — €200k free / next €300k @ 20% / above @ marginal) plus 75% ARF with imputed minimum drawdown (4%/5%/6%).
+- **State pension** auto-injected at the configured age.
+- **CGT, ETF exit tax, CAT/inheritance** on disposals and bequests.
+- **Monte Carlo**: 200 (configurable 10–1,000) independent simulations with per-asset-class Gaussian shocks. Outputs p5/p10/p25/p50/p75/p90/p95 net-worth bands and a shortfall probability.
 
-- **Tax engine (`backend/app/engine/tax_ie.py`)** — Income tax bands & credits, USC, PRSI per Budget 2026. 13 golden-number pytest cases.
-- **Pension engine (`backend/app/engine/pension_ie.py`)** — Age-based contribution caps (15%–40% with €115k earnings cap), lump-sum tax bands (€200k tax-free / next €300k @ 20% / above @ marginal), ARF minimum drawdown percentages (4% / 5% / 6%).
-- **Simulator (`backend/app/engine/simulator.py`)** — Per-year, per-person:
-  - Pre-retirement: pension contribution capped per `pension_ie`, deducted from taxable income, routed to a PRSA/occupational wrapper (auto-creates implicit one if none exists).
-  - At retirement age: pension wrappers crystallise → 25% lump sum (taxed per bands, net to cash) + 75% ARF (auto-created).
-  - Post-retirement: ARF imputed minimum drawdown taxed as PAYE income; state pension auto-injected from `state_pension_age`.
-- **`/api/plans/{id}/projection`** — `YearRow` adds `pension_contributions`, `pension_lump_sum`, `pension_lump_sum_tax`, `arf_drawdowns`, `state_pension_total`.
-- **Let's See page** — Year-detail card surfaces pension contribution, ARF drawdown, state pension, and one-shot retirement lump sum events.
-- Frontend forms: **People** captures `retirement_age`, **Income** captures `pension_contribution_pct`, **Assets** binds pension wrappers to an owner, **Assumptions** sets state-pension annual amount.
+Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run the year and every projection picks it up.
 
-Roadmap: Phase 8 (Firebase Auth + multi-user backbone), Phase 9 (Postgres + Alembic + Docker + Cloud Run), Phase 10 (plan-sharing UX), Phases 11–13 (multi-tax-year config, CAT / inheritance, Monte Carlo).
+---
 
-## Prerequisites
+## What you can do with it
 
-- **Python 3.11+** (tested on 3.14.2).
-- **Node.js 18.x with npm** (tested on v18.6.0).
+1. Create a **plan** for your household (base year, horizon, inflation/earnings-growth assumptions).
+2. Add **people** with DOBs, retirement ages, pension contribution %, state-pension entitlement.
+3. Add **income sources, expenses, assets** (cash / ETF / equities / property / pension wrappers / ARF), and **liabilities** (mortgages amortise year-by-year).
+4. Add **goals** (net-worth-by-year, retirement-income, lump-sum events) and grade them against accessible net worth.
+5. Define **scenarios** as JSON-Patch overlays on the base plan, and compare projections on one chart.
+6. Toggle **Probability bands** on the Let's See chart for the Monte Carlo fan view.
+7. Share plans with other users in `owner` / `editor` / `viewer` roles (Firebase Auth in prod, dev-auth bypass for local).
 
-> **Note:** `fnm` users — make sure your active Node has npm bundled. Node 25.x as installed on this machine ships without npm, so the dev runner uses Node 18 explicitly via `fnm`.
+---
 
-## First-time setup
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Backend | FastAPI, SQLAlchemy 2.x, Pydantic v2, Alembic |
+| Engine | Pure Python — no ORM imports, fully unit-testable |
+| Database | SQLite (local dev), Neon serverless Postgres (prod, free tier) |
+| Frontend | Vite, React 19, TypeScript, react-query, zustand, recharts |
+| Auth | Firebase Auth (prod) / seeded dev user (local) |
+| Hosting | Cloud Run (API) + Firebase Hosting (static frontend) |
+| Tests | 132 pytest tests, `tsc --noEmit` + `vite build` + audits in CI |
+
+---
+
+## Quickstart
+
+### Prerequisites
+- **Python 3.11+** (tested on 3.14)
+- **Node.js 18+ with npm** (the dev runner uses `fnm` to pin Node LTS)
+
+### First-time setup
 
 ```powershell
 # Backend
@@ -50,138 +71,146 @@ cd ..\frontend
 npm install
 ```
 
-## Run dev servers
-
-Two terminals, or use the provided runner:
-
-```powershell
-# Terminal 1 — backend on :8000
-cd backend
-.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000 --host 127.0.0.1
-
-# Terminal 2 — frontend on :5173 (proxies /api to backend)
-cd frontend
-npm run dev
-```
-
-Or start both with one command:
+### Run
 
 ```powershell
 .\dev.ps1
 ```
 
-Open http://localhost:5173 in your browser.
+Starts FastAPI on `:8000` and Vite on `:5173` with `/api` proxied to the backend. Open http://localhost:5173.
 
-## Phase 2 verification
+OpenAPI docs: http://127.0.0.1:8000/docs
 
-End-to-end golden path:
-
-1. Visit http://localhost:5173 → `/plans`. Create plan **Murphy household** (base year 2026, 30 years).
-2. **People** tab → add `Liam`, DOB 1985-03-12, primary.
-3. **Income** tab → on Liam, add `Software engineer`, employment, €80,000, start 2026, 3% escalation.
-4. **Expenses** tab → add `Living` (basic, €24k, 2.5% escalation), `Holidays` (discretionary, €5k, 2.5%), `Mortgage` (basic, €18k, 2026–2050).
-5. **Assets** tab → add `Current account` (cash, €15,000) and `Investment ETF` (etf_fund, €50,000, 6% growth).
-6. **Let's See** tab → chart loads. Dropdown switches between Net worth (area), Cash flow (bar+line), Income breakdown (stacked bar), Tax breakdown (stacked bar).
-7. Hover any year → year-detail card updates with income/tax/expense/asset breakdown.
-8. **Assumptions** → bump inflation to 3%, save → return to Let's See, expense bars and net-worth curve change.
-
-Run the test suite:
+### Test
 
 ```powershell
 cd backend
-.\.venv\Scripts\python -m pytest -v   # 132 tests, ~5s
+.\.venv\Scripts\python -m pytest -v        # ~5s, 132 tests
+
+cd ..\frontend
+npm run lint                               # tsc --noEmit
+npm run build
 ```
 
-Backend smoke check:
+---
 
-```powershell
-curl http://127.0.0.1:8000/api/health
-# {"status":"ok"}
-```
+## Try the golden-path demo (5 min)
 
-OpenAPI is published at http://127.0.0.1:8000/docs.
+1. Create plan **Murphy household** — base year 2026, 30 years.
+2. **People** → `Liam`, DOB 1985-03-12, primary, retirement age 65.
+3. **Income** → on Liam, `Software engineer`, employment, €80,000, start 2026, 3% escalation, 10% pension contribution.
+4. **Expenses** → `Living` (basic, €24k, 2.5%), `Holidays` (discretionary, €5k, 2.5%), `Mortgage` (basic, €18k, 2026–2050).
+5. **Assets** → `Current account` (cash, €15,000), `Investment ETF` (etf_fund, €50,000, 6% growth).
+6. **Let's See** → switch chart modes, hover any year for the breakdown card, toggle **Probability bands** for the Monte Carlo fan.
+7. **Assumptions** → bump inflation to 3%, save → curve and expense bars react.
+
+---
 
 ## Project layout
 
 ```
 meridian-financial-planning/
-├── backend/                 # FastAPI + SQLAlchemy + SQLite
+├── backend/                 # FastAPI + SQLAlchemy
 │   ├── app/
-│   │   ├── main.py          # FastAPI app factory, CORS, router registration
-│   │   ├── db.py            # engine, SessionLocal, Base
-│   │   ├── models/          # SQLAlchemy ORM
+│   │   ├── main.py          # app factory, lifespan, CORS, routers
+│   │   ├── db.py            # engine, SessionLocal, utcnow()
+│   │   ├── auth.py          # Firebase verify + dev bypass + role gates
+│   │   ├── models/          # ORM (one file, all tables)
 │   │   ├── schemas/         # Pydantic v2 DTOs
-│   │   ├── routers/         # plans, people, assumptions (more in later phases)
-│   │   ├── engine/          # (Phase 2) pure calc engine
-│   │   ├── config/          # (Phase 2) tax_ie_2026.py
-│   │   └── tests/           # pytest
+│   │   ├── routers/         # plans, people, assets, projections, scenarios, …
+│   │   ├── engine/          # PURE — tax_ie, pension_ie, simulator, montecarlo, cat_ie, scenario
+│   │   ├── services/        # ORM ↔ engine dataclass serialisation
+│   │   ├── config/          # tax_ie_2026.py (seeded into DB on startup)
+│   │   ├── alembic/         # production migrations
+│   │   └── tests/           # test_phase1..13.py + engine unit tests
 │   ├── pyproject.toml
-│   └── meridian.db          # local SQLite — created on first run, gitignored
-└── frontend/                # Vite + React + TypeScript
-    ├── src/
-    │   ├── api/             # client + react-query hooks
-    │   ├── pages/           # PlansList, PlanEditor, panes/*
-    │   ├── components/      # shared UI (Phase 2+)
-    │   ├── store/           # zustand stores (Phase 2+)
-    │   └── lib/             # money/date helpers
-    ├── index.html
-    ├── vite.config.ts
-    └── package.json
+│   └── meridian.db          # local SQLite, gitignored
+├── frontend/                # Vite + React 19 + TypeScript
+│   ├── src/
+│   │   ├── api/             # typed client + react-query hooks
+│   │   ├── pages/           # PlansList, PlanEditor, panes/*
+│   │   ├── auth/            # Firebase web SDK + dev bypass
+│   │   ├── components/      # shared UI
+│   │   └── store/           # zustand client state
+│   └── vite.config.ts
+├── cloudbuild.yaml          # Cloud Run deploy pipeline
+├── firebase.json            # Firebase Hosting config
+├── dev.ps1                  # one-shot local runner
+├── CLAUDE.md                # architecture/conventions (for Claude Code & humans)
+├── DEPLOY.md                # full prod-deploy walkthrough
+└── QA_FINDINGS.md           # standing QA notes
 ```
 
-## Roadmap (multi-month)
+---
 
-| Phase | Scope                                                    | Status     |
-| ----- | -------------------------------------------------------- | ---------- |
-| 1     | Foundations + CRUD for plan/people/assumptions           | ✅ Done    |
-| 2     | Ireland 2026 tax engine + cash flow simulator + Let's See | ✅ Done    |
-| 3     | Liabilities (mortgage amortisation) + ETF exit tax + CGT | ✅ Done    |
-| 4     | Pension lifecycle (PRSA / ARF / annuity / state pension) | ✅ Done    |
-| 4.5   | UX polish: inline edit, tooltips, employer pension %     | ✅ Done    |
-| 5     | Goals + draggable Timeline                               | ✅ Done    |
-| 6     | Scenarios as JSON-Patch + Compare view                   | ✅ Done    |
-| 7     | Rebrand to Meridian + UX polish + clone/export           | ✅ Done    |
-| 8     | Firebase Auth + multi-user backbone (User, PlanMember)   | ✅ Done    |
-| 9     | Postgres + Alembic + Docker + Cloud Run deploy           | ✅ Done    |
-| 10    | Plan-sharing UX (share-link invites)                     | ✅ Done    |
-| 11    | Multi-tax-year configurable rules                        | ✅ Done    |
-| 12    | CAT / inheritance / legacy                               | ✅ Done    |
-| 13    | Monte Carlo (probability bands)                          | ✅ Done    |
+## Architecture in one paragraph
 
-Deferred: PDF export, AI walkthrough, AI chatbot.
+The backend enforces a hard split between an **ORM layer** (`models/`, `routers/`, `schemas/`) and a **pure engine** (`engine/`). The engine consumes plain dataclasses (`PlanInput`, `PersonInput`, …) and emits `YearRow` records — no SQLAlchemy import is allowed under `engine/`. The simulator orchestrates seven phases per year (age → grow → income → tax → expenses → liquidate → liabilities/goals) over a shared mutable state. Monte Carlo wraps the same `simulate()` with per-run Gaussian shocks. Scenarios are JSON-Patch overlays applied to `PlanInput` before simulation. All tax knobs flow through one `TaxConfig` dataclass seeded from `config/tax_ie_2026.py`.
 
-## Notes
+Read **[CLAUDE.md](./CLAUDE.md)** for the deeper architecture guide (layering rules, deferred refactors, conventions, gotchas).
 
-- **Multi-user with role-based shared plans.** Every endpoint is gated by `Depends(get_current_user)` (Firebase Auth) and an `owner`/`editor`/`viewer` membership check. Sharing UX (invite flow) lands in Phase 10; the substrate is in place now.
-- **Dev-auth mode is the default for local development.** `MERIDIAN_DEV_AUTH=true` (backend) + `VITE_DEV_AUTH=true` (frontend) bypass Firebase and use a seeded "Local Dev User" — no Firebase project needed to run `./dev.ps1`. Flip both to `false` and configure `FIREBASE_SERVICE_ACCOUNT_PATH` + the `VITE_FIREBASE_*` env vars for production.
-- **Schema is managed by `Base.metadata.create_all`** + lightweight ALTER TABLE in the FastAPI lifespan. Alembic comes in Phase 9.
-- **Inspired by Voyant AdviserGo, not affiliated with Voyant Inc.** No Voyant code or assets are included.
+---
+
+## Auth modes
+
+**Local dev (default):** `MERIDIAN_DEV_AUTH=true` + `VITE_DEV_AUTH=true` → every request resolves to a seeded `dev-local` user. No Firebase project needed.
+
+**Production:** flip both flags to `false` and supply Firebase credentials (service-account JSON for the backend, `VITE_FIREBASE_*` env vars for the frontend). Authorisation is `PlanMember` rows with `viewer < editor < owner`. Non-members see **404 (not 403)** on plan endpoints — deliberate, so plan IDs don't leak.
+
+---
 
 ## Production deploy
 
-Meridian deploys as a single Cloud Run service (FastAPI + Alembic) backed by **Neon serverless Postgres** (free tier, autosuspends on idle), with the static frontend on Firebase Hosting. The `cloudbuild.yaml` and `firebase.json` configs are wired in this repo; you supply the GCP project, the Neon connection string, and the Firebase auth secrets.
+Meridian runs as a single Cloud Run service (FastAPI + Alembic) on **Neon serverless Postgres** (free tier, autosuspends on idle), with the frontend on Firebase Hosting.
 
-**See [`DEPLOY.md`](./DEPLOY.md) for the full step-by-step walkthrough** — including prerequisites, Neon project setup, Firebase Auth wiring, Cloud Run deploy, frontend deploy, and a troubleshooting table. Cloud SQL Postgres is documented as an alternative in Appendix A of that file (one-line `DATABASE_URL` swap, no code change).
+See **[DEPLOY.md](./DEPLOY.md)** for the full walkthrough — GCP project setup, Neon, Firebase Auth wiring, Cloud Run deploy, frontend deploy, troubleshooting. Cloud SQL Postgres is documented as a one-secret swap in Appendix A.
 
-Quick reference for the impatient:
+Quick reference once secrets are configured:
+
 ```powershell
-# After §1-§5 of DEPLOY.md (project + Neon + Firebase + secrets created)
 gcloud builds submit --config cloudbuild.yaml `
   --substitutions "_REGION=europe-west1,_REPO=meridian,_SERVICE=meridian-api"
 
 cd frontend; npm run build; firebase deploy --only hosting
 ```
 
-## Firebase setup (local dev with real Firebase Auth)
+---
 
-1. In the Firebase console, create a project and enable Authentication → "Sign-in method" → Google + Email/Password.
-2. Project settings → "Service accounts" → generate a new private key JSON. Save it somewhere safe (don't commit it).
-3. Backend env vars:
-   - `MERIDIAN_DEV_AUTH=false`
-   - `FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json`
-4. Frontend env vars (copy `frontend/.env.example` to `.env.local` and fill in):
-   - `VITE_DEV_AUTH=false`
-   - `VITE_FIREBASE_API_KEY=…`
-   - `VITE_FIREBASE_AUTH_DOMAIN=…`
-   - `VITE_FIREBASE_PROJECT_ID=…`
-   - `VITE_FIREBASE_APP_ID=…`
+## Status & roadmap
+
+**Phase 13 complete.** 132/132 backend tests passing. Phase 14 (AI walkthrough) is next.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Foundations + CRUD for plan/people/assumptions | ✅ |
+| 2 | Ireland 2026 tax engine + cash-flow simulator + Let's See | ✅ |
+| 3 | Liabilities (mortgage amortisation) + ETF exit tax + CGT | ✅ |
+| 4 | Pension lifecycle (PRSA / ARF / annuity / state pension) | ✅ |
+| 4.5 | UX polish: inline edit, tooltips, employer pension % | ✅ |
+| 5 | Goals + draggable Timeline | ✅ |
+| 6 | Scenarios as JSON-Patch + Compare view | ✅ |
+| 7 | Rebrand to Meridian + UX polish + clone/export | ✅ |
+| 8 | Firebase Auth + multi-user backbone | ✅ |
+| 9 | Postgres + Alembic + Docker + Cloud Run | ✅ |
+| 10 | Plan-sharing UX (share-link invites) | ✅ |
+| 11 | Multi-tax-year configurable rules | ✅ |
+| 12 | CAT / inheritance / legacy | ✅ |
+| 13 | Monte Carlo (probability bands) | ✅ |
+| 14 | AI walkthrough | 🔜 |
+
+Deferred: PDF export, AI chatbot.
+
+---
+
+## Where to read next
+
+- **[CLAUDE.md](./CLAUDE.md)** — architecture, conventions, layering rules, deferred refactors.
+- **[DEPLOY.md](./DEPLOY.md)** — production deploy walkthrough.
+- **`backend/app/engine/`** — the tax/pension/simulator code. Start with `tax_ie.py` then `simulator.py`.
+- **`backend/app/tests/`** — per-phase integration tests + engine unit tests. Good map of what each phase added.
+
+---
+
+## Licence & attribution
+
+Inspired by Voyant AdviserGo. No Voyant code or assets are included. This is a personal project, not affiliated with Voyant Inc.

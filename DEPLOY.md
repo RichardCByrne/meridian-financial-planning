@@ -218,9 +218,7 @@ foreach ($r in @("roles/run.admin", "roles/iam.serviceAccountUser", "roles/artif
 
 ## 6. Deploy the backend
 
-The pipeline is described in `cloudbuild.yaml`: build → push → `gcloud run deploy` with secrets mounted.
-
-> **One-time edit to `cloudbuild.yaml`.** The committed file currently includes `--add-cloudsql-instances=${_CLOUD_SQL_INSTANCE}` from the original Cloud SQL design. For Neon, remove that line and drop the `_CLOUD_SQL_INSTANCE` substitution from the `gcloud builds submit` call. (Keep both if you want a single `cloudbuild.yaml` that works for either path — pass `_CLOUD_SQL_INSTANCE=""` and Cloud Run treats it as a no-op.)
+The pipeline is described in `cloudbuild.yaml`: build → push → `gcloud run deploy` with secrets mounted. The committed file is already wired for Neon (no `--add-cloudsql-instances` flag). If you later switch to Cloud SQL, see Appendix A for the one-line restore.
 
 Run the build:
 
@@ -261,20 +259,20 @@ If `db` reports anything other than `ok`, jump to §10 Troubleshooting.
 
 ### 7a. Point `.firebaserc` at your project
 
-Edit `.firebaserc` at the repo root and replace the placeholder with `$PROJECT_ID`:
+The committed `.firebaserc` already targets `meridian-financial-planner`. If you fork the repo and use a different `$PROJECT_ID`, update it:
+
+```powershell
+firebase use --add $PROJECT_ID
+```
+
+Or edit `.firebaserc` directly:
 
 ```json
 {
   "projects": {
-    "default": "meridian-prod"
+    "default": "$PROJECT_ID"
   }
 }
-```
-
-Or run:
-
-```powershell
-firebase use --add $PROJECT_ID
 ```
 
 ### 7b. Write `frontend/.env.production`

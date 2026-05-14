@@ -177,6 +177,8 @@ class Person(Base):
     # legacy full-state-pension behaviour.
     prsi_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=2080, nullable=False)
     homecaring_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Voluntary ARF drawdown rate (post-retirement). NULL = statutory min only.
+    arf_target_drawdown_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     plan: Mapped[Plan] = relationship(back_populates="people")
     income_sources: Mapped[list["IncomeSource"]] = relationship(

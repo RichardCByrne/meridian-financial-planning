@@ -27,6 +27,7 @@ type FormState = {
   lump_sum_pct: number; // whole-number percent, 0–25
   prsi_years_at_base_year: number; // years, converted to weeks on submit
   homecaring_years_at_base_year: number;
+  arf_target_drawdown_pct: number | ""; // whole-number percent, "" = use statutory min
 };
 
 const blankForm: FormState = {
@@ -39,6 +40,7 @@ const blankForm: FormState = {
   lump_sum_pct: 25,
   prsi_years_at_base_year: 40,
   homecaring_years_at_base_year: 0,
+  arf_target_drawdown_pct: "",
 };
 
 function fromPerson(p: Person): FormState {
@@ -52,6 +54,10 @@ function fromPerson(p: Person): FormState {
     lump_sum_pct: Math.round((p.lump_sum_pct ?? 0.25) * 1000) / 10,
     prsi_years_at_base_year: Math.round((p.prsi_weeks_at_base_year ?? 2080) / 52),
     homecaring_years_at_base_year: Math.round((p.homecaring_weeks_at_base_year ?? 0) / 52),
+    arf_target_drawdown_pct:
+      p.arf_target_drawdown_pct == null
+        ? ""
+        : Math.round(p.arf_target_drawdown_pct * 1000) / 10,
   };
 }
 
@@ -79,6 +85,7 @@ export function PeoplePane({ planId }: { planId: number }) {
       lump_sum_pct: p.lump_sum_pct,
       prsi_weeks_at_base_year: p.prsi_weeks_at_base_year,
       homecaring_weeks_at_base_year: p.homecaring_weeks_at_base_year,
+      arf_target_drawdown_pct: p.arf_target_drawdown_pct,
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -101,6 +108,10 @@ export function PeoplePane({ planId }: { planId: number }) {
     lump_sum_pct: Math.max(0, Math.min(0.25, f.lump_sum_pct / 100)),
     prsi_weeks_at_base_year: Math.max(0, Math.min(2600, Math.round(f.prsi_years_at_base_year * 52))),
     homecaring_weeks_at_base_year: Math.max(0, Math.min(1040, Math.round(f.homecaring_years_at_base_year * 52))),
+    arf_target_drawdown_pct:
+      f.arf_target_drawdown_pct === ""
+        ? null
+        : Math.max(0, Math.min(1, Number(f.arf_target_drawdown_pct) / 100)),
   });
 
   const onFilingStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -426,6 +437,26 @@ function FormFields({
             setForm({
               ...form,
               homecaring_years_at_base_year: Math.max(0, Math.min(20, v)),
+            })
+          }
+        />
+      </div>
+      <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+        <label>
+          ARF drawdown %
+          <HelpTip>
+            Voluntary ARF drawdown rate in retirement. Leave blank to use the statutory minimum
+            (4% under 70, 5% 70–79, 6% on large funds). Setting a higher value lets you model
+            drawing more for spending; the engine takes max(minimum, your target) each year.
+          </HelpTip>
+        </label>
+        <NumericInput
+          placeholder="min"
+          value={form.arf_target_drawdown_pct === "" ? NaN : form.arf_target_drawdown_pct}
+          onChange={(v) =>
+            setForm({
+              ...form,
+              arf_target_drawdown_pct: Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : "",
             })
           }
         />

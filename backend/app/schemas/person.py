@@ -29,6 +29,7 @@ class PersonCreate(BaseModel):
     lump_sum_pct: float = Field(default=0.25, ge=0.0, le=0.25)
     prsi_weeks_at_base_year: int = Field(default=2080, ge=0, le=2600)
     homecaring_weeks_at_base_year: int = Field(default=0, ge=0, le=1040)
+    arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
 
     @field_validator("dob")
     @classmethod
@@ -47,6 +48,7 @@ class PersonUpdate(BaseModel):
     lump_sum_pct: float | None = Field(default=None, ge=0.0, le=0.25)
     prsi_weeks_at_base_year: int | None = Field(default=None, ge=0, le=2600)
     homecaring_weeks_at_base_year: int | None = Field(default=None, ge=0, le=1040)
+    arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
 
     @field_validator("dob")
     @classmethod
@@ -69,3 +71,4 @@ class PersonRead(BaseModel):
     lump_sum_pct: float = 0.25
     prsi_weeks_at_base_year: int = 2080
     homecaring_weeks_at_base_year: int = 0
+    arf_target_drawdown_pct: float | None = None

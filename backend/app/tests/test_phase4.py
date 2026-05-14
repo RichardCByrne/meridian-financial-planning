@@ -563,3 +563,43 @@ def test_multiple_children_stack():
     )
     rows = simulate(plan)
     assert abs(rows[0].income_by_kind.get("child_benefit", 0) - 3 * 1_680) < 1
+
+
+# --- Voluntary ARF drawdown rate --------------------------------------------
+
+
+def _retired_with_arf(target_pct: float | None, value: float = 200_000):
+    person = PersonInput(
+        id=1, name="ARF target", dob=date(1960, 1, 1),
+        is_primary=True, life_expectancy=90, retirement_age=66,
+        arf_target_drawdown_pct=target_pct,
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=1,
+        people=[person], incomes=[], expenses=[],
+        assets=[
+            AssetInput(id=1, name="Cash", kind="cash", value=0, growth_rate=0.0, cost_basis=0.0),
+            AssetInput(id=2, name="ARF", kind="arf", value=value, growth_rate=0.0,
+                       cost_basis=0.0, owner_person_id=1),
+        ],
+        assumptions=AssumptionsInput(state_pension_annual_amount=0.0),
+    )
+    return simulate(plan)
+
+
+def test_arf_target_drawdown_above_minimum_draws_more():
+    """target_pct=0.06 with statutory min 4% → engine draws 6% (12k of 200k)."""
+    rows = _retired_with_arf(target_pct=0.06)
+    assert abs(rows[0].arf_drawdowns - 12_000) < 1
+
+
+def test_arf_target_below_minimum_uses_statutory():
+    """target_pct=0.02 with statutory min 4% → engine still draws the 4% floor."""
+    rows = _retired_with_arf(target_pct=0.02)
+    assert abs(rows[0].arf_drawdowns - 8_000) < 1
+
+
+def test_arf_target_none_preserves_legacy_minimum_only():
+    """target_pct=None → statutory minimum applies (4% of 200k = 8k)."""
+    rows = _retired_with_arf(target_pct=None)
+    assert abs(rows[0].arf_drawdowns - 8_000) < 1

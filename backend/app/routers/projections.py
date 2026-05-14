@@ -86,6 +86,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             lump_sum_pct=p.lump_sum_pct,
             prsi_weeks_at_base_year=p.prsi_weeks_at_base_year,
             homecaring_weeks_at_base_year=p.homecaring_weeks_at_base_year,
+            arf_target_drawdown_pct=p.arf_target_drawdown_pct,
         )
         for p in plan.people
     ]

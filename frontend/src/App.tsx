@@ -10,6 +10,7 @@ import { GuidePage } from "./pages/GuidePage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlansListPage } from "./pages/PlansList";
 import { PlanEditorPage } from "./pages/PlanEditor";
+import { PlanWizardPage } from "./pages/PlanWizardPage";
 
 export function App() {
   return (
@@ -99,6 +100,22 @@ function AppShell() {
               element={
                 <ProtectedRoute>
                   <PlansListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plans/new"
+              element={
+                <ProtectedRoute>
+                  <PlanWizardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plans/new/:stepId"
+              element={
+                <ProtectedRoute>
+                  <PlanWizardPage />
                 </ProtectedRoute>
               }
             />

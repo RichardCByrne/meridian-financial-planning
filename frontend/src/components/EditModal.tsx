@@ -1,7 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { useFocusTrap } from "../lib/focusTrap";
 
 export function EditModal({
   open,
@@ -17,66 +16,7 @@ export function EditModal({
   footer?: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      // Focus trap: cycle Tab focus inside the dialog so the user can't tab
-      // back into the page underneath.
-      const panel = panelRef.current;
-      if (!panel) return;
-      const focusables = Array.from(
-        panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-      if (focusables.length === 0) {
-        e.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey && (active === first || !panel.contains(active))) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-
-    const t = setTimeout(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-      (first ?? panelRef.current)?.focus();
-    }, 0);
-
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      clearTimeout(t);
-      const prev = previouslyFocused.current;
-      // Restore focus to whatever opened the dialog. Fall back to <body>
-      // when the trigger has been unmounted (e.g. row was deleted) so focus
-      // doesn't get stranded on a hidden node.
-      if (prev && document.contains(prev) && typeof prev.focus === "function") {
-        prev.focus();
-      } else {
-        document.body.focus?.();
-      }
-    };
-  }, [open, onClose]);
+  useFocusTrap({ open, panelRef, onClose });
 
   if (!open) return null;
 

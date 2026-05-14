@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   exportPlan,
   useClonePlan,
-  useCreatePlan,
   useDeletePlan,
   useImportPlan,
   usePlans,
@@ -16,22 +15,13 @@ import { buildSampleHouseholdPayload } from "../lib/sampleHousehold";
 
 export function PlansListPage() {
   const { data, isLoading, error } = usePlans();
-  const createPlan = useCreatePlan();
   const deletePlan = useDeletePlan();
   const clonePlan = useClonePlan();
   const importPlan = useImportPlan();
   const navigate = useNavigate();
-  const [name, setName] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [sampleBusy, setSampleBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const onCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    await createPlan.mutateAsync({ name: name.trim() });
-    setName("");
-  };
 
   const onExport = async (id: number, planName: string) => {
     setBusyId(id);
@@ -99,32 +89,18 @@ export function PlansListPage() {
             >
               {sampleBusy ? "Creating sample…" : "Try a sample plan"}
             </button>
-            <Link
-              to="#"
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById("plan-name-input")?.focus();
-              }}
-              style={{ alignSelf: "center" }}
-            >
-              or start from scratch ↓
+            <Link to="/plans/new" className="btn btn-secondary" style={{ alignSelf: "center" }}>
+              Or start from scratch →
             </Link>
           </div>
         </div>
       )}
 
       <div className="card">
-        <form onSubmit={onCreate} className="row" style={{ flexWrap: "wrap" }}>
-          <input
-            id="plan-name-input"
-            placeholder="New plan name (e.g. Smith household)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ flex: 1, minWidth: 220, padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: 6 }}
-          />
-          <button type="submit" className="btn" disabled={createPlan.isPending}>
-            {createPlan.isPending ? "Creating…" : "Create plan"}
-          </button>
+        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+          <Link to="/plans/new" className="btn">
+            Create plan
+          </Link>
           {!isEmpty && (
             <button
               type="button"
@@ -155,7 +131,7 @@ export function PlansListPage() {
               e.target.value = "";
             }}
           />
-        </form>
+        </div>
       </div>
 
       {isLoading && (

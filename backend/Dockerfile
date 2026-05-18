@@ -8,7 +8,7 @@
 # prebuilt wheels for 3.13, so pip skips source compilation. Saves ~2-3 min
 # per cold build.
 
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -33,7 +33,7 @@ COPY app ./app
 
 # ----------
 
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

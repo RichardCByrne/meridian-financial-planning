@@ -10,9 +10,9 @@ requires-python = ">=3.11"
 # code on the next `pip install`. Upgrade process: bump the pin, run
 # `pytest` + `pip-audit`, PR. See DEPLOY.md §"Supply-chain policy".
 dependencies = [
-    "fastapi==0.136.1",
+    "fastapi==0.136.3",
     "uvicorn[standard]==0.46.0",
-    "sqlalchemy==2.0.49",
+    "sqlalchemy==2.0.50",
     "pydantic==2.13.4",
     "alembic==1.18.4",
     "python-dateutil==2.9.0.post0",
@@ -30,7 +30,7 @@ dependencies = [
 dev = [
     "pytest==9.0.3",
     "httpx==0.28.1",
-    "ruff==0.15.12",
+    "ruff==0.15.14",
     "pip-audit==2.10.0",
 ]
 

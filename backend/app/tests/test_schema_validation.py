@@ -10,6 +10,7 @@ from datetime import date, timedelta
 import pytest
 from pydantic import ValidationError
 
+from app.schemas.child import ChildCreate, ChildUpdate
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate
 from app.schemas.goal import GoalCreate, GoalUpdate
 from app.schemas.income import IncomeSourceCreate, IncomeSourceUpdate
@@ -165,6 +166,28 @@ def test_person_update_allows_none_dob() -> None:
     # Update payload omitting dob entirely must remain valid.
     u = PersonUpdate(name="Renamed")
     assert u.dob is None
+
+
+# ---------- Child.dob (planned future arrivals) ----------
+
+
+def test_child_accepts_far_future_dob() -> None:
+    # Users plan children years ahead — no upper bound on the birth year.
+    future = date.today() + timedelta(days=365 * 5)
+    c = ChildCreate(name="Future kid", dob=future)
+    assert c.dob == future
+
+
+def test_child_update_accepts_far_future_dob() -> None:
+    future = date.today() + timedelta(days=365 * 8)
+    u = ChildUpdate(dob=future)
+    assert u.dob == future
+
+
+def test_child_rejects_dob_too_far_in_past() -> None:
+    ancient = date.today() - timedelta(days=31 * 366)
+    with pytest.raises(ValidationError):
+        ChildCreate(name="Old", dob=ancient)
 
 
 # ---------- NaN / inf guards (V7 cross-cut) ----------

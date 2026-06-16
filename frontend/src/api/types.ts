@@ -59,7 +59,11 @@ export interface Person {
   prsi_weeks_at_base_year: number;
   homecaring_weeks_at_base_year: number;
   arf_target_drawdown_pct: number | null;
+  pension_option: PensionOption;
+  annuity_rate: number;
 }
+
+export type PensionOption = "arf" | "annuity" | "taxable_lump_sum";
 
 export interface PersonCreate {
   name: string;
@@ -73,6 +77,8 @@ export interface PersonCreate {
   prsi_weeks_at_base_year?: number;
   homecaring_weeks_at_base_year?: number;
   arf_target_drawdown_pct?: number | null;
+  pension_option?: PensionOption;
+  annuity_rate?: number;
 }
 
 export interface Assumptions {
@@ -404,6 +410,10 @@ export type ScenarioOverrides = {
   liabilities?: Record<string, Partial<LiabilityCreate>>;
   goals?: Record<string, Partial<GoalCreate>>;
   assumptions?: Partial<AssumptionsUpsert>;
+  // Plan-level scalar overrides (not bucketed).
+  filing_status?: "single" | "married" | "cohabiting";
+  // Marriage event: tax both people as a jointly-assessed couple from this year on.
+  marriage_year?: number;
 };
 
 export interface Scenario {

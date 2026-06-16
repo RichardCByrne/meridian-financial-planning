@@ -27,10 +27,13 @@ import type {
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../components/Toast";
 import { useIncomeForPeople } from "../../lib/useIncomeForPeople";
 
-type Bucket = keyof ScenarioOverrides;
+// Bucketed override keys only — the plan-level scalars (filing_status,
+// marriage_year) are handled separately, not via the bucket/field UI.
+type Bucket = Exclude<keyof ScenarioOverrides, "filing_status" | "marriage_year">;
 
 type FieldDef = {
   name: string;
@@ -227,6 +230,9 @@ function ScenarioCard({
   const [showJson, setShowJson] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState<"override" | "step" | "added">("override");
+  const [collapsed, setCollapsed] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Reset local state only when we're switched to a *different* scenario id.
   // Background refetches on the same id no longer clobber in-flight edits.
@@ -352,9 +358,44 @@ function ScenarioCard({
     });
   };
 
+  const setMarriageYear = (year: number | null) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (year === null) delete next.marriage_year;
+      else next.marriage_year = year;
+      return next;
+    });
+  };
+
+  const addedCount =
+    ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
+    ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0);
+  const summaryParts: string[] = [];
+  if (overrideRows.length) summaryParts.push(`${overrideRows.length} override${overrideRows.length === 1 ? "" : "s"}`);
+  if (addedCount) summaryParts.push(`${addedCount} added`);
+  if (overrides.marriage_year) summaryParts.push(`married ${overrides.marriage_year}`);
+  const summary = summaryParts.length ? summaryParts.join(" · ") : "No changes yet";
+
   return (
     <div className="card">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: collapsed ? 0 : 8, gap: 8 }}>
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand scenario" : "Collapse scenario"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((c) => !c)}
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            fontSize: 16,
+            width: 24,
+            color: "#64748b",
+          }}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
         <input
           value={name}
           onChange={(e) => {
@@ -364,28 +405,65 @@ function ScenarioCard({
           style={{ fontSize: 18, fontWeight: 600, padding: 4, border: "1px solid transparent", borderRadius: 4, flex: 1 }}
         />
         <div className="row" style={{ gap: 6 }}>
+          {dirty && (
+            <button
+              className="btn"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await onSave(overrides, name);
+                  setDirty(false);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              {saving && <Spinner />} {saving ? "Saving…" : "Save changes"}
+            </button>
+          )}
           <button
-            className="btn"
-            disabled={!dirty}
-            onClick={async () => {
-              await onSave(overrides, name);
-              setDirty(false);
+            className="btn btn-secondary"
+            disabled={deleting}
+            onClick={() => {
+              setDeleting(true);
+              onDelete();
             }}
           >
-            {dirty ? "Save changes" : "Saved"}
-          </button>
-          <button className="btn btn-secondary" onClick={onDelete}>
-            Delete
+            {deleting && <Spinner />} {deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>
 
-      <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length}
-        addedCount={
-          ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
-          ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0)
-        }
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="muted"
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            padding: "2px 0 0 24px",
+            fontSize: 13,
+            textAlign: "left",
+          }}
+        >
+          {summary}
+          {dirty ? " · unsaved" : ""}
+        </button>
+      )}
+
+      {!collapsed && (
+      <>
+      <MarriageEventRow
+        baseYear={baseYear}
+        value={overrides.marriage_year ?? null}
+        twoPeople={(people?.length ?? 0) >= 2}
+        onChange={setMarriageYear}
       />
+
+      <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length} addedCount={addedCount} />
 
       {mode === "override" && (
         <>
@@ -522,6 +600,75 @@ function ScenarioCard({
         >
           {JSON.stringify(overrides, null, 2)}
         </pre>
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+function MarriageEventRow({
+  baseYear,
+  value,
+  twoPeople,
+  onChange,
+}: {
+  baseYear: number;
+  value: number | null;
+  twoPeople: boolean;
+  onChange: (year: number | null) => void;
+}) {
+  const [draft, setDraft] = useState<number>(value ?? baseYear + 1);
+
+  useEffect(() => {
+    if (value !== null) setDraft(value);
+  }, [value]);
+
+  return (
+    <div
+      style={{
+        padding: 12,
+        background: "#fdf2f8",
+        border: "1px solid #fbcfe8",
+        borderRadius: 6,
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+        💍 Getting married
+        <HelpTip>
+          Taxes both people as a jointly-assessed married couple (standard-rate band transfer +
+          married tax credit) from the chosen year onward. Earlier years keep the base plan's
+          status (e.g. cohabiting / individually assessed). Needs two people in the base plan.
+        </HelpTip>
+      </div>
+      {!twoPeople ? (
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          Add a second person to the base plan to model marriage.
+        </p>
+      ) : value === null ? (
+        <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+          <div className="field" style={{ marginBottom: 0, minWidth: 120 }}>
+            <label>Marriage year</label>
+            <NumericInput
+              integer
+              value={draft}
+              onChange={(v) => Number.isFinite(v) && setDraft(v)}
+            />
+          </div>
+          <button className="btn" disabled={draft < baseYear} onClick={() => onChange(draft)}>
+            Set marriage event
+          </button>
+        </div>
+      ) : (
+        <div className="row" style={{ alignItems: "center", gap: 8 }}>
+          <span>
+            Married from <strong>{value}</strong> onward (jointly assessed).
+          </span>
+          <button className="btn btn-secondary" onClick={() => onChange(null)}>
+            Clear
+          </button>
+        </div>
       )}
     </div>
   );

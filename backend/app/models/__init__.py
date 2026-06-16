@@ -179,6 +179,12 @@ class Person(Base):
     homecaring_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Voluntary ARF drawdown rate (post-retirement). NULL = statutory min only.
     arf_target_drawdown_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # What happens to the pension pot after the tax-free lump sum at retirement:
+    # "arf" (default), "annuity", or "taxable_lump_sum".
+    pension_option: Mapped[str] = mapped_column(String, default="arf", nullable=False)
+    # Annual annuity income as a fraction of the annuitised pot. Only used when
+    # pension_option == "annuity".
+    annuity_rate: Mapped[float] = mapped_column(Float, default=0.04, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="people")
     income_sources: Mapped[list["IncomeSource"]] = relationship(

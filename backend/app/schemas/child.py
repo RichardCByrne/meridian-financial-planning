@@ -10,9 +10,9 @@ def _validate_dob(value: date | None) -> date | None:
     if value is None:
         return value
     today = date.today()
-    if value > today + timedelta(days=365):
-        # Allow ~1 year in the future for planned arrivals; reject anything further.
-        raise ValueError("dob cannot be more than a year in the future")
+    # Future births are unrestricted: users plan children years ahead, before
+    # conception. The projection only counts a child once their birth year is
+    # reached, so a far-future dob is harmless. Past dates keep a sanity cap.
     if value < today - timedelta(days=_MAX_AGE_YEARS * 366):
         raise ValueError(f"dob cannot be more than {_MAX_AGE_YEARS} years ago")
     return value

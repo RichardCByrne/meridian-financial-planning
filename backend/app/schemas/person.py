@@ -1,9 +1,12 @@
 from datetime import date, timedelta
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 _MAX_AGE_YEARS = 120
+
+PensionOption = Literal["arf", "annuity", "taxable_lump_sum"]
 
 
 def _validate_dob(value: date | None) -> date | None:
@@ -30,6 +33,8 @@ class PersonCreate(BaseModel):
     prsi_weeks_at_base_year: int = Field(default=2080, ge=0, le=2600)
     homecaring_weeks_at_base_year: int = Field(default=0, ge=0, le=1040)
     arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
+    pension_option: PensionOption = "arf"
+    annuity_rate: float = Field(default=0.04, ge=0.0, le=0.2)
 
     @field_validator("dob")
     @classmethod
@@ -49,6 +54,8 @@ class PersonUpdate(BaseModel):
     prsi_weeks_at_base_year: int | None = Field(default=None, ge=0, le=2600)
     homecaring_weeks_at_base_year: int | None = Field(default=None, ge=0, le=1040)
     arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
+    pension_option: PensionOption | None = None
+    annuity_rate: float | None = Field(default=None, ge=0.0, le=0.2)
 
     @field_validator("dob")
     @classmethod
@@ -72,3 +79,5 @@ class PersonRead(BaseModel):
     prsi_weeks_at_base_year: int = 2080
     homecaring_weeks_at_base_year: int = 0
     arf_target_drawdown_pct: float | None = None
+    pension_option: str = "arf"
+    annuity_rate: float = 0.04

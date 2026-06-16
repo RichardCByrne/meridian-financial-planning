@@ -10,7 +10,7 @@ import {
   useUpdatePerson,
   useUpdatePlan,
 } from "../../api/hooks";
-import type { FilingStatus, Person, PersonCreate } from "../../api/types";
+import type { FilingStatus, PensionOption, Person, PersonCreate } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
@@ -28,6 +28,8 @@ type FormState = {
   prsi_years_at_base_year: number; // years, converted to weeks on submit
   homecaring_years_at_base_year: number;
   arf_target_drawdown_pct: number | ""; // whole-number percent, "" = use statutory min
+  pension_option: PensionOption;
+  annuity_rate: number; // whole-number percent, only used for annuity
 };
 
 const blankForm: FormState = {
@@ -41,6 +43,8 @@ const blankForm: FormState = {
   prsi_years_at_base_year: 40,
   homecaring_years_at_base_year: 0,
   arf_target_drawdown_pct: "",
+  pension_option: "arf",
+  annuity_rate: 4,
 };
 
 function fromPerson(p: Person): FormState {
@@ -58,6 +62,8 @@ function fromPerson(p: Person): FormState {
       p.arf_target_drawdown_pct == null
         ? ""
         : Math.round(p.arf_target_drawdown_pct * 1000) / 10,
+    pension_option: p.pension_option ?? "arf",
+    annuity_rate: Math.round((p.annuity_rate ?? 0.04) * 1000) / 10,
   };
 }
 
@@ -86,6 +92,8 @@ export function PeoplePane({ planId }: { planId: number }) {
       prsi_weeks_at_base_year: p.prsi_weeks_at_base_year,
       homecaring_weeks_at_base_year: p.homecaring_weeks_at_base_year,
       arf_target_drawdown_pct: p.arf_target_drawdown_pct,
+      pension_option: p.pension_option,
+      annuity_rate: p.annuity_rate,
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -112,6 +120,8 @@ export function PeoplePane({ planId }: { planId: number }) {
       f.arf_target_drawdown_pct === ""
         ? null
         : Math.max(0, Math.min(1, Number(f.arf_target_drawdown_pct) / 100)),
+    pension_option: f.pension_option,
+    annuity_rate: Math.max(0, Math.min(0.2, f.annuity_rate / 100)),
   });
 
   const onFilingStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -216,7 +226,8 @@ export function PeoplePane({ planId }: { planId: number }) {
                 thExtra: (
                   <HelpTip>
                     Age this person retires. At this age the engine crystallises their pension wrappers
-                    (25% lump sum + 75% to ARF) and stops applying employer/PRSI charges to earnings.
+                    (lump sum + the chosen "at retirement" option) and stops applying employer/PRSI
+                    charges to earnings.
                   </HelpTip>
                 ),
               },
@@ -441,26 +452,68 @@ function FormFields({
           }
         />
       </div>
-      <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+      <div className="field" style={{ flex: "1 1 160px", minWidth: 160 }}>
         <label>
-          ARF drawdown %
+          At retirement
           <HelpTip>
-            Voluntary ARF drawdown rate in retirement. Leave blank to use the statutory minimum
-            (4% under 70, 5% 70–79, 6% on large funds). Setting a higher value lets you model
-            drawing more for spending; the engine takes max(minimum, your target) each year.
+            What happens to the pension pot after the tax-free lump sum:
+            <br />
+            <strong>ARF</strong> — invest the rest, draw it down over time (taxed as PAYE).
+            <br />
+            <strong>Annuity</strong> — buy a guaranteed income for life; the pot leaves your estate.
+            <br />
+            <strong>Taxable lump sum</strong> — take the rest as cash in the retirement year, taxed
+            at your marginal rate.
           </HelpTip>
         </label>
-        <NumericInput
-          placeholder="min"
-          value={form.arf_target_drawdown_pct === "" ? NaN : form.arf_target_drawdown_pct}
-          onChange={(v) =>
-            setForm({
-              ...form,
-              arf_target_drawdown_pct: Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : "",
-            })
-          }
-        />
+        <select
+          value={form.pension_option}
+          onChange={(e) => setForm({ ...form, pension_option: e.target.value as PensionOption })}
+        >
+          <option value="arf">ARF (drawdown)</option>
+          <option value="annuity">Annuity (lifetime income)</option>
+          <option value="taxable_lump_sum">Taxable lump sum</option>
+        </select>
       </div>
+      {form.pension_option === "annuity" && (
+        <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+          <label>
+            Annuity rate %
+            <HelpTip>
+              Annual income as a percentage of the annuitised pot. ~4% is a typical Irish
+              level-annuity rate; older buyers get more.
+            </HelpTip>
+          </label>
+          <NumericInput
+            value={form.annuity_rate}
+            onChange={(v) =>
+              Number.isFinite(v) && setForm({ ...form, annuity_rate: Math.max(0, Math.min(20, v)) })
+            }
+          />
+        </div>
+      )}
+      {form.pension_option === "arf" && (
+        <div className="field" style={{ flex: "1 1 130px", minWidth: 130 }}>
+          <label>
+            ARF drawdown %
+            <HelpTip>
+              Voluntary ARF drawdown rate in retirement. Leave blank to use the statutory minimum
+              (4% under 70, 5% 70–79, 6% on large funds). Setting a higher value lets you model
+              drawing more for spending; the engine takes max(minimum, your target) each year.
+            </HelpTip>
+          </label>
+          <NumericInput
+            placeholder="min"
+            value={form.arf_target_drawdown_pct === "" ? NaN : form.arf_target_drawdown_pct}
+            onChange={(v) =>
+              setForm({
+                ...form,
+                arf_target_drawdown_pct: Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : "",
+              })
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -221,3 +221,50 @@ def test_cohabiting_filing_status_taxes_each_person_as_single():
     assert cohab_row.income_tax > married_row.income_tax
     # Ballpark sanity: married @ 70k → IT around €11,400; single → around €15,200.
     assert cohab_row.income_tax - married_row.income_tax > 3_000
+
+
+def test_marriage_year_flips_filing_status_mid_projection():
+    """A cohabiting single-earner couple that marries in 2028 keeps the same tax
+    in 2026/2027 but switches to the married band (lower income tax) from 2028 on."""
+    p1 = PersonInput(id=1, name="Aoife", dob=date(1990, 1, 1), is_primary=True, life_expectancy=90)
+    p2 = PersonInput(id=2, name="Conor", dob=date(1992, 1, 1), is_primary=False, life_expectancy=90)
+    incomes = [
+        IncomeInput(
+            id=1, person_id=1, kind="employment", name="A", gross_amount=70_000,
+            start_year=2026, end_year=None, escalation_rate=0.0, pays_prsi=True, pays_usc=True,
+        ),
+    ]
+    common = dict(
+        base_year=2026, projection_years=5, people=[p1, p2], incomes=incomes,
+        expenses=[], assets=[], assumptions=AssumptionsInput(),
+    )
+    cohab = PlanInput(**common, filing_status="cohabiting")
+    marrying = PlanInput(**common, filing_status="cohabiting", marriage_year=2028)
+
+    cohab_rows = simulate(cohab)
+    rows = simulate(marrying)
+
+    # Pre-marriage (2026, 2027): identical income tax.
+    assert abs(rows[0].income_tax - cohab_rows[0].income_tax) < 0.5
+    assert abs(rows[1].income_tax - cohab_rows[1].income_tax) < 0.5
+    # From the marriage year (2028) on: married band transfer → lower income tax.
+    assert rows[2].income_tax < cohab_rows[2].income_tax
+    assert cohab_rows[2].income_tax - rows[2].income_tax > 3_000
+
+
+def test_marriage_year_no_effect_with_single_person():
+    """marriage_year needs two people; a solo plan ignores it."""
+    p = _person()
+    incomes = [
+        IncomeInput(
+            id=1, person_id=1, kind="employment", name="A", gross_amount=70_000,
+            start_year=2026, end_year=None, escalation_rate=0.0, pays_prsi=True, pays_usc=True,
+        ),
+    ]
+    common = dict(
+        base_year=2026, projection_years=3, people=[p], incomes=incomes,
+        expenses=[], assets=[], assumptions=AssumptionsInput(),
+    )
+    base = PlanInput(**common, filing_status="single")
+    with_event = PlanInput(**common, filing_status="single", marriage_year=2027)
+    assert simulate(with_event)[-1].income_tax == simulate(base)[-1].income_tax

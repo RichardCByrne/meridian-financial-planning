@@ -27,6 +27,7 @@ import type {
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../components/Toast";
 import { useIncomeForPeople } from "../../lib/useIncomeForPeople";
 
@@ -230,6 +231,8 @@ function ScenarioCard({
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState<"override" | "step" | "added">("override");
   const [collapsed, setCollapsed] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Reset local state only when we're switched to a *different* scenario id.
   // Background refetches on the same id no longer clobber in-flight edits.
@@ -405,16 +408,29 @@ function ScenarioCard({
           {dirty && (
             <button
               className="btn"
+              disabled={saving}
               onClick={async () => {
-                await onSave(overrides, name);
-                setDirty(false);
+                setSaving(true);
+                try {
+                  await onSave(overrides, name);
+                  setDirty(false);
+                } finally {
+                  setSaving(false);
+                }
               }}
             >
-              Save changes
+              {saving && <Spinner />} {saving ? "Saving…" : "Save changes"}
             </button>
           )}
-          <button className="btn btn-secondary" onClick={onDelete}>
-            Delete
+          <button
+            className="btn btn-secondary"
+            disabled={deleting}
+            onClick={() => {
+              setDeleting(true);
+              onDelete();
+            }}
+          >
+            {deleting && <Spinner />} {deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>

@@ -310,6 +310,22 @@ th {
   }
 }
 
+@keyframes meridian-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.meridian-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: currentColor;
+  border-top-color: transparent;
+  animation: meridian-spin 0.6s linear infinite;
+  vertical-align: -0.125em;
+}
+
 .tabnav {
   display: flex;
   border-bottom: 1px solid #e2e8f0;

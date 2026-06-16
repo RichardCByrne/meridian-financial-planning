@@ -128,6 +128,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
         // savings (regular investing + pension contributions). Overlaid on the
         // income-breakdown bars so funded-vs-gap is visible at a glance.
         need: f(y.expenses_total + y.total_tax + y.asset_contributions + y.pension_contributions),
+        // Assets liquidated this year to cover a shortfall (all wrappers summed).
+        // Stacked on top of income to show the full funding picture vs the need line.
+        asset_withdrawals: f(
+          Object.values(y.withdrawals_by_asset ?? {}).reduce((s, v) => s + v, 0),
+        ),
         surplus: f(y.surplus_or_shortfall),
         income_tax: f(y.income_tax),
         usc: f(y.usc),
@@ -534,6 +539,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     name={k.replace(/_/g, " ")}
                   />
                 ))}
+                {/* Assets drawn down to meet need, stacked above income. */}
+                <Bar
+                  dataKey="asset_withdrawals"
+                  stackId="income"
+                  fill="#94a3b8"
+                  name="Assets drawn"
+                />
                 {/* Need line: total the year must fund (expenses + tax + savings).
                     Bars above the line = surplus; below = a funding gap. */}
                 <Line

@@ -8,6 +8,8 @@ import {
   ComposedChart,
   Legend,
   Line,
+  ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,6 +19,7 @@ import {
 import {
   useAssets,
   useAssumptions,
+  useChildren,
   useGoals,
   useMonteCarlo,
   usePeople,
@@ -30,6 +33,8 @@ import { ChartSkeleton } from "../../components/Skeleton";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
 type ChartKind = "net_worth" | "cash_flow" | "income_vs_expenses" | "tax";
+
+type ChartEvent = { year: number; label: string; color: string };
 
 // Minimal subset of recharts' CategoricalChartState — just what we read.
 type ChartMouseState = { activeLabel?: string | number | null } | undefined;
@@ -62,10 +67,12 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const { data: people } = usePeople(planId);
   const { data: goals } = useGoals(planId);
   const { data: assets } = useAssets(planId);
+  const { data: children } = useChildren(planId);
   const isMobile = useIsMobile();
   const tooltipTrigger = isMobile ? "click" : "hover";
   const [chart, setChart] = useState<ChartKind>("net_worth");
   const [hoverYear, setHoverYear] = useState<number | null>(null);
+  const [showEvents, setShowEvents] = useState(true);
   const [showMonteCarlo, setShowMonteCarlo] = useState(false);
   const [realMode, setRealMode] = useState<boolean>(() => {
     try {
@@ -117,6 +124,10 @@ export function LetsSeePane({ planId }: { planId: number }) {
         gross_income: f(y.gross_income_total),
         net_income: f(y.net_income_total),
         expenses: f(y.expenses_total),
+        // "Need line": everything the year must fund — expenses + tax + planned
+        // savings (regular investing + pension contributions). Overlaid on the
+        // income-breakdown bars so funded-vs-gap is visible at a glance.
+        need: f(y.expenses_total + y.total_tax + y.asset_contributions + y.pension_contributions),
         surplus: f(y.surplus_or_shortfall),
         income_tax: f(y.income_tax),
         usc: f(y.usc),
@@ -147,6 +158,51 @@ export function LetsSeePane({ planId }: { planId: number }) {
     });
   }, [data, mcData, series, deflate]);
 
+  const lastYear = data?.years.at(-1)?.year ?? baseYear;
+
+  // Life-event markers overlaid on every chart: retirement, state pension,
+  // goals, child births, first shortfall. All derived from already-loaded data.
+  const events = useMemo<ChartEvent[]>(() => {
+    if (!data) return [];
+    const evs: ChartEvent[] = [];
+    const dobYear = (iso: string) => new Date(iso).getFullYear();
+    for (const p of people ?? []) {
+      if (p.retirement_age != null) {
+        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a" });
+      }
+      if (assumptions?.state_pension_age) {
+        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2" });
+      }
+    }
+    for (const g of goals ?? []) {
+      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed" });
+    }
+    for (const c of children ?? []) {
+      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777" });
+    }
+    if (data.summary.first_shortfall_year) {
+      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626" });
+    }
+    return evs.filter((e) => e.year >= baseYear && e.year <= lastYear);
+  }, [data, people, goals, children, assumptions, baseYear, lastYear]);
+
+  // Contiguous runs of shortfall years (surplus < 0), for red shading.
+  const shortfallRuns = useMemo<{ start: number; end: number }[]>(() => {
+    const runs: { start: number; end: number }[] = [];
+    let cur: { start: number; end: number } | null = null;
+    for (const row of series) {
+      if (row.surplus < 0) {
+        if (cur) cur.end = row.year;
+        else cur = { start: row.year, end: row.year };
+      } else if (cur) {
+        runs.push(cur);
+        cur = null;
+      }
+    }
+    if (cur) runs.push(cur);
+    return runs;
+  }, [series]);
+
   const onToggleReal = () => {
     setRealMode((v) => {
       const next = !v;
@@ -166,6 +222,33 @@ export function LetsSeePane({ planId }: { planId: number }) {
       /* ignore */
     }
   };
+
+  // Reference overlays shared by every chart. Return arrays of recharts
+  // elements (recharts accepts element arrays as children, but not Fragments).
+  const renderShortfall = () =>
+    shortfallRuns.map((r, i) => (
+      <ReferenceArea
+        key={`sf-${i}`}
+        x1={r.start}
+        x2={r.end}
+        fill="#dc2626"
+        fillOpacity={0.07}
+        stroke="none"
+      />
+    ));
+  const renderEvents = () =>
+    showEvents
+      ? events.map((e, i) => (
+          <ReferenceLine
+            key={`ev-${i}`}
+            x={e.year}
+            stroke={e.color}
+            strokeDasharray="3 3"
+            strokeOpacity={0.6}
+            label={{ value: e.label, position: "top", fontSize: 10, fill: e.color }}
+          />
+        ))
+      : null;
 
   if (isLoading)
     return (
@@ -219,6 +302,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
               }
             >
               {realMode ? "Today's € (real)" : "Nominal €"}
+            </button>
+            <button
+              className={`btn ${showEvents ? "" : "btn-secondary"}`}
+              onClick={() => setShowEvents((v) => !v)}
+              title="Mark life events (retirement, state pension, goals, births, shortfall) on the chart"
+            >
+              {showEvents ? "Events on" : "Events off"}
             </button>
             {chart === "net_worth" && (
               <button
@@ -351,6 +441,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  {renderShortfall()}
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip
@@ -358,6 +449,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     content={<McTooltip mcData={mcData} deflate={deflate} />}
                     labelFormatter={(l) => `Year ${l}`}
                   />
+                  {renderEvents()}
                   <Legend />
                   {/* Fan band: transparent base offset + stacked delta layers */}
                   <Area type="monotone" dataKey="band_base" stackId="mc"
@@ -382,6 +474,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  {renderShortfall()}
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
@@ -393,6 +486,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     fillOpacity={0.18}
                     name="Net worth"
                   />
+                  {renderEvents()}
                 </AreaChart>
               )
             ) : chart === "cash_flow" ? (
@@ -402,6 +496,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
@@ -416,14 +511,16 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   name="Surplus / shortfall"
                   dot={false}
                 />
+                {renderEvents()}
               </ComposedChart>
             ) : chart === "income_vs_expenses" ? (
-              <BarChart
+              <ComposedChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
@@ -437,7 +534,18 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     name={k.replace(/_/g, " ")}
                   />
                 ))}
-              </BarChart>
+                {/* Need line: total the year must fund (expenses + tax + savings).
+                    Bars above the line = surplus; below = a funding gap. */}
+                <Line
+                  type="monotone"
+                  dataKey="need"
+                  stroke="#0f172a"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Need (expenses + tax + savings)"
+                />
+                {renderEvents()}
+              </ComposedChart>
             ) : (
               <BarChart
                 data={series}
@@ -445,6 +553,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
@@ -453,6 +562,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <Bar dataKey="usc" stackId="t" fill={TAX_COLORS.usc} name="USC" />
                 <Bar dataKey="prsi" stackId="t" fill={TAX_COLORS.prsi} name="PRSI" />
                 <Bar dataKey="investment_tax" stackId="t" fill="#f59e0b" name="Investment tax (CGT/ETF)" />
+                {renderEvents()}
               </BarChart>
             )}
           </ResponsiveContainer>

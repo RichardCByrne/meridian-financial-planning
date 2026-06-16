@@ -16,7 +16,7 @@ Most retail financial planners either ignore Irish tax entirely or apply a flat 
 
 - **Income tax bands & credits, USC, PRSI** per Budget 2026 — single-source-of-truth `TaxConfig` dataclass.
 - **Age-based pension contribution caps** (15%–40%, €115k earnings cap) with PRSA/occupational wrapper auto-creation.
-- **Retirement crystallisation**: 25% tax-free lump sum (with band logic — €200k free / next €300k @ 20% / above @ marginal) plus 75% ARF with imputed minimum drawdown (4%/5%/6%).
+- **Retirement crystallisation**: up to 25% tax-free lump sum (with band logic — €200k free / next €300k @ 20% / above @ marginal); the remaining pot defaults to an ARF with imputed minimum drawdown (4%/5%/6%), or can be taken as an annuity or a taxable cash lump sum.
 - **State pension** auto-injected at the configured age.
 - **CGT, ETF exit tax, CAT/inheritance** on disposals and bequests.
 - **Monte Carlo**: 200 (configurable 10–1,000) independent simulations with per-asset-class Gaussian shocks. Outputs p5/p10/p25/p50/p75/p90/p95 net-worth bands and a shortfall probability.
@@ -47,14 +47,14 @@ Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run 
 | Frontend | Vite, React 19, TypeScript, react-query, zustand, recharts |
 | Auth | Firebase Auth (prod) / seeded dev user (local) |
 | Hosting | Cloud Run (API) + Firebase Hosting (static frontend) |
-| Tests | 132 pytest tests, `tsc --noEmit` + `vite build` + audits in CI |
+| Tests | 211 pytest tests, `tsc --noEmit` + `vite build` + audits in CI |
 
 ---
 
 ## Quickstart
 
 ### Prerequisites
-- **Python 3.11+** (CI + production run on 3.13)
+- **Python 3.14+** (CI + production run on 3.14)
 - **Node.js 18+ with npm** (the dev runner uses `fnm` to pin Node LTS)
 
 ### First-time setup
@@ -85,7 +85,7 @@ OpenAPI docs: http://127.0.0.1:8000/docs
 
 ```powershell
 cd backend
-.\.venv\Scripts\python -m pytest -v        # ~5s, 184 tests
+.\.venv\Scripts\python -m pytest -v        # ~7s, 211 tests
 
 cd ..\frontend
 npm run lint                               # tsc --noEmit
@@ -121,8 +121,9 @@ meridian-financial-planning/
 │   │   ├── engine/          # PURE — tax_ie, pension_ie, simulator, montecarlo, cat_ie, scenario
 │   │   ├── services/        # ORM ↔ engine dataclass serialisation
 │   │   ├── config/          # tax_ie_2026.py (seeded into DB on startup)
-│   │   ├── alembic/         # production migrations
-│   │   └── tests/           # test_phase1..13.py + engine unit tests
+│   │   └── tests/           # engine unit tests + per-scope API/integration tests
+│   ├── alembic/             # production migrations
+│   ├── Dockerfile           # Cloud Run image (runs `alembic upgrade head` then uvicorn)
 │   ├── pyproject.toml
 │   └── meridian.db          # local SQLite, gitignored
 ├── frontend/                # Vite + React 19 + TypeScript
@@ -131,14 +132,15 @@ meridian-financial-planning/
 │   │   ├── pages/           # PlansList, PlanEditor, panes/*
 │   │   ├── auth/            # Firebase web SDK + dev bypass
 │   │   ├── components/      # shared UI
-│   │   └── store/           # zustand client state
+│   │   ├── hooks/           # shared React hooks
+│   │   ├── wizard/          # plan-creation wizard + zustand store
+│   │   └── lib/             # formatting, helpers, client-only state
 │   └── vite.config.ts
 ├── cloudbuild.yaml          # Cloud Run deploy pipeline
 ├── firebase.json            # Firebase Hosting config
 ├── dev.ps1                  # one-shot local runner
 ├── CLAUDE.md                # architecture/conventions (for Claude Code & humans)
-├── DEPLOY.md                # full prod-deploy walkthrough
-└── QA_FINDINGS.md           # standing QA notes
+└── DEPLOY.md                # full prod-deploy walkthrough
 ```
 
 ---
@@ -178,7 +180,7 @@ cd frontend; npm run build; firebase deploy --only hosting
 
 ## Status & roadmap
 
-**Phase 13 complete.** 132/132 backend tests passing. Phase 14 (AI walkthrough) is next.
+**Phase 13 complete.** 211/211 backend tests passing. Phase 14 (AI walkthrough) is next.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -207,7 +209,7 @@ Deferred: PDF export, AI chatbot.
 - **[CLAUDE.md](./CLAUDE.md)** — architecture, conventions, layering rules, deferred refactors.
 - **[DEPLOY.md](./DEPLOY.md)** — production deploy walkthrough.
 - **`backend/app/engine/`** — the tax/pension/simulator code. Start with `tax_ie.py` then `simulator.py`.
-- **`backend/app/tests/`** — per-phase integration tests + engine unit tests. Good map of what each phase added.
+- **`backend/app/tests/`** — engine unit tests + per-scope API/integration tests (named by functionality, e.g. `test_pension.py`, `test_scenarios.py`, `test_cat_estate.py`).
 
 ---
 

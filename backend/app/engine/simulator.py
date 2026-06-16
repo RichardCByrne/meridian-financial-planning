@@ -179,6 +179,12 @@ class PlanInput:
     # Explicit "cohabiting" forces single-band tax for both people, which is
     # how Irish Revenue actually treats unmarried couples.
     filing_status: str | None = None
+    # Marriage event year. None = no change. If set, both people are taxed as a
+    # jointly-assessed married couple (SRCO band transfer + married personal
+    # credit) from this calendar year onward, regardless of `filing_status`;
+    # earlier years keep the base status. Requires ≥2 people to have any effect.
+    # This is the engine hook a scenario uses to model "getting married in year N".
+    marriage_year: int | None = None
 
 
 @dataclass
@@ -275,8 +281,15 @@ def _filing_status_for_person(
     *,
     age: int,
     is_paye_employee: bool,
+    year: int,
+    marriage_year: int | None = None,
 ) -> FilingStatus:
-    if plan_filing_status == "married":
+    # A marriage event flips the couple to jointly-assessed married from its
+    # year onward, overriding the base filing status. Only meaningful for couples.
+    married_by_event = (
+        marriage_year is not None and year >= marriage_year and len(all_people) >= 2
+    )
+    if plan_filing_status == "married" or married_by_event:
         married = True
     elif plan_filing_status in ("single", "cohabiting"):
         # Cohabiting couples are taxed individually under Irish law — no SRCO
@@ -788,6 +801,8 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 plan.filing_status,
                 age=age,
                 is_paye_employee=has_paye_income or not has_self_employment or is_retired_now,
+                year=year,
+                marriage_year=plan.marriage_year,
             )
 
             it, _band = tax_ie.income_tax(taxable_for_it, status, tax_config)

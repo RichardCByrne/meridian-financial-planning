@@ -19,8 +19,15 @@ Shape:
                       "_added": [{"name": "Wedding", "category": "single_year",
                                   "amount": 20000, "start_year": 2029}]},
       ...
-      "assumptions": {"inflation_rate": 0.03, ...}
+      "assumptions": {"inflation_rate": 0.03, ...},
+      "filing_status": "married",   # plan-level scalar override (optional)
+      "marriage_year": 2030          # plan-level scalar override (optional)
     }
+
+The two plan-level scalars are not bucketed: `filing_status` flips the whole
+projection's tax treatment; `marriage_year` flips it to jointly-assessed married
+from that calendar year onward (earlier years keep the base status) — this is how
+a scenario models "getting married in year N".
 
 Unknown keys, unknown ids, and `_added` entries missing required fields are
 silently dropped — scenarios pre-date or post-date entity edits and we never
@@ -135,6 +142,20 @@ def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanIn
     if a_patch:
         new_assumptions = _patch_dataclass(plan.assumptions, a_patch)
 
+    # Plan-level scalar overrides (not bucketed). Validated/coerced here and
+    # silently dropped if malformed, matching the bucket policy of never letting
+    # a stale override 500 a projection.
+    plan_scalars: dict[str, Any] = {}
+    fs = overrides.get("filing_status")
+    if isinstance(fs, str) and fs in ("single", "married", "cohabiting"):
+        plan_scalars["filing_status"] = fs
+    my = overrides.get("marriage_year")
+    if my not in (None, ""):
+        try:
+            plan_scalars["marriage_year"] = int(my)
+        except (TypeError, ValueError):
+            pass
+
     return replace(
         plan,
         people=new_lists["people"],
@@ -144,4 +165,5 @@ def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanIn
         liabilities=new_lists["liabilities"],
         goals=new_lists["goals"],
         assumptions=new_assumptions,
+        **plan_scalars,
     )

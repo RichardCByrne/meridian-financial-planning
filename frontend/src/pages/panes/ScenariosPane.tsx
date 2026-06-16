@@ -30,7 +30,9 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { useToast } from "../../components/Toast";
 import { useIncomeForPeople } from "../../lib/useIncomeForPeople";
 
-type Bucket = keyof ScenarioOverrides;
+// Bucketed override keys only — the plan-level scalars (filing_status,
+// marriage_year) are handled separately, not via the bucket/field UI.
+type Bucket = Exclude<keyof ScenarioOverrides, "filing_status" | "marriage_year">;
 
 type FieldDef = {
   name: string;
@@ -352,6 +354,16 @@ function ScenarioCard({
     });
   };
 
+  const setMarriageYear = (year: number | null) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (year === null) delete next.marriage_year;
+      else next.marriage_year = year;
+      return next;
+    });
+  };
+
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
@@ -379,6 +391,13 @@ function ScenarioCard({
           </button>
         </div>
       </div>
+
+      <MarriageEventRow
+        baseYear={baseYear}
+        value={overrides.marriage_year ?? null}
+        twoPeople={(people?.length ?? 0) >= 2}
+        onChange={setMarriageYear}
+      />
 
       <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length}
         addedCount={
@@ -522,6 +541,73 @@ function ScenarioCard({
         >
           {JSON.stringify(overrides, null, 2)}
         </pre>
+      )}
+    </div>
+  );
+}
+
+function MarriageEventRow({
+  baseYear,
+  value,
+  twoPeople,
+  onChange,
+}: {
+  baseYear: number;
+  value: number | null;
+  twoPeople: boolean;
+  onChange: (year: number | null) => void;
+}) {
+  const [draft, setDraft] = useState<number>(value ?? baseYear + 1);
+
+  useEffect(() => {
+    if (value !== null) setDraft(value);
+  }, [value]);
+
+  return (
+    <div
+      style={{
+        padding: 12,
+        background: "#fdf2f8",
+        border: "1px solid #fbcfe8",
+        borderRadius: 6,
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+        💍 Getting married
+        <HelpTip>
+          Taxes both people as a jointly-assessed married couple (standard-rate band transfer +
+          married tax credit) from the chosen year onward. Earlier years keep the base plan's
+          status (e.g. cohabiting / individually assessed). Needs two people in the base plan.
+        </HelpTip>
+      </div>
+      {!twoPeople ? (
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          Add a second person to the base plan to model marriage.
+        </p>
+      ) : value === null ? (
+        <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+          <div className="field" style={{ marginBottom: 0, minWidth: 120 }}>
+            <label>Marriage year</label>
+            <NumericInput
+              integer
+              value={draft}
+              onChange={(v) => Number.isFinite(v) && setDraft(v)}
+            />
+          </div>
+          <button className="btn" disabled={draft < baseYear} onClick={() => onChange(draft)}>
+            Set marriage event
+          </button>
+        </div>
+      ) : (
+        <div className="row" style={{ alignItems: "center", gap: 8 }}>
+          <span>
+            Married from <strong>{value}</strong> onward (jointly assessed).
+          </span>
+          <button className="btn btn-secondary" onClick={() => onChange(null)}>
+            Clear
+          </button>
+        </div>
       )}
     </div>
   );

@@ -404,6 +404,10 @@ export type ScenarioOverrides = {
   liabilities?: Record<string, Partial<LiabilityCreate>>;
   goals?: Record<string, Partial<GoalCreate>>;
   assumptions?: Partial<AssumptionsUpsert>;
+  // Plan-level scalar overrides (not bucketed).
+  filing_status?: "single" | "married" | "cohabiting";
+  // Marriage event: tax both people as a jointly-assessed couple from this year on.
+  marriage_year?: number;
 };
 
 export interface Scenario {

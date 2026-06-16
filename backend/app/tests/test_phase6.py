@@ -85,6 +85,25 @@ def test_apply_overrides_unknown_keys_silently_ignored():
     assert new_plan.people[0].retirement_age == 60
 
 
+def test_apply_overrides_marriage_year_scalar():
+    """Plan-level marriage_year scalar is coerced to int and applied."""
+    plan = _base_plan()
+    assert plan.marriage_year is None
+    new_plan = apply_overrides(plan, {"marriage_year": "2030"})
+    assert new_plan.marriage_year == 2030
+    assert plan.marriage_year is None  # input not mutated
+
+
+def test_apply_overrides_filing_status_scalar_validated():
+    """filing_status scalar applies for known values, drops garbage."""
+    plan = _base_plan()
+    assert apply_overrides(plan, {"filing_status": "married"}).filing_status == "married"
+    # Unknown value silently ignored — never 500 a projection on a stale override.
+    assert apply_overrides(plan, {"filing_status": "bogus"}).filing_status == plan.filing_status
+    # Non-int marriage_year dropped, not raised.
+    assert apply_overrides(plan, {"marriage_year": "soon"}).marriage_year is None
+
+
 def test_scenario_higher_salary_yields_higher_net_worth():
     plan = _base_plan()
     base_rows = simulate(plan)

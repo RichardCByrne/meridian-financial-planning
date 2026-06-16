@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { Link, NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom";
 
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { useAuth } from "./auth/useAuth";
@@ -22,6 +22,7 @@ export function App() {
 
 function AppShell() {
   const tour = useTour();
+  const auth = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -29,11 +30,20 @@ function AppShell() {
     setMenuOpen(false);
   }, [location.pathname]);
 
+  // Logo goes home: the plans list when signed in, the login screen otherwise.
+  const brandTarget = auth.status === "signed-in" ? "/plans" : "/login";
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <h1>Meridian</h1>
+          <Link
+            to={brandTarget}
+            aria-label="Meridian home"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <h1>Meridian</h1>
+          </Link>
           <button
             type="button"
             className="sidebar-toggle"

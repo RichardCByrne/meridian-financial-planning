@@ -228,18 +228,18 @@ export function LegacyPane({ planId }: { planId: number }) {
                   </select>
                 </div>
                 <div className="field" style={{ minWidth: 100 }}>
-                  <label>Share (0–1)</label>
+                  <label>Share %</label>
                   <input
                     type="number"
                     min={0}
-                    max={1}
-                    step={0.01}
-                    value={newBequest.from_person_id === person.id ? (newBequest.share_pct ?? 1) : 1}
+                    max={100}
+                    step={1}
+                    value={(newBequest.from_person_id === person.id ? (newBequest.share_pct ?? 1) : 1) * 100}
                     onChange={(e) =>
                       setNewBequest({
                         ...newBequest,
                         from_person_id: person.id,
-                        share_pct: Number(e.target.value),
+                        share_pct: Number(e.target.value) / 100,
                       })
                     }
                   />
@@ -353,16 +353,16 @@ export function LegacyPane({ planId }: { planId: number }) {
                 </select>
               </div>
               <div className="field">
-                <label>Share (0–1)</label>
+                <label>Share %</label>
                 <input
                   type="number"
                   inputMode="decimal"
                   min={0}
-                  max={1}
-                  step={0.01}
-                  value={editDraft.share_pct ?? editing.share_pct}
+                  max={100}
+                  step={1}
+                  value={(editDraft.share_pct ?? editing.share_pct) * 100}
                   onChange={(e) =>
-                    setEditDraft((d) => ({ ...d, share_pct: Number(e.target.value) }))
+                    setEditDraft((d) => ({ ...d, share_pct: Number(e.target.value) / 100 }))
                   }
                 />
               </div>

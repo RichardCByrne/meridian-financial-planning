@@ -1,4 +1,4 @@
-"""Phase 10 tests: invite + accept + role management round-trip."""
+"""Invites & members: invite + accept + role management round-trip."""
 
 from contextlib import contextmanager
 from datetime import timedelta

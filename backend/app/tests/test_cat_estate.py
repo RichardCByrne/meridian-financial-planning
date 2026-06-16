@@ -1,4 +1,4 @@
-"""Phase 12 tests: CAT engine, death events, bequest CRUD."""
+"""CAT & estate: CAT engine, death events, bequest CRUD."""
 
 from contextlib import contextmanager
 from datetime import date

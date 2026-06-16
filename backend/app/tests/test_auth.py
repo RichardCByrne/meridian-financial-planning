@@ -1,4 +1,4 @@
-"""Phase 8 tests: auth + multi-user isolation + role enforcement.
+"""Auth: multi-user plan isolation + role enforcement.
 
 We override `get_current_user` per request so we can simulate two distinct users
 without going through Firebase. Same trick the production code paths will use

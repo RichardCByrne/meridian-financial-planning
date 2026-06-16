@@ -1,4 +1,4 @@
-"""Phase 7 tests: plan clone + JSON export / import round-trip."""
+"""Plan I/O: clone + JSON export / import round-trip."""
 
 from fastapi.testclient import TestClient
 

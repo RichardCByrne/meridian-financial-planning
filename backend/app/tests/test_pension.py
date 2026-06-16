@@ -1,11 +1,12 @@
-"""Phase 4 integration tests: pension contributions, retirement, ARF, state pension."""
+"""Pension: contributions, retirement crystallisation, lump sum, ARF/annuity/
+taxable-cash options, imputed + voluntary ARF drawdown, employer contributions,
+and income behaviour at retirement."""
 
 from datetime import date
 
 from app.engine.simulator import (
     AssetInput,
     AssumptionsInput,
-    ChildInput,
     IncomeInput,
     PersonInput,
     PlanInput,
@@ -310,40 +311,6 @@ def test_arf_drawdown_jumps_to_5_percent_at_70():
     assert abs(rows[0].arf_drawdowns - 15_000) < 1
 
 
-# --- State pension auto-injection -------------------------------------------
-
-
-def test_state_pension_auto_injects_at_state_pension_age():
-    person = PersonInput(
-        id=1, name="Eilis", dob=date(1960, 1, 1),  # 66 in 2026
-        is_primary=True, life_expectancy=90, retirement_age=66,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=2,
-        people=[person], incomes=[], expenses=[],
-        assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0, inflation_rate=0.0),
-    )
-    rows = simulate(plan)
-    assert abs(rows[0].state_pension_total - 15_000) < 1
-    assert rows[0].income_by_kind.get("state_pension", 0) == 15_000
-
-
-def test_state_pension_does_not_inject_below_eligibility_age():
-    person = PersonInput(
-        id=1, name="Cara", dob=date(1990, 1, 1),  # 36 in 2026
-        is_primary=True, life_expectancy=90, retirement_age=66,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=1,
-        people=[person], incomes=[_salary(pct=0.0)], expenses=[],
-        assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0),
-    )
-    rows = simulate(plan)
-    assert rows[0].state_pension_total == 0
-
-
 # --- Employer pension contribution ------------------------------------------
 
 
@@ -398,6 +365,9 @@ def test_employer_contribution_does_not_reduce_household_cash_flow():
     assert abs(cash_with - cash_without) < 1
 
 
+# --- Income behaviour at retirement -----------------------------------------
+
+
 def test_employment_income_stops_at_retirement_even_with_open_end_year():
     """Open-ended employment income must not pay past retirement_age."""
     person = PersonInput(
@@ -445,184 +415,6 @@ def test_rental_income_continues_past_retirement():
     assert rows[0].income_by_kind.get("rental", 0) == 12_000
     assert rows[1].income_by_kind.get("rental", 0) == 12_000
     assert rows[2].income_by_kind.get("rental", 0) == 12_000
-
-
-# --- State pension Total Contributions Approach (TCA) -----------------------
-
-
-def test_state_pension_zero_below_qualifying_minimum():
-    """Under 520 PRSI weeks (10 years) → no state pension at all."""
-    person = PersonInput(
-        id=1, name="Rian", dob=date(1960, 1, 1),
-        is_primary=True, life_expectancy=90, retirement_age=66,
-        prsi_weeks_at_base_year=400,  # < 520 minimum
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=2,
-        people=[person], incomes=[], expenses=[], assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0, inflation_rate=0.0),
-    )
-    rows = simulate(plan)
-    assert rows[0].state_pension_total == 0
-    assert rows[1].state_pension_total == 0
-
-
-def test_state_pension_scales_linearly_above_minimum():
-    """1,040 paid weeks (20 years) → 50% of full pension under TCA."""
-    person = PersonInput(
-        id=1, name="Saoirse", dob=date(1960, 1, 1),
-        is_primary=True, life_expectancy=90, retirement_age=66,
-        prsi_weeks_at_base_year=1040,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=1,
-        people=[person], incomes=[], expenses=[], assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0, inflation_rate=0.0),
-    )
-    rows = simulate(plan)
-    assert abs(rows[0].state_pension_total - 7_500) < 1  # 1040/2080 = 50%
-
-
-def test_homecaring_credits_fill_the_gap():
-    """520 paid + 1,040 HomeCaring = 1,560 / 2,080 → 75% pension."""
-    person = PersonInput(
-        id=1, name="Niamh", dob=date(1960, 1, 1),
-        is_primary=True, life_expectancy=90, retirement_age=66,
-        prsi_weeks_at_base_year=520,
-        homecaring_weeks_at_base_year=1040,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=1,
-        people=[person], incomes=[], expenses=[], assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0, inflation_rate=0.0),
-    )
-    rows = simulate(plan)
-    assert abs(rows[0].state_pension_total - 11_250) < 1  # 1560/2080 = 75%
-
-
-def test_homecaring_income_marker_credits_years_during_projection():
-    """A 'homecaring' income entry credits +52 weeks/yr (capped at 1,040)."""
-    person = PersonInput(
-        id=1, name="Aoife", dob=date(1965, 1, 1),  # 61 in 2026, retires at 66 in 2031
-        is_primary=True, life_expectancy=90, retirement_age=66,
-        prsi_weeks_at_base_year=520,
-        homecaring_weeks_at_base_year=0,
-    )
-    homecaring = IncomeInput(
-        id=1, person_id=1, kind="homecaring", name="Caring for kids",
-        gross_amount=0, start_year=2026, end_year=2030,
-        escalation_rate=0.0, pays_prsi=False, pays_usc=False,
-        pension_contribution_pct=0.0,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=10,
-        people=[person], incomes=[homecaring], expenses=[], assets=[],
-        assumptions=AssumptionsInput(
-            state_pension_annual_amount=15_000.0,
-            state_pension_escalation_rate=0.0,
-            inflation_rate=0.0,
-        ),
-    )
-    rows = simulate(plan)
-    # By state pension age (2031), accrued: 520 paid + 5*52 = 260 HomeCaring
-    # → 780/2080 = 37.5% of 15,000 = 5,625.
-    retirement_row = next(r for r in rows if r.year == 2031)
-    assert abs(retirement_row.state_pension_total - 5_625) < 1
-    # HomeCaring marker contributes zero to gross income.
-    assert retirement_row.income_by_kind.get("homecaring", 0) == 0
-
-
-def test_state_pension_full_with_default_seed():
-    """Default prsi_weeks_at_base_year=2080 → 100% of full state pension (legacy behaviour)."""
-    person = PersonInput(
-        id=1, name="Eilis", dob=date(1960, 1, 1),
-        is_primary=True, life_expectancy=90, retirement_age=66,
-    )
-    plan = PlanInput(
-        base_year=2026, projection_years=1,
-        people=[person], incomes=[], expenses=[], assets=[],
-        assumptions=AssumptionsInput(state_pension_annual_amount=15_000.0, inflation_rate=0.0),
-    )
-    rows = simulate(plan)
-    assert abs(rows[0].state_pension_total - 15_000) < 1
-
-
-# --- Child Benefit -----------------------------------------------------------
-
-
-def _basic_parent_plan(children: list[ChildInput], years: int = 5) -> PlanInput:
-    parent = PersonInput(
-        id=1, name="Parent", dob=date(1990, 1, 1),
-        is_primary=True, life_expectancy=90, retirement_age=66,
-    )
-    return PlanInput(
-        base_year=2026, projection_years=years,
-        people=[parent], incomes=[], expenses=[], assets=[],
-        children=children,
-        assumptions=AssumptionsInput(inflation_rate=0.0, state_pension_escalation_rate=0.0),
-    )
-
-
-def test_child_benefit_pays_for_child_under_18():
-    """One 5-year-old → €140 × 12 = €1,680 in year 0 (no escalation yet)."""
-    child = ChildInput(id=1, name="Niamh", dob=date(2021, 1, 1))  # 5 in 2026
-    plan = _basic_parent_plan([child], years=1)
-    rows = simulate(plan)
-    assert abs(rows[0].income_by_kind.get("child_benefit", 0) - 1_680) < 1
-
-
-def test_child_benefit_stops_at_age_18():
-    """Child turns 18 mid-projection → benefit drops to 0 from that year on."""
-    # Born 2010 → 16 in 2026, 17 in 2027, 18 in 2028 (no benefit), 19 in 2029.
-    child = ChildInput(id=1, name="Aoife", dob=date(2010, 1, 1))
-    plan = _basic_parent_plan([child], years=4)
-    rows = simulate(plan)
-    assert abs(rows[0].income_by_kind.get("child_benefit", 0) - 1_680) < 1  # age 16
-    assert abs(rows[1].income_by_kind.get("child_benefit", 0) - 1_680 * 1.0075) < 1  # age 17
-    assert rows[2].income_by_kind.get("child_benefit", 0) == 0  # age 18
-    assert rows[3].income_by_kind.get("child_benefit", 0) == 0  # age 19
-
-
-def test_child_benefit_is_tax_free():
-    """Benefit must not appear in any tax base. Parent with zero earned income
-    pays zero IT/USC/PRSI despite the benefit being injected."""
-    child = ChildInput(id=1, name="Cara", dob=date(2022, 1, 1))
-    plan = _basic_parent_plan([child], years=1)
-    rows = simulate(plan)
-    assert rows[0].income_tax == 0
-    assert rows[0].usc == 0
-    assert rows[0].prsi == 0
-    assert abs(rows[0].net_income_total - 1_680) < 1
-
-
-def test_child_benefit_escalates_at_configured_rate():
-    """Year 4 amount = €1,680 × (1.0075 ** 4) ≈ €1,730.91."""
-    child = ChildInput(id=1, name="Roisin", dob=date(2020, 1, 1))
-    plan = _basic_parent_plan([child], years=5)
-    rows = simulate(plan)
-    expected_year_4 = 1_680 * (1.0075 ** 4)
-    assert abs(rows[4].income_by_kind.get("child_benefit", 0) - expected_year_4) < 1
-
-
-def test_no_children_no_benefit():
-    """Empty children list → no child_benefit line item."""
-    plan = _basic_parent_plan([], years=1)
-    rows = simulate(plan)
-    assert "child_benefit" not in rows[0].income_by_kind
-
-
-def test_multiple_children_stack():
-    """Three children under 18 → benefit triples."""
-    plan = _basic_parent_plan(
-        [
-            ChildInput(id=1, name="A", dob=date(2020, 1, 1)),
-            ChildInput(id=2, name="B", dob=date(2022, 1, 1)),
-            ChildInput(id=3, name="C", dob=date(2024, 1, 1)),
-        ],
-        years=1,
-    )
-    rows = simulate(plan)
-    assert abs(rows[0].income_by_kind.get("child_benefit", 0) - 3 * 1_680) < 1
 
 
 # --- Voluntary ARF drawdown rate --------------------------------------------

@@ -20,6 +20,7 @@ class PlanUpdate(BaseModel):
     projection_years: int | None = Field(default=None, ge=1, le=100)
     tax_config_id: int | None = None
     filing_status: FilingStatusValue | None = None
+    onboarding_complete: bool | None = None
 
 
 class PlanRead(BaseModel):
@@ -32,3 +33,4 @@ class PlanRead(BaseModel):
     created_at: datetime
     tax_config_id: int | None = None
     filing_status: FilingStatusValue | None = None
+    onboarding_complete: bool = False

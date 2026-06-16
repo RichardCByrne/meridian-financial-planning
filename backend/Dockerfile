@@ -4,11 +4,13 @@
 # stage runs `alembic upgrade head` before starting uvicorn so a deploy never
 # serves traffic against a half-migrated DB.
 #
-# Python 3.13 (not 3.14): most native deps (psycopg, cryptography) still ship
-# prebuilt wheels for 3.13, so pip skips source compilation. Saves ~2-3 min
-# per cold build.
+# Python 3.14. The native deps (psycopg, cryptography, pydantic-core, grpcio via
+# firebase-admin, uvloop/httptools via uvicorn[standard]) ship manylinux cp314
+# wheels, so pip skips source compilation and the cold build stays fast. If a
+# future dep bump lacks a cp314 wheel, pip will try to compile from source and
+# fail on this slim image (no toolchain) — pin that dep back or add build-essential.
 
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -33,13 +35,13 @@ COPY app ./app
 
 # ----------
 
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000
 
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 WORKDIR /app

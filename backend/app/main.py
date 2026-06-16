@@ -151,6 +151,19 @@ def _apply_lightweight_migrations() -> None:
                 conn.execute(
                     text("ALTER TABLE people ADD COLUMN arf_target_drawdown_pct FLOAT")
                 )
+        if "pension_option" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE people ADD COLUMN "
+                        "pension_option VARCHAR NOT NULL DEFAULT 'arf'"
+                    )
+                )
+        if "annuity_rate" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE people ADD COLUMN annuity_rate FLOAT NOT NULL DEFAULT 0.04")
+                )
     # children table picked up by Base.metadata.create_all on the dev path.
     if "liabilities" in tables:
         cols = {c["name"] for c in insp.get_columns("liabilities")}

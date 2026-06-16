@@ -87,6 +87,8 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             prsi_weeks_at_base_year=p.prsi_weeks_at_base_year,
             homecaring_weeks_at_base_year=p.homecaring_weeks_at_base_year,
             arf_target_drawdown_pct=p.arf_target_drawdown_pct,
+            pension_option=p.pension_option,
+            annuity_rate=p.annuity_rate,
         )
         for p in plan.people
     ]

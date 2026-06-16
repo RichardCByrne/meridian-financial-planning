@@ -54,8 +54,20 @@ class PersonInput:
     # Voluntary ARF drawdown rate. None = use statutory minimum only (4%/5%/6%).
     # When set, engine draws max(statutory_minimum, target) each post-retirement
     # year. Lets users model "I want 6% drawdown" or back-solve from a target
-    # monthly spend. Range [0.0, 1.0].
+    # monthly spend. Range [0.0, 1.0]. Only used when pension_option == "arf".
     arf_target_drawdown_pct: float | None = None
+    # What to do with the pension pot remaining after the tax-free lump sum at
+    # retirement. Irish options:
+    #   "arf"               — invest in an ARF, draw it down over time (default).
+    #   "annuity"           — buy a lifetime annuity: pot is converted into a
+    #                         level annual income (annuity_rate × pot) and leaves
+    #                         the estate. Income is taxed as PAYE, PRSI-exempt.
+    #   "taxable_lump_sum"  — take the whole remainder as cash in the retirement
+    #                         year, taxed at the marginal income-tax rate.
+    pension_option: str = "arf"
+    # Annual annuity income as a fraction of the annuitised pot. Only used when
+    # pension_option == "annuity". ~4% is a typical Irish level-annuity rate.
+    annuity_rate: float = 0.04
 
 
 @dataclass
@@ -451,6 +463,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
     }
     retired_persons: set[int] = set()  # person ids who have already crystallised
     deceased_persons: set[int] = set()  # person ids who have already died
+    # Level annuity income per person, set at retirement when pension_option ==
+    # "annuity"; paid (and taxed as PAYE) every year thereafter.
+    annuity_income: dict[int, float] = {}
+    # One-off taxable pension cash to charge as income in the retirement year
+    # (pension_option == "taxable_lump_sum"). Popped once consumed.
+    pension_taxable_cash: dict[int, float] = {}
     # PRSI contribution history for the Total Contributions Approach. Seeded
     # from PersonInput.prsi_weeks_at_base_year; accumulates +52 per simulated
     # year that the person earns any PRSI-paying income. HomeCaring weeks
@@ -720,7 +738,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 if pot > 0:
                     lump_sum_pct = max(0.0, min(0.25, person.lump_sum_pct))
                     lump_sum = lump_sum_pct * pot
-                    arf_amount = pot - lump_sum
+                    remainder = pot - lump_sum
                     crystallised_lump_sum = lump_sum
                     crystallised_lump_sum_tax = pension_ie.lump_sum_tax(lump_sum, tax_config)
                     net_lump_sum = lump_sum - crystallised_lump_sum_tax
@@ -731,12 +749,32 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                             st.balance = 0.0
 
                     states[_cash_target()].balance += net_lump_sum
-                    states[_person_arf_target(person.id)].balance += arf_amount
 
-                    notes.append(
-                        f"{person.name} retires: pot EUR {pot:,.0f} → lump sum EUR {lump_sum:,.0f} "
-                        f"(tax EUR {crystallised_lump_sum_tax:,.0f}) + ARF EUR {arf_amount:,.0f}."
-                    )
+                    # Disposition of the post-lump-sum remainder depends on the
+                    # person's chosen pension option.
+                    option = person.pension_option
+                    if option == "annuity":
+                        rate = max(0.0, person.annuity_rate)
+                        annuity_income[person.id] = remainder * rate
+                        notes.append(
+                            f"{person.name} retires: pot EUR {pot:,.0f} → lump sum EUR {lump_sum:,.0f} "
+                            f"(tax EUR {crystallised_lump_sum_tax:,.0f}) + annuity EUR "
+                            f"{remainder * rate:,.0f}/yr from EUR {remainder:,.0f}."
+                        )
+                    elif option == "taxable_lump_sum":
+                        # Whole remainder taken as cash this year, taxed as income.
+                        pension_taxable_cash[person.id] = remainder
+                        notes.append(
+                            f"{person.name} retires: pot EUR {pot:,.0f} → lump sum EUR {lump_sum:,.0f} "
+                            f"(tax EUR {crystallised_lump_sum_tax:,.0f}) + EUR {remainder:,.0f} taken "
+                            f"as taxable cash."
+                        )
+                    else:  # "arf" (default)
+                        states[_person_arf_target(person.id)].balance += remainder
+                        notes.append(
+                            f"{person.name} retires: pot EUR {pot:,.0f} → lump sum EUR {lump_sum:,.0f} "
+                            f"(tax EUR {crystallised_lump_sum_tax:,.0f}) + ARF EUR {remainder:,.0f}."
+                        )
                 retired_persons.add(person.id)
 
             pension_lump_sum_total += crystallised_lump_sum
@@ -789,10 +827,23 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                         income_by_kind.get("state_pension", 0.0) + state_pension_amt
                     )
 
+            # 3e-ii. Annuity income (paid every year once an annuity is bought) and
+            # one-off taxable cash drawdown (taxable_lump_sum option, retirement year).
+            # Both are PAYE-taxed pension income, PRSI-exempt like ARF/state pension.
+            annuity_amt = annuity_income.get(person.id, 0.0)
+            if annuity_amt > 0:
+                income_by_kind["annuity"] = income_by_kind.get("annuity", 0.0) + annuity_amt
+            taxable_cash = pension_taxable_cash.pop(person.id, 0.0)
+            if taxable_cash > 0:
+                income_by_kind["pension_taxable_cash"] = (
+                    income_by_kind.get("pension_taxable_cash", 0.0) + taxable_cash
+                )
+
             # 3f. Tax computation.
-            taxable_for_it = max(0.0, earned_for_it - pension_contribution) + arf_drawdown + state_pension_amt
-            taxable_for_usc = max(0.0, earned_for_usc) + arf_drawdown + state_pension_amt
-            taxable_for_prsi = earned_for_prsi  # ARF + state pension exempt
+            pension_income = arf_drawdown + state_pension_amt + annuity_amt + taxable_cash
+            taxable_for_it = max(0.0, earned_for_it - pension_contribution) + pension_income
+            taxable_for_usc = max(0.0, earned_for_usc) + pension_income
+            taxable_for_prsi = earned_for_prsi  # ARF / annuity / state pension exempt
 
             status = _filing_status_for_person(
                 person,

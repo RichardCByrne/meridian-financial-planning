@@ -198,6 +198,66 @@ def test_lump_sum_tax_above_200k_threshold():
     assert abs(r1.pension_lump_sum_tax - 10_000) < 1
 
 
+# --- Pension option at retirement (ARF / annuity / taxable lump sum) ---------
+
+
+def _retiree_with_prsa(pension_option: str, **kwargs) -> PlanInput:
+    """Single person, age 65 in 2026, retires 2027, 200k PRSA. State pension
+    zeroed so the only post-retirement income is the chosen pension option."""
+    person = PersonInput(
+        id=1, name="Orla", dob=date(1961, 1, 1),
+        is_primary=True, life_expectancy=90, retirement_age=66,
+        pension_option=pension_option, **kwargs,
+    )
+    return PlanInput(
+        base_year=2026, projection_years=3,
+        people=[person], incomes=[], expenses=[],
+        assets=[
+            AssetInput(id=1, name="Cash", kind="cash", value=10_000, growth_rate=0.0, cost_basis=0.0),
+            AssetInput(id=2, name="PRSA", kind="prsa", value=200_000, growth_rate=0.0,
+                       cost_basis=0.0, owner_person_id=1),
+        ],
+        assumptions=AssumptionsInput(state_pension_annual_amount=0),
+    )
+
+
+def test_annuity_option_pays_level_income_and_creates_no_arf():
+    """annuity option: 150k remainder × 4% = 6k/yr level income, no ARF, pot leaves estate."""
+    rows = simulate(_retiree_with_prsa("annuity", annuity_rate=0.04))
+    # Pre-retirement year: no annuity.
+    assert rows[0].income_by_kind.get("annuity", 0) == 0
+    # Retirement year 2027 and the year after: 6k annuity each.
+    assert abs(rows[1].income_by_kind.get("annuity", 0) - 6_000) < 1
+    assert abs(rows[2].income_by_kind.get("annuity", 0) - 6_000) < 1
+    # No ARF wrapper created (ARF synthetic id is -2001).
+    assert rows[1].asset_balances.get(-2001, 0) == 0
+    # No ARF imputed drawdown.
+    assert rows[1].arf_drawdowns == 0
+
+
+def test_taxable_lump_sum_option_charges_remainder_as_income_once():
+    """taxable_lump_sum: whole 150k remainder taxed as income in the retirement year only."""
+    rows = simulate(_retiree_with_prsa("taxable_lump_sum"))
+    assert rows[0].income_by_kind.get("pension_taxable_cash", 0) == 0
+    # 200k pot, 25% lump = 50k, remainder 150k taken as taxable cash in 2027.
+    assert abs(rows[1].income_by_kind.get("pension_taxable_cash", 0) - 150_000) < 1
+    # One-shot: not repeated next year.
+    assert rows[2].income_by_kind.get("pension_taxable_cash", 0) == 0
+    # No ARF created.
+    assert rows[1].asset_balances.get(-2001, 0) == 0
+    # Big income → meaningful income tax that year.
+    assert rows[1].income_tax > 0
+
+
+def test_arf_option_is_the_default_and_creates_an_arf():
+    """Default (no pension_option) and explicit 'arf' both route the remainder to an ARF."""
+    default_rows = simulate(_retiree_with_prsa("arf"))
+    # ARF wrapper exists post-retirement, ~150k less the 4% imputed drawdown.
+    assert default_rows[1].asset_balances.get(-2001, 0) > 100_000
+    assert default_rows[1].arf_drawdowns > 0
+    assert default_rows[1].income_by_kind.get("annuity", 0) == 0
+
+
 # --- ARF imputed distribution ------------------------------------------------
 
 

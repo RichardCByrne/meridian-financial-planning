@@ -59,7 +59,11 @@ export interface Person {
   prsi_weeks_at_base_year: number;
   homecaring_weeks_at_base_year: number;
   arf_target_drawdown_pct: number | null;
+  pension_option: PensionOption;
+  annuity_rate: number;
 }
+
+export type PensionOption = "arf" | "annuity" | "taxable_lump_sum";
 
 export interface PersonCreate {
   name: string;
@@ -73,6 +77,8 @@ export interface PersonCreate {
   prsi_weeks_at_base_year?: number;
   homecaring_weeks_at_base_year?: number;
   arf_target_drawdown_pct?: number | null;
+  pension_option?: PensionOption;
+  annuity_rate?: number;
 }
 
 export interface Assumptions {

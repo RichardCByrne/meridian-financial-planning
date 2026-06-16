@@ -1,6 +1,7 @@
 import { Fragment, type Key, type ReactNode } from "react";
 
 import { useIsMobile } from "../hooks/useIsMobile";
+import { RowActions } from "./RowActions";
 
 export type Column<T> = {
   header: string;
@@ -86,9 +87,10 @@ export function ResponsiveTable<T>({
                   display: "flex",
                   gap: 8,
                   flexWrap: "nowrap",
+                  justifyContent: "flex-end",
                 }}
               >
-                {renderActions(r)}
+                <RowActions>{renderActions(r)}</RowActions>
               </div>
             )}
           </li>

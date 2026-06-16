@@ -316,6 +316,13 @@ th {
   }
 }
 
+/* Buttons inside the row-actions "⋯" overflow menu stack full-width, left-aligned. */
+.row-actions-menu .btn {
+  width: 100%;
+  justify-content: flex-start;
+  margin: 0;
+}
+
 .meridian-spinner {
   display: inline-block;
   border-radius: 50%;

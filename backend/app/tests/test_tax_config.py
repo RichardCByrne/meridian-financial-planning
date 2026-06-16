@@ -1,4 +1,4 @@
-"""Phase 11 tests: TaxConfig dataclass + per-plan custom configs."""
+"""Tax config: TaxConfig dataclass + per-plan custom configs."""
 
 from contextlib import contextmanager
 

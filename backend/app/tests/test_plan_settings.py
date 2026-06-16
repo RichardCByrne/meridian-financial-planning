@@ -1,4 +1,4 @@
-"""Phase 14 prep tests: editable filing_status on Plan.
+"""Plan settings: editable filing_status + onboarding flag on Plan.
 
 Exercises the PATCH /plans/{id} transition flow:
 - Plan can be created with any filing status (or null = auto).

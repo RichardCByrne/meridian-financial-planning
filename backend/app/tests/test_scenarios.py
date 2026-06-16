@@ -1,4 +1,4 @@
-"""Phase 6 tests: scenario overrides + compare endpoint shape."""
+"""Scenarios: override application + compare endpoint shape."""
 
 from datetime import date
 

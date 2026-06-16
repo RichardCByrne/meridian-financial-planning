@@ -1,4 +1,4 @@
-"""Phase 5 integration tests: goals as expenses + goal status resolution."""
+"""Goals: cost-bearing goals as expenses + goal-status resolution."""
 
 from datetime import date
 

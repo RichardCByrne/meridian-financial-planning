@@ -8,7 +8,7 @@ Repo: https://github.com/RichardCByrne/meridian-financial-planning
 
 Meridian is a single-repo financial planning app for Ireland with an in-house tax/pension engine (Budget 2026). FastAPI + SQLAlchemy backend, Vite + React 19 + TypeScript frontend. Local dev uses SQLite; production runs on Cloud Run with **Neon** serverless Postgres (free tier, autosuspends on idle) and Firebase Hosting for the static frontend. Cloud SQL is documented as a one-secret swap in `DEPLOY.md` Appendix A but not the default.
 
-The project is organised as numbered phases (1–13 done; Phase 14 = AI walkthrough is next). Backend tests are split per-phase under `backend/app/tests/test_phase*.py` plus engine-level tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`). Test count target: keep `pytest` green (currently 184/184).
+The project is organised as numbered phases (1–13 done; Phase 14 = AI walkthrough is next), but **tests are grouped by scope/functionality, not by phase**. Backend tests live under `backend/app/tests/test_<area>.py` — e.g. `test_pension.py`, `test_state_pension.py`, `test_child_benefit.py`, `test_liabilities.py`, `test_disposal_tax.py`, `test_goals.py`, `test_scenarios.py`, `test_plan_io.py`, `test_auth.py`, `test_invites_members.py`, `test_tax_config.py`, `test_cat_estate.py`, `test_montecarlo.py`, `test_plan_settings.py` — plus pure engine-level unit tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`, `test_engine_edge_cases.py`, `test_schema_validation.py`). Test count target: keep `pytest` green (currently 211/211).
 
 ## Commands
 
@@ -25,7 +25,7 @@ Backend (from `backend/`, venv at `.venv`):
 ```powershell
 .\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000 --host 127.0.0.1
 .\.venv\Scripts\python -m pytest                        # full suite
-.\.venv\Scripts\python -m pytest app/tests/test_phase13.py -v   # single file
+.\.venv\Scripts\python -m pytest app/tests/test_montecarlo.py -v   # single file
 .\.venv\Scripts\python -m pytest -k montecarlo -v       # by keyword
 .\.venv\Scripts\python -m ruff check app                # lint
 ```
@@ -101,7 +101,7 @@ When adding a new column on an existing table: add it to the model, write an Ale
 - **Money is float, not Decimal.** Tax engine constants live in `TaxConfig`; never hardcode rates inside routers or simulator branches.
 - **Never put ORM imports inside `engine/`.** If you need a new piece of plan data in the simulator, add it to the relevant `*Input` dataclass and map it in `services/serialisation.py` AND `routers/projections.py::_load_plan_input` (the ORM→dataclass copy is still by-hand — see deferred refactor below).
 - Pension wrappers and ARFs are not separate tables — they are `Asset` rows with `kind` values like `prsa` / `occupational_pension` / `arf`. The simulator auto-creates them via `_person_pension_target` / `_person_arf_target` / `_cash_target` on first need; do not duplicate that logic inline.
-- Phase tests (`test_phaseN.py`) are *integration-ish*: they spin up the FastAPI app against a dedicated `backend/test_meridian.db` SQLite file (forced by `backend/conftest.py` setting `DATABASE_URL` before any `app.*` import) and exercise endpoints. An autouse `_clean_db` fixture in `app/tests/conftest.py` wipes every data table after each test — that wipe targets the test DB only, NOT the dev `meridian.db`. Do not remove the root `backend/conftest.py` or the dev DB will get nuked on every `pytest` run. Engine tests are pure unit tests against the dataclasses.
+- The API/integration tests (e.g. `test_auth.py`, `test_scenarios.py`, `test_plan_io.py`, `test_tax_config.py`, `test_cat_estate.py`, `test_invites_members.py`, `test_plan_settings.py`, `test_montecarlo.py`) are *integration-ish*: they spin up the FastAPI app against a dedicated `backend/test_meridian.db` SQLite file (forced by `backend/conftest.py` setting `DATABASE_URL` before any `app.*` import) and exercise endpoints. An autouse `_clean_db` fixture in `app/tests/conftest.py` wipes every data table after each test — that wipe targets the test DB only, NOT the dev `meridian.db`. Do not remove the root `backend/conftest.py` or the dev DB will get nuked on every `pytest` run. Engine tests are pure unit tests against the dataclasses.
 - `claims_rent_credit` and `filing_status` are recent (Phase 14 prep) — cohabiting couples are taxed individually under Irish law, so don't infer married filing from "2 people in plan".
 - Use `app.db.utcnow()` for created/updated timestamps, never `datetime.utcnow()` (deprecated). The helper returns a naive UTC datetime so existing `DateTime` columns work unchanged.
 - SQLAlchemy: prefer `db.execute(select(...))` / `update(...)` over the legacy `db.query()` API. Production code is migrated; older test helpers still use `db.query` and that's OK.

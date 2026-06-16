@@ -746,12 +746,18 @@ function OverrideInput({
   onChange: (v: unknown) => void;
 }) {
   if (field.kind === "percent") {
+    // Show/edit whole percent (2.5), store the fraction (0.025) the engine wants.
+    const shown =
+      value === null || value === undefined || value === "" ? "" : Number(value) * 100;
     return (
       <input
         type="number"
-        step="0.001"
-        value={value === null || value === undefined ? "" : Number(value)}
-        onChange={(e) => onChange(parseValue(field, e.target.value))}
+        step="0.1"
+        value={shown}
+        onChange={(e) => {
+          const t = e.target.value;
+          onChange(t === "" ? null : Number(t) / 100);
+        }}
         style={{ padding: "4px 8px", border: "1px solid #cbd5e1", borderRadius: 4, width: 100 }}
       />
     );

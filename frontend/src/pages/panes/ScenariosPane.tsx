@@ -229,6 +229,7 @@ function ScenarioCard({
   const [showJson, setShowJson] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState<"override" | "step" | "added">("override");
+  const [collapsed, setCollapsed] = useState(true);
 
   // Reset local state only when we're switched to a *different* scenario id.
   // Background refetches on the same id no longer clobber in-flight edits.
@@ -364,9 +365,34 @@ function ScenarioCard({
     });
   };
 
+  const addedCount =
+    ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
+    ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0);
+  const summaryParts: string[] = [];
+  if (overrideRows.length) summaryParts.push(`${overrideRows.length} override${overrideRows.length === 1 ? "" : "s"}`);
+  if (addedCount) summaryParts.push(`${addedCount} added`);
+  if (overrides.marriage_year) summaryParts.push(`married ${overrides.marriage_year}`);
+  const summary = summaryParts.length ? summaryParts.join(" · ") : "No changes yet";
+
   return (
     <div className="card">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: collapsed ? 0 : 8, gap: 8 }}>
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand scenario" : "Collapse scenario"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((c) => !c)}
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            fontSize: 16,
+            width: 24,
+            color: "#64748b",
+          }}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
         <input
           value={name}
           onChange={(e) => {
@@ -376,22 +402,44 @@ function ScenarioCard({
           style={{ fontSize: 18, fontWeight: 600, padding: 4, border: "1px solid transparent", borderRadius: 4, flex: 1 }}
         />
         <div className="row" style={{ gap: 6 }}>
-          <button
-            className="btn"
-            disabled={!dirty}
-            onClick={async () => {
-              await onSave(overrides, name);
-              setDirty(false);
-            }}
-          >
-            {dirty ? "Save changes" : "Saved"}
-          </button>
+          {dirty && (
+            <button
+              className="btn"
+              onClick={async () => {
+                await onSave(overrides, name);
+                setDirty(false);
+              }}
+            >
+              Save changes
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={onDelete}>
             Delete
           </button>
         </div>
       </div>
 
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="muted"
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            padding: "2px 0 0 24px",
+            fontSize: 13,
+            textAlign: "left",
+          }}
+        >
+          {summary}
+          {dirty ? " · unsaved" : ""}
+        </button>
+      )}
+
+      {!collapsed && (
+      <>
       <MarriageEventRow
         baseYear={baseYear}
         value={overrides.marriage_year ?? null}
@@ -399,12 +447,7 @@ function ScenarioCard({
         onChange={setMarriageYear}
       />
 
-      <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length}
-        addedCount={
-          ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
-          ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0)
-        }
-      />
+      <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length} addedCount={addedCount} />
 
       {mode === "override" && (
         <>
@@ -541,6 +584,8 @@ function ScenarioCard({
         >
           {JSON.stringify(overrides, null, 2)}
         </pre>
+      )}
+      </>
       )}
     </div>
   );

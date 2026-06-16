@@ -112,6 +112,14 @@ def _apply_lightweight_migrations() -> None:
         if "filing_status" not in cols:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE plans ADD COLUMN filing_status VARCHAR(20)"))
+        if "onboarding_complete" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE plans ADD COLUMN "
+                        "onboarding_complete BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
     if "people" in tables:
         cols = {c["name"] for c in insp.get_columns("people")}
         if "claims_rent_credit" not in cols:

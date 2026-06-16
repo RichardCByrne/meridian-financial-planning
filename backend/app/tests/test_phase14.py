@@ -126,6 +126,24 @@ def test_invalid_filing_status_rejected():
         assert r.status_code == 422
 
 
+def test_onboarding_complete_defaults_false_and_persists_via_patch():
+    alice = _ensure_user("alice-uid", "alice@example.com")
+    with TestClient(app) as client, _as_user(alice.firebase_uid, alice.email or ""):
+        plan_id = client.post("/api/plans", json={"name": "Onboarding"}).json()["id"]
+        # New plans start with the getting-started stepper enabled.
+        assert client.get(f"/api/plans/{plan_id}").json()["onboarding_complete"] is False
+
+        # The UI flips this once people + income + assets exist; it must persist.
+        r = client.patch(f"/api/plans/{plan_id}", json={"onboarding_complete": True})
+        assert r.status_code == 200
+        assert r.json()["onboarding_complete"] is True
+        assert client.get(f"/api/plans/{plan_id}").json()["onboarding_complete"] is True
+
+        # Patching other fields must not reset it.
+        client.patch(f"/api/plans/{plan_id}", json={"name": "Renamed"})
+        assert client.get(f"/api/plans/{plan_id}").json()["onboarding_complete"] is True
+
+
 def test_patch_to_cohabiting_increases_projected_tax():
     """End-to-end: switching from married (auto for 2 people) to cohabiting raises
     income tax because cohabiting couples are taxed individually."""

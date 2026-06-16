@@ -10,6 +10,7 @@ export interface Plan {
   created_at: string;
   tax_config_id: number | null;
   filing_status: FilingStatus | null;
+  onboarding_complete: boolean;
 }
 
 export interface PlanCreate {
@@ -26,6 +27,7 @@ export interface PlanUpdate {
   projection_years?: number;
   tax_config_id?: number | null;
   filing_status?: FilingStatus | null;
+  onboarding_complete?: boolean;
 }
 
 export interface TaxConfigSummary {

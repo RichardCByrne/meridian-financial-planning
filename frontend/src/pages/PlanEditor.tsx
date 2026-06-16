@@ -151,16 +151,38 @@ export function PlanEditorPage() {
 }
 
 function FirstRunStepper({ planId }: { planId: number }) {
-  const { data: people } = usePeople(planId);
-  const { data: assets } = useAssets(planId);
-  const { data: projection } = useProjection(planId);
+  const { data: plan } = usePlan(planId);
+  const { data: people, isLoading: peopleLoading } = usePeople(planId);
+  const { data: assets, isLoading: assetsLoading } = useAssets(planId);
+  const { data: projection, isLoading: projectionLoading } = useProjection(planId);
+  const updatePlan = useUpdatePlan(planId);
+
+  const alreadyComplete = plan?.onboarding_complete ?? false;
 
   const hasPeople = (people?.length ?? 0) > 0;
   const hasAssets = (assets?.length ?? 0) > 0;
   const hasIncome = (projection?.years[0]?.gross_income_total ?? 0) > 0;
+  const allDone = hasPeople && hasAssets && hasIncome;
 
-  // Dismiss once all three are present — engaged users don't need the nudge.
-  if (hasPeople && hasAssets && hasIncome) return null;
+  // Persist the flag the first time everything is present, so future loads can
+  // skip the stepper from a single cached boolean instead of re-deriving it
+  // (which caused the brief flash while people/assets/projection were loading).
+  const flaggedRef = useRef(false);
+  useEffect(() => {
+    if (plan && !alreadyComplete && allDone && !flaggedRef.current) {
+      flaggedRef.current = true;
+      updatePlan.mutate({ onboarding_complete: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, alreadyComplete, allDone]);
+
+  // Already onboarded → never render (decided from the flag alone, no flash).
+  if (alreadyComplete) return null;
+  // Wait for the data that judges completion before deciding to show anything;
+  // this is what eliminates the flash for plans that are already complete.
+  if (!plan || peopleLoading || assetsLoading || projectionLoading) return null;
+  // All tasks done but flag not yet persisted — hide now; the effect sets it.
+  if (allDone) return null;
 
   const steps = [
     { label: "Add people", path: `/plans/${planId}/people`, done: hasPeople },

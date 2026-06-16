@@ -104,6 +104,10 @@ class Plan(Base):
     # Cohabiting couples are taxed individually under Irish law — without an
     # explicit override the engine would over-credit them as married.
     filing_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Set true the first time a plan has people + income + assets (the getting-
+    # started wizard tasks). Lets the UI skip the first-run stepper outright
+    # instead of computing completion on every load (which caused a brief flash).
+    onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     people: Mapped[list["Person"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"

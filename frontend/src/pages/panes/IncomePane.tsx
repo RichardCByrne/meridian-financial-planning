@@ -90,6 +90,7 @@ type FormState = {
   escalation_rate: number;
   pension_contribution_pct: number;
   employer_pension_contribution_pct: number;
+  is_bonus: boolean;
 };
 
 const blankForm: FormState = {
@@ -101,6 +102,7 @@ const blankForm: FormState = {
   escalation_rate: 0.03,
   pension_contribution_pct: 0,
   employer_pension_contribution_pct: 0,
+  is_bonus: false,
 };
 
 function fromIncome(i: IncomeSource): FormState {
@@ -113,6 +115,7 @@ function fromIncome(i: IncomeSource): FormState {
     escalation_rate: i.escalation_rate,
     pension_contribution_pct: i.pension_contribution_pct,
     employer_pension_contribution_pct: i.employer_pension_contribution_pct ?? 0,
+    is_bonus: i.is_bonus ?? false,
   };
 }
 
@@ -162,6 +165,7 @@ function PersonIncomeBlock({
       pays_usc: kindMeta.defaultPaysUSC,
       pension_contribution_pct: f.pension_contribution_pct,
       employer_pension_contribution_pct: f.employer_pension_contribution_pct,
+      is_bonus: f.is_bonus,
     };
   };
 
@@ -169,6 +173,25 @@ function PersonIncomeBlock({
     e.preventDefault();
     if (!form.name.trim()) return;
     await create.mutateAsync(buildPayload(form));
+  };
+
+  // One-click bonus: a single-year taxable "other" income flagged as a bonus.
+  // Uses the gross/year currently in the form so the user can set the amount,
+  // then click. Matches the plan wizard's "+ Add bonus".
+  const onAddBonus = async () => {
+    await create.mutateAsync({
+      kind: "other",
+      name: `${form.start_year} bonus`,
+      gross_amount: form.gross_amount,
+      start_year: form.start_year,
+      end_year: form.start_year,
+      escalation_rate: 0,
+      pays_prsi: false,
+      pays_usc: true,
+      pension_contribution_pct: 0,
+      employer_pension_contribution_pct: 0,
+      is_bonus: true,
+    });
   };
 
   const onSaveEdit = async () => {
@@ -195,9 +218,20 @@ function PersonIncomeBlock({
             inline
           />
         )}
-        <button type="submit" className="btn" disabled={create.isPending}>
-          Add
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="submit" className="btn" disabled={create.isPending}>
+            Add
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onAddBonus}
+            disabled={create.isPending}
+            title="Add a one-year taxable bonus (USC/PAYE apply). Uses the gross and start year above."
+          >
+            + Add bonus
+          </button>
+        </div>
       </form>
 
       {isLoading && <p className="muted">Loading…</p>}
@@ -218,9 +252,23 @@ function PersonIncomeBlock({
           <ResponsiveTable<IncomeSource>
             rows={data}
             getKey={(i) => i.id}
-            cardTitle={(i) => i.name}
+            cardTitle={(i) => (
+              <>
+                {i.name}
+                {i.is_bonus && <BonusBadge />}
+              </>
+            )}
             columns={[
-              { header: "Name", cell: (i) => i.name, hideOnMobile: true },
+              {
+                header: "Name",
+                cell: (i) => (
+                  <>
+                    {i.name}
+                    {i.is_bonus && <BonusBadge />}
+                  </>
+                ),
+                hideOnMobile: true,
+              },
               {
                 header: "Type",
                 cell: (i) => (
@@ -333,6 +381,26 @@ function PersonIncomeBlock({
         )}
       </EditModal>
     </div>
+  );
+}
+
+function BonusBadge() {
+  return (
+    <span
+      title="One-off / annual bonus — taxed as normal income"
+      style={{
+        marginLeft: 6,
+        padding: "1px 6px",
+        fontSize: 11,
+        fontWeight: 600,
+        color: "#3730a3",
+        background: "#e0e7ff",
+        borderRadius: 999,
+        verticalAlign: "middle",
+      }}
+    >
+      Bonus
+    </span>
   );
 }
 

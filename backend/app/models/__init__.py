@@ -213,6 +213,9 @@ class IncomeSource(Base):
     employer_pension_contribution_pct: Mapped[float] = mapped_column(
         Float, default=0.0, nullable=False
     )
+    # UI marker: a one-off / annual bonus (still a normal taxable income row).
+    # Lets the editor badge it and offer a bonus shortcut; the engine ignores it.
+    is_bonus: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     person: Mapped[Person] = relationship(back_populates="income_sources")
 

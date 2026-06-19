@@ -23,6 +23,7 @@ class IncomeSourceCreate(BaseModel):
     pays_usc: bool = True
     pension_contribution_pct: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
     employer_pension_contribution_pct: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
+    is_bonus: bool = False
 
 
 class IncomeSourceUpdate(BaseModel):
@@ -36,6 +37,7 @@ class IncomeSourceUpdate(BaseModel):
     pays_usc: bool | None = None
     pension_contribution_pct: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     employer_pension_contribution_pct: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    is_bonus: bool | None = None
 
 
 class IncomeSourceRead(BaseModel):
@@ -53,3 +55,4 @@ class IncomeSourceRead(BaseModel):
     pays_usc: bool
     pension_contribution_pct: float
     employer_pension_contribution_pct: float
+    is_bonus: bool

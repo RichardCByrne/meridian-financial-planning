@@ -485,6 +485,7 @@ export interface ProjectionResponse {
 // `assumptions` is a flat partial dict — singleton per plan.
 export type AddedIncome = IncomeSourceCreate & { person_id: number };
 export type AddedExpense = ExpenseCreate;
+export type AddedBenefit = BenefitCreate;
 export type AddedChild = ChildCreate;
 
 // A child override patch carries the editable child fields plus a scenario-only
@@ -500,6 +501,7 @@ export type ScenarioOverrides = {
   assets?: Record<string, Partial<AssetCreate>>;
   liabilities?: Record<string, Partial<LiabilityCreate>>;
   goals?: Record<string, Partial<GoalCreate>>;
+  benefits?: BucketPatch<Partial<BenefitCreate>, AddedBenefit>;
   children?: BucketPatch<ChildPatch, AddedChild>;
   assumptions?: Partial<AssumptionsUpsert>;
   // Plan-level scalar overrides (not bucketed).

@@ -1098,26 +1098,36 @@ function YearDetailCard({
           )}
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
-          <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Expenses</h4>
+          <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Money out</h4>
+          <Row label="Net income" value={fy(row.net_income_total)} muted />
           {Object.entries(row.expenses_by_category).map(([cat, amt]) => (
-            <Row key={cat} label={cat.replace(/_/g, " ")} value={fy(amt)} />
+            <Row key={cat} label={cat.replace(/_/g, " ")} value={`−${fy(amt)}`} />
           ))}
-          <Row label="Total" value={fy(row.expenses_total)} bold />
-          {row.pension_contributions > 0 && (
-            <Row label="Pension contributions" value={`−${fy(row.pension_contributions)}`} muted />
-          )}
-          {row.asset_contributions > 0 && (
-            <Row label="Savings / investments" value={`−${fy(row.asset_contributions)}`} muted />
-          )}
-          {row.investment_tax > 0 && (
-            <Row label="Investment tax" value={`−${fy(row.investment_tax)}`} muted />
+          <Row label="Total expenses" value={`−${fy(row.expenses_total)}`} subtotal />
+          {(row.pension_contributions > 0 ||
+            row.asset_contributions > 0 ||
+            row.investment_tax > 0) && (
+            <>
+              <h4 style={{ margin: "10px 0 4px 0", color: "#475569", fontSize: 13 }}>
+                Also funded this year
+              </h4>
+              {row.pension_contributions > 0 && (
+                <Row label="Pension contributions" value={`−${fy(row.pension_contributions)}`} muted />
+              )}
+              {row.asset_contributions > 0 && (
+                <Row label="Savings / investments" value={`−${fy(row.asset_contributions)}`} muted />
+              )}
+              {row.investment_tax > 0 && (
+                <Row label="Investment tax" value={`−${fy(row.investment_tax)}`} muted />
+              )}
+            </>
           )}
           <Row
             label={
               <span>
                 Surplus / shortfall
                 <HelpTip>
-                  Free cash flow: net income minus expenses <em>and</em> every other committed
+                  What's left of net income after expenses <em>and</em> every other committed
                   outflow that year — your own pension contributions, regular savings into assets,
                   and any ETF/pension-lump-sum tax. A negative figure is funded by drawing down
                   assets (below).
@@ -1281,15 +1291,20 @@ function Row({
   label,
   value,
   bold,
+  subtotal,
   muted,
   color,
 }: {
   label: React.ReactNode;
   value: string;
   bold?: boolean;
+  // A running subtotal: a thin divider + semibold, but visually lighter than a
+  // bold final line, so it doesn't read as "the answer".
+  subtotal?: boolean;
   muted?: boolean;
   color?: string;
 }) {
+  const ruled = bold || subtotal;
   return (
     <div
       style={{
@@ -1297,11 +1312,11 @@ function Row({
         justifyContent: "space-between",
         padding: "3px 0",
         fontSize: 14,
-        color: color ?? (muted ? "#64748b" : "inherit"),
-        fontWeight: bold ? 600 : 400,
-        borderTop: bold ? "1px solid #e2e8f0" : undefined,
-        marginTop: bold ? 4 : 0,
-        paddingTop: bold ? 6 : 3,
+        color: color ?? (muted ? "#64748b" : subtotal ? "#475569" : "inherit"),
+        fontWeight: bold ? 600 : subtotal ? 500 : 400,
+        borderTop: ruled ? "1px solid #e2e8f0" : undefined,
+        marginTop: ruled ? 4 : 0,
+        paddingTop: ruled ? 6 : 3,
       }}
     >
       <span style={{ textTransform: "capitalize" }}>{label}</span>

@@ -16,10 +16,10 @@ Scenario overrides are applied to PlanInput before simulate() — see
 """
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
-from app.engine import cat_ie, pension_ie, tax_ie
+from app.engine import bik_ie, cat_ie, pension_ie, tax_ie
 from app.engine.liquidation import (
     LIQUIDATION_ORDER,
     disposal_tax_rate as _disposal_tax_rate,
@@ -84,6 +84,35 @@ class IncomeInput:
     pays_usc: bool
     pension_contribution_pct: float = 0.0
     employer_pension_contribution_pct: float = 0.0
+
+
+@dataclass
+class BenefitInput:
+    """An employer-provided benefit-in-kind charged to the employee as notional
+    pay (IT + USC + PRSI) but never received as cash and never paid for by the
+    household. See `engine.bik_ie` for the per-kind cash-equivalent calculation.
+
+    Field meaning depends on `kind`:
+      - medical_insurance / other → `amount` is the cash equivalent (premium).
+      - company_car / company_van → `omv` × rate (car uses `rate`, default mid
+        band; van uses the statutory rate). Falls back to `amount` if omv == 0.
+      - preferential_loan → `amount` is the loan balance, `rate` the rate the
+        employer charges; BIK = balance × (specified − charged).
+    `relief_adults` / `relief_children` size the medical-insurance relief cap.
+    """
+    id: int
+    person_id: int
+    kind: str
+    name: str
+    start_year: int
+    end_year: int | None
+    escalation_rate: float = 0.0
+    amount: float = 0.0
+    omv: float = 0.0
+    rate: float = 0.0
+    loan_is_qualifying: bool = False
+    relief_adults: int = 1
+    relief_children: int = 0
 
 
 @dataclass
@@ -217,6 +246,7 @@ class PlanInput:
     goals: list[GoalInput] = field(default_factory=list)
     bequests: list[BequestInput] = field(default_factory=list)
     children: list[ChildInput] = field(default_factory=list)
+    benefits: list[BenefitInput] = field(default_factory=list)
     # Tax-rule constants. None = use IRELAND_2026_OFFICIAL.
     tax_config: TaxConfig | None = None
     # Filing status override. None → auto (1 person → single, 2+ → married).
@@ -278,6 +308,10 @@ class YearRow:
     estate_transfers: dict[int, float] = field(default_factory=dict)
     asset_contributions: float = 0.0
     had_shortfall: bool = False
+    # Total taxable cash-equivalent of employer benefits-in-kind charged this
+    # year (notional pay: taxed but not received as cash, not a household
+    # expense). Reported separately so it doesn't double-count in cash gross.
+    benefits_in_kind_total: float = 0.0
     # Net worth minus assets locked to a person's pre-retirement pension wrappers
     # (prsa / occupational_pension / avc). ARF balances are always accessible since
     # they only exist post-retirement and are drawn down automatically. Property,
@@ -293,6 +327,14 @@ def _income_active(inc: IncomeInput, year: int) -> bool:
     if year < inc.start_year:
         return False
     if inc.end_year is not None and year > inc.end_year:
+        return False
+    return True
+
+
+def _benefit_active(b: BenefitInput, year: int) -> bool:
+    if year < b.start_year:
+        return False
+    if b.end_year is not None and year > b.end_year:
         return False
     return True
 
@@ -504,6 +546,11 @@ def _validate_plan_input(plan: PlanInput) -> None:
             _ensure_finite(adj.value, f"liability[{liability.id}].adjustment[{adj.id}].value")
     for g in plan.goals:
         _ensure_finite(g.target_amount, f"goal[{g.id}].target_amount")
+    for b in plan.benefits:
+        _ensure_finite(b.amount, f"benefit[{b.id}].amount")
+        _ensure_finite(b.omv, f"benefit[{b.id}].omv")
+        _ensure_finite(b.rate, f"benefit[{b.id}].rate")
+        _ensure_finite(b.escalation_rate, f"benefit[{b.id}].escalation_rate")
     a = plan.assumptions
     _ensure_finite(a.inflation_rate, "assumptions.inflation_rate")
     _ensure_finite(a.default_growth_rate, "assumptions.default_growth_rate")
@@ -765,6 +812,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         pension_lump_sum_tax_total = 0.0
         arf_drawdowns_total = 0.0
         state_pension_total = 0.0
+        benefits_in_kind_total = 0.0
 
         for person in plan.people:
             age = ages[person.id]
@@ -987,11 +1035,45 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                     income_by_kind.get("pension_taxable_cash", 0.0) + taxable_cash
                 )
 
+            # 3e-iii. Employer benefits-in-kind (notional pay). The cash
+            # equivalent of each active benefit is charged to IT/USC/PRSI but
+            # never received as cash and never paid by the household, so it
+            # raises tax without touching the cash flow. Medical-insurance BIK
+            # also entitles the employee to the 20% (capped) relief credit,
+            # because tax relief at source is not granted when the employer
+            # pays. BIK is employment-related, so it stops at retirement.
+            person_bik_total = 0.0
+            person_medical_relief = 0.0
+            if not is_retired_now:
+                for b in plan.benefits:
+                    if b.person_id != person.id or not _benefit_active(b, year):
+                        continue
+                    escalated = _escalate(b.amount, b.escalation_rate, year - b.start_year)
+                    ce = bik_ie.cash_equivalent(
+                        kind=b.kind,
+                        amount=escalated,
+                        omv=b.omv,
+                        rate=b.rate,
+                        loan_is_qualifying=b.loan_is_qualifying,
+                        tax_config=tax_config,
+                    )
+                    if ce <= 0:
+                        continue
+                    person_bik_total += ce
+                    if b.kind == "medical_insurance":
+                        person_medical_relief += bik_ie.medical_insurance_relief(
+                            ce, b.relief_adults, b.relief_children, tax_config
+                        )
+            benefits_in_kind_total += person_bik_total
+
             # 3f. Tax computation.
             pension_income = arf_drawdown + state_pension_amt + annuity_amt + taxable_cash
-            taxable_for_it = max(0.0, earned_for_it - pension_contribution) + pension_income
-            taxable_for_usc = max(0.0, earned_for_usc) + pension_income
-            taxable_for_prsi = earned_for_prsi  # ARF / annuity / state pension exempt
+            taxable_for_it = (
+                max(0.0, earned_for_it - pension_contribution) + pension_income + person_bik_total
+            )
+            taxable_for_usc = max(0.0, earned_for_usc) + pension_income + person_bik_total
+            # BIK is PRSI-able; ARF / annuity / state pension stay exempt.
+            taxable_for_prsi = earned_for_prsi + person_bik_total
 
             status = _filing_status_for_person(
                 person,
@@ -1003,6 +1085,8 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 year=year,
                 marriage_year=plan.marriage_year,
             )
+            if person_medical_relief > 0:
+                status = replace(status, medical_insurance_relief=person_medical_relief)
 
             it, _band = tax_ie.income_tax(taxable_for_it, status, tax_config)
             u = tax_ie.usc(taxable_for_usc, tax_config)
@@ -1020,7 +1104,13 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             # flow (it lands in the pension pot, not in spendable cash). Using
             # taxable_for_it as "gross" previously double-removed the pension —
             # once here and again in the cash flow.
-            true_gross = taxable_for_it + pension_contribution
+            #
+            # BIK inflated taxable_for_it for the tax computation, but it is
+            # notional pay (never received as cash). Strip it back out of the
+            # reported gross so net_income only loses the *tax* on the benefit,
+            # not the benefit value itself — the employer funds the benefit, so
+            # it never enters or leaves household cash.
+            true_gross = (taxable_for_it - person_bik_total) + pension_contribution
             person_rows.append(
                 PersonYear(
                     person_id=person.id,
@@ -1332,6 +1422,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 estate_transfers=estate_transfers_year,
                 asset_contributions=round(asset_contributions_total, 2),
                 had_shortfall=had_shortfall,
+                benefits_in_kind_total=round(benefits_in_kind_total, 2),
             )
         )
 

@@ -11,6 +11,7 @@ import {
 } from "../api/hooks";
 import { PeoplePane } from "./panes/PeoplePane";
 import { ChildrenPane } from "./panes/ChildrenPane";
+import { BenefitsPane } from "./panes/BenefitsPane";
 import { AssumptionsPane } from "./panes/AssumptionsPane";
 import { IncomePane } from "./panes/IncomePane";
 import { ExpensesPane } from "./panes/ExpensesPane";
@@ -135,6 +136,7 @@ export function PlanEditorPage() {
         <Route path="people" element={<PeoplePane planId={id} />} />
         <Route path="children" element={<ChildrenPane planId={id} />} />
         <Route path="income" element={<IncomePane planId={id} />} />
+        <Route path="benefits" element={<BenefitsPane planId={id} />} />
         <Route path="expenses" element={<ExpensesPane planId={id} />} />
         <Route path="assets" element={<AssetsPane planId={id} />} />
         <Route path="liabilities" element={<LiabilitiesPane planId={id} />} />
@@ -301,6 +303,7 @@ function TabNav({ planId }: { planId: number }) {
       <TabLink to={`/plans/${planId}/people`}>People</TabLink>
       <TabLink to={`/plans/${planId}/children`}>Children</TabLink>
       <TabLink to={`/plans/${planId}/income`}>Income</TabLink>
+      <TabLink to={`/plans/${planId}/benefits`}>Benefits</TabLink>
       <TabLink to={`/plans/${planId}/expenses`}>Expenses</TabLink>
       <TabLink to={`/plans/${planId}/assets`}>Assets</TabLink>
       <TabLink to={`/plans/${planId}/liabilities`}>Liabilities</TabLink>

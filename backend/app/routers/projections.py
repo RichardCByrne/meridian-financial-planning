@@ -12,6 +12,7 @@ from app.auth import get_current_user, require_plan_access
 from app.engine.simulator import (
     AssetInput,
     AssumptionsInput,
+    BenefitInput,
     BequestInput,
     ChildInput,
     ExpenseInput,
@@ -27,6 +28,7 @@ from app.engine import montecarlo as _mc
 from app.engine.tax_config import TaxConfig
 from app.models import (
     Assumptions,
+    Benefit,
     Bequest,
     Child,
     IncomeSource,
@@ -233,6 +235,27 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         )
         for c in children_raw
     ]
+    benefits_raw = list(
+        db.execute(select(Benefit).where(Benefit.plan_id == plan.id)).scalars()
+    )
+    benefits = [
+        BenefitInput(
+            id=b.id,
+            person_id=b.person_id,
+            kind=b.kind,
+            name=b.name,
+            start_year=b.start_year,
+            end_year=b.end_year,
+            escalation_rate=b.escalation_rate,
+            amount=b.amount,
+            omv=b.omv,
+            rate=b.rate,
+            loan_is_qualifying=b.loan_is_qualifying,
+            relief_adults=b.relief_adults,
+            relief_children=b.relief_children,
+        )
+        for b in benefits_raw
+    ]
     tax_config = _resolve_plan_tax_config(plan, db)
     return PlanInput(
         base_year=plan.base_year,
@@ -245,6 +268,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         goals=goals,
         bequests=bequests,
         children=children,
+        benefits=benefits,
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,

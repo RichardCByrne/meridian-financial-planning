@@ -87,6 +87,15 @@ IRELAND_2026_OFFICIAL = TaxConfig(
         ("B", 40_000.0),
         ("C", 20_000.0),
     ),
+
+    # ----- Benefit-in-kind (BIK) -----
+    medical_insurance_relief_rate=0.20,
+    medical_insurance_relief_cap_adult=1_000.0,
+    medical_insurance_relief_cap_child=500.0,
+    bik_company_car_default_rate=0.225,
+    bik_company_van_rate=0.08,
+    bik_preferential_loan_rate_qualifying=0.04,
+    bik_preferential_loan_rate_other=0.135,
 )
 
 

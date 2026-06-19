@@ -128,6 +128,7 @@ export interface IncomeSource {
   pays_usc: boolean;
   pension_contribution_pct: number;
   employer_pension_contribution_pct: number;
+  is_bonus: boolean;
 }
 
 export interface IncomeSourceCreate {
@@ -141,6 +142,7 @@ export interface IncomeSourceCreate {
   pays_usc?: boolean;
   pension_contribution_pct?: number;
   employer_pension_contribution_pct?: number;
+  is_bonus?: boolean;
 }
 
 export type IncomeSourceUpdate = Partial<IncomeSourceCreate>;

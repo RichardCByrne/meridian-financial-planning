@@ -63,8 +63,8 @@ function toPersonCreate(d: WizardState["people"][number]): PersonCreate {
   return rest;
 }
 function toIncomeCreate(d: WizardState["incomes"][number]): IncomeSourceCreate {
-  const { draftId: _i, personDraftId: _p, isBonus: _b, ...rest } = d;
-  return rest;
+  const { draftId: _i, personDraftId: _p, isBonus, ...rest } = d;
+  return { ...rest, is_bonus: isBonus ?? false };
 }
 function toAssetCreate(d: WizardState["assets"][number]): AssetCreate {
   const { draftId: _i, ownerPersonDraftId: _o, ...rest } = d;

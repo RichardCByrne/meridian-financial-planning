@@ -31,6 +31,29 @@ def _salary(pct: float = 0.0, gross: float = 80_000) -> IncomeInput:
     )
 
 
+def test_pension_contribution_not_double_counted_in_surplus():
+    """Regression: the pension contribution must reduce the surplus exactly once.
+
+    Previously `gross_income` was reported net of the contribution AND the cash
+    flow subtracted it again, understating the surplus by the contribution.
+    """
+    plan = PlanInput(
+        base_year=2026, projection_years=1,
+        people=[_employee()],
+        incomes=[_salary(pct=0.10, gross=100_000)],
+        expenses=[],
+        assets=[AssetInput(id=1, name="Cash", kind="cash", value=0.0, growth_rate=0.0, cost_basis=0.0)],
+        assumptions=AssumptionsInput(inflation_rate=0.0, default_growth_rate=0.0),
+    )
+    row = simulate(plan)[0]
+    # True gross is reported (not the IT-taxable base net of the contribution).
+    assert sum(pr.gross_income for pr in row.persons) == 100_000.0
+    assert row.pension_contributions == 10_000.0
+    # net_income is gross − tax (before the contribution is diverted); surplus is
+    # net minus the contribution (once) and expenses (zero here).
+    assert abs(row.surplus_or_shortfall - (row.net_income_total - 10_000.0)) < 0.01
+
+
 # --- Contributions reduce taxable income and grow the wrapper ----------------
 
 

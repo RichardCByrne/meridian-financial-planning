@@ -947,6 +947,11 @@ function YearDetailCard({
   if (!row) return null;
   const tax = row.total_tax;
   const taxRate = row.gross_income_total > 0 ? tax / row.gross_income_total : 0;
+  // Spendable income: gross − tax − the amounts diverted before you can spend
+  // them (your own pension contribution + regular investing). The income column
+  // walks gross → these deductions → this figure, and the money-out column
+  // starts from it — so pension/investing are shown once, on the income side.
+  const spendableNet = row.net_income_total - row.pension_contributions - row.asset_contributions;
   const fy = (v: number) => fmtMoney(deflate(v, row.year));
   const withdrawals = Object.entries(row.withdrawals_by_asset ?? {})
     .map(([id, v]) => ({ id: Number(id), amount: v }))
@@ -1035,6 +1040,9 @@ function YearDetailCard({
               muted
             />
           )}
+          {(row.pension_contributions > 0 || row.asset_contributions > 0) && (
+            <Row label="After tax" value={fy(row.net_income_total)} subtotal />
+          )}
           {row.pension_contributions > 0 && (
             <Row
               label="Pension contribution"
@@ -1049,7 +1057,7 @@ function YearDetailCard({
               muted
             />
           )}
-          <Row label="Net income" value={fy(row.net_income_total)} bold />
+          <Row label="Net income" value={fy(spendableNet)} bold />
           {row.pension_lump_sum > 0 && (
             <Row
               label={<JargonTerm term="LUMP_SUM">Retirement lump sum</JargonTerm>}
@@ -1099,38 +1107,25 @@ function YearDetailCard({
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Money out</h4>
-          <Row label="Net income" value={fy(row.net_income_total)} muted />
+          {/* Starts from spendable net income (pension + regular investing are
+              already taken off in the Income column), so each outflow is shown
+              once across the two columns. */}
+          <Row label="Net income" value={fy(spendableNet)} muted />
           {Object.entries(row.expenses_by_category).map(([cat, amt]) => (
             <Row key={cat} label={cat.replace(/_/g, " ")} value={`−${fy(amt)}`} />
           ))}
           <Row label="Total expenses" value={`−${fy(row.expenses_total)}`} subtotal />
-          {(row.pension_contributions > 0 ||
-            row.asset_contributions > 0 ||
-            row.investment_tax > 0) && (
-            <>
-              <h4 style={{ margin: "10px 0 4px 0", color: "#475569", fontSize: 13 }}>
-                Also funded this year
-              </h4>
-              {row.pension_contributions > 0 && (
-                <Row label="Pension contributions" value={`−${fy(row.pension_contributions)}`} muted />
-              )}
-              {row.asset_contributions > 0 && (
-                <Row label="Savings / investments" value={`−${fy(row.asset_contributions)}`} muted />
-              )}
-              {row.investment_tax > 0 && (
-                <Row label="Investment tax" value={`−${fy(row.investment_tax)}`} muted />
-              )}
-            </>
+          {row.investment_tax > 0 && (
+            <Row label="Investment tax" value={`−${fy(row.investment_tax)}`} muted />
           )}
           <Row
             label={
               <span>
                 Surplus / shortfall
                 <HelpTip>
-                  What's left of net income after expenses <em>and</em> every other committed
-                  outflow that year — your own pension contributions, regular savings into assets,
-                  and any ETF/pension-lump-sum tax. A negative figure is funded by drawing down
-                  assets (below).
+                  What's left of spendable income (after tax, your pension contribution and
+                  regular investing) once expenses and any ETF/CGT tax are paid. A negative
+                  figure is funded by drawing down assets (below).
                 </HelpTip>
               </span>
             }

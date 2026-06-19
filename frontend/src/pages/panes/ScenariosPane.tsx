@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useAssets,
   useAssumptions,
+  useBenefits,
   useCreateScenario,
   useDeleteScenario,
   useExpenses,
@@ -14,8 +15,10 @@ import {
   useUpdateScenario,
 } from "../../api/hooks";
 import type {
+  AddedBenefit,
   AddedExpense,
   AddedIncome,
+  BenefitKind,
   Expense,
   ExpenseCategory,
   IncomeKind,
@@ -73,6 +76,13 @@ const FIELDS: Record<Bucket, FieldDef[]> = {
     { name: "target_amount", label: "Target amount (€)", kind: "number" },
     { name: "target_year", label: "Target year", kind: "int" },
   ],
+  benefits: [
+    { name: "amount", label: "Value / premium (€)", kind: "number" },
+    { name: "rate", label: "BIK / loan rate", kind: "percent" },
+    { name: "escalation_rate", label: "Escalation rate", kind: "percent" },
+    { name: "start_year", label: "Start year", kind: "int" },
+    { name: "end_year", label: "End year", kind: "int" },
+  ],
   assumptions: [
     { name: "inflation_rate", label: "Inflation rate", kind: "percent" },
     { name: "default_growth_rate", label: "Default growth", kind: "percent" },
@@ -90,6 +100,7 @@ const BUCKET_LABELS: Record<Bucket, string> = {
   assets: "Asset",
   liabilities: "Liability",
   goals: "Goal",
+  benefits: "Benefit-in-kind",
   assumptions: "Assumptions",
 };
 
@@ -222,6 +233,7 @@ function ScenarioCard({
   const { data: assets } = useAssets(planId);
   const { data: liabilities } = useLiabilities(planId);
   const { data: goals } = useGoals(planId);
+  const { data: benefits } = useBenefits(planId);
   const { data: assumptions } = useAssumptions(planId);
   const { incomes } = useIncomeForPeople(people ?? []);
 
@@ -260,6 +272,11 @@ function ScenarioCard({
         return (liabilities ?? []).map((l) => ({ id: l.id, label: l.name }));
       case "goals":
         return (goals ?? []).map((g) => ({ id: g.id, label: g.name }));
+      case "benefits":
+        return (benefits ?? []).map((b) => ({
+          id: b.id,
+          label: `${b.name} (${people?.find((p) => p.id === b.person_id)?.name ?? "?"})`,
+        }));
       case "assumptions":
         return assumptions ? [{ id: 0, label: "Plan assumptions" }] : [];
     }
@@ -274,6 +291,7 @@ function ScenarioCard({
       assets,
       liabilities,
       goals,
+      benefits,
     } as Record<Bucket, unknown[] | undefined>)[bucket];
     const row = (list ?? []).find((r) => (r as { id: number }).id === id) as
       | Record<string, unknown>
@@ -358,6 +376,19 @@ function ScenarioCard({
     });
   };
 
+  const addBenefitAdded = (payload: AddedBenefit) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      const bucket = { ...((next.benefits ?? {}) as Record<string, unknown>) };
+      const list = Array.isArray(bucket._added) ? [...(bucket._added as unknown[])] : [];
+      list.push(payload);
+      bucket._added = list;
+      next.benefits = bucket as ScenarioOverrides["benefits"];
+      return next;
+    });
+  };
+
   const setMarriageYear = (year: number | null) => {
     setDirty(true);
     setOverrides((prev) => {
@@ -370,7 +401,8 @@ function ScenarioCard({
 
   const addedCount =
     ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
-    ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0);
+    ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0) +
+    ((overrides.benefits?._added as unknown[] | undefined)?.length ?? 0);
   const summaryParts: string[] = [];
   if (overrideRows.length) summaryParts.push(`${overrideRows.length} override${overrideRows.length === 1 ? "" : "s"}`);
   if (addedCount) summaryParts.push(`${addedCount} added`);
@@ -578,6 +610,20 @@ function ScenarioCard({
             return next;
           });
         }}
+        onAddBenefit={addBenefitAdded}
+        onRemoveAddedBenefit={(idx) => {
+          setDirty(true);
+          setOverrides((prev) => {
+            const next = { ...prev };
+            const bucket = { ...((next.benefits ?? {}) as Record<string, unknown>) };
+            const list = Array.isArray(bucket._added) ? [...(bucket._added as unknown[])] : [];
+            list.splice(idx, 1);
+            if (list.length === 0) delete bucket._added;
+            else bucket._added = list;
+            next.benefits = bucket as ScenarioOverrides["benefits"];
+            return next;
+          });
+        }}
       />
 
       )}
@@ -688,7 +734,7 @@ function ModeTabs({
   const tabs: { id: "override" | "step" | "added"; label: string; sub: string; count?: number }[] = [
     { id: "override", label: "Override a field", sub: "Change a value on something in your base plan", count: overrideCount },
     { id: "step", label: "Schedule a step change", sub: "End one income/expense, start another at year Y" },
-    { id: "added", label: "Add new income / expense", sub: "Promotion, wedding, inheritance — not in base plan", count: addedCount },
+    { id: "added", label: "Add income / expense / benefit", sub: "Promotion, wedding, inheritance, employer perk — not in base plan", count: addedCount },
   ];
   return (
     <div className="row" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -1009,6 +1055,8 @@ function AddedItemsSection({
   onRemoveAddedIncome,
   onAddExpense,
   onRemoveAddedExpense,
+  onAddBenefit,
+  onRemoveAddedBenefit,
 }: {
   overrides: ScenarioOverrides;
   people: Person[];
@@ -1016,11 +1064,15 @@ function AddedItemsSection({
   onRemoveAddedIncome: (idx: number) => void;
   onAddExpense: (payload: AddedExpense) => void;
   onRemoveAddedExpense: (idx: number) => void;
+  onAddBenefit: (payload: AddedBenefit) => void;
+  onRemoveAddedBenefit: (idx: number) => void;
 }) {
   const addedIncomes = (overrides.incomes?._added ?? []) as AddedIncome[];
   const addedExpenses = (overrides.expenses?._added ?? []) as AddedExpense[];
+  const addedBenefits = (overrides.benefits?._added ?? []) as AddedBenefit[];
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [showAddBenefit, setShowAddBenefit] = useState(false);
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -1028,17 +1080,21 @@ function AddedItemsSection({
         New entities added by this scenario
         <HelpTip>
           Use this to model events that don't exist in the base plan: a promotion (extra
-          income source from year X), a one-off cost like a wedding, an inheritance, or an
-          additional ongoing expense. The base plan stays untouched.
+          income source from year X), a one-off cost like a wedding, an inheritance, an
+          additional ongoing expense, or a new employer perk like medical insurance taxed as
+          benefit-in-kind. The base plan stays untouched.
         </HelpTip>
       </h4>
 
-      <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+      <div className="row" style={{ gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <button className="btn btn-secondary" onClick={() => setShowAddIncome((s) => !s)}>
           {showAddIncome ? "Cancel" : "+ Add income (e.g. promotion)"}
         </button>
         <button className="btn btn-secondary" onClick={() => setShowAddExpense((s) => !s)}>
           {showAddExpense ? "Cancel" : "+ Add expense (one-off or recurring)"}
+        </button>
+        <button className="btn btn-secondary" onClick={() => setShowAddBenefit((s) => !s)}>
+          {showAddBenefit ? "Cancel" : "+ Add benefit-in-kind"}
         </button>
       </div>
 
@@ -1059,16 +1115,27 @@ function AddedItemsSection({
           }}
         />
       )}
+      {showAddBenefit && (
+        <AddBenefitForm
+          people={people}
+          onSubmit={(payload) => {
+            onAddBenefit(payload);
+            setShowAddBenefit(false);
+          }}
+        />
+      )}
 
-      {(addedIncomes.length > 0 || addedExpenses.length > 0) && (
+      {(addedIncomes.length > 0 || addedExpenses.length > 0 || addedBenefits.length > 0) && (
         <div style={{ marginTop: 8 }}>
           <ResponsiveTable<
             | { kind: "income"; idx: number; row: AddedIncome }
             | { kind: "expense"; idx: number; row: AddedExpense }
+            | { kind: "benefit"; idx: number; row: AddedBenefit }
           >
             rows={[
               ...addedIncomes.map((row, idx) => ({ kind: "income" as const, idx, row })),
               ...addedExpenses.map((row, idx) => ({ kind: "expense" as const, idx, row })),
+              ...addedBenefits.map((row, idx) => ({ kind: "benefit" as const, idx, row })),
             ]}
             getKey={(r) => `${r.kind}-${r.idx}`}
             cardTitle={(r) => r.row.name}
@@ -1076,7 +1143,9 @@ function AddedItemsSection({
               {
                 header: "Type",
                 cell: (r) => (
-                  <span className="muted">{r.kind === "income" ? "Income" : "Expense"}</span>
+                  <span className="muted">
+                    {r.kind === "income" ? "Income" : r.kind === "expense" ? "Expense" : "Benefit"}
+                  </span>
                 ),
               },
               { header: "Name", cell: (r) => r.row.name, hideOnMobile: true },
@@ -1085,20 +1154,28 @@ function AddedItemsSection({
                 cell: (r) =>
                   r.kind === "income"
                     ? `€${Number(r.row.gross_amount).toLocaleString()}`
-                    : `€${Number(r.row.amount).toLocaleString()}`,
+                    : r.kind === "expense"
+                    ? `€${Number(r.row.amount).toLocaleString()}`
+                    : r.row.kind === "company_car" || r.row.kind === "company_van"
+                    ? r.row.omv
+                      ? `OMV €${Number(r.row.omv).toLocaleString()}`
+                      : `€${Number(r.row.amount ?? 0).toLocaleString()}`
+                    : `€${Number(r.row.amount ?? 0).toLocaleString()}`,
               },
               {
                 header: "Years",
                 cell: (r) =>
                   r.kind === "income"
                     ? `${r.row.start_year}${r.row.end_year ? `–${r.row.end_year}` : "+"}`
-                    : `${r.row.start_year}${
+                    : r.kind === "expense"
+                    ? `${r.row.start_year}${
                         r.row.category === "single_year"
                           ? " (one-off)"
                           : r.row.end_year
                           ? `–${r.row.end_year}`
                           : "+"
-                      }`,
+                      }`
+                    : `${r.row.start_year}${r.row.end_year ? `–${r.row.end_year}` : "+"}`,
               },
               {
                 header: "Detail",
@@ -1109,7 +1186,12 @@ function AddedItemsSection({
                           people.find((p) => p.id === r.row.person_id)?.name ??
                           `person ${r.row.person_id}`
                         }`
-                      : r.row.category}
+                      : r.kind === "expense"
+                      ? r.row.category
+                      : `${BENEFIT_KIND_LABELS[r.row.kind]} · ${
+                          people.find((p) => p.id === r.row.person_id)?.name ??
+                          `person ${r.row.person_id}`
+                        }`}
                   </span>
                 ),
               },
@@ -1120,7 +1202,9 @@ function AddedItemsSection({
                 onClick={() =>
                   r.kind === "income"
                     ? onRemoveAddedIncome(r.idx)
-                    : onRemoveAddedExpense(r.idx)
+                    : r.kind === "expense"
+                    ? onRemoveAddedExpense(r.idx)
+                    : onRemoveAddedBenefit(r.idx)
                 }
               >
                 Remove
@@ -1335,6 +1419,211 @@ function AddExpenseForm({ onSubmit }: { onSubmit: (payload: AddedExpense) => voi
             start_year: startYear,
             end_year: category === "single_year" ? null : endYear === "" ? null : endYear,
             escalation_rate: category === "single_year" ? 0 : escalation,
+          })
+        }
+      >
+        Add to scenario
+      </button>
+    </div>
+  );
+}
+
+const BENEFIT_KIND_LABELS: Record<BenefitKind, string> = {
+  medical_insurance: "Medical insurance",
+  company_car: "Company car",
+  company_van: "Company van",
+  preferential_loan: "Preferential loan",
+  other: "Other",
+};
+
+function AddBenefitForm({
+  people,
+  onSubmit,
+}: {
+  people: Person[];
+  onSubmit: (payload: AddedBenefit) => void;
+}) {
+  const [personId, setPersonId] = useState<number | null>(people[0]?.id ?? null);
+  const [name, setName] = useState("Employer health cover");
+  const [kind, setKind] = useState<BenefitKind>("medical_insurance");
+  const [amount, setAmount] = useState(2_000);
+  const [omv, setOmv] = useState(0);
+  const [rate, setRate] = useState(0);
+  const [startYear, setStartYear] = useState(new Date().getFullYear() + 1);
+  const [endYear, setEndYear] = useState<number | "">("");
+  const [escalation, setEscalation] = useState(0.03);
+  const [loanIsQualifying, setLoanIsQualifying] = useState(false);
+  const [reliefAdults, setReliefAdults] = useState(1);
+  const [reliefChildren, setReliefChildren] = useState(0);
+
+  if (personId === null) {
+    return (
+      <p className="muted" style={{ padding: 12 }}>
+        Add a person to the base plan first before adding a scenario benefit-in-kind.
+      </p>
+    );
+  }
+
+  const isCar = kind === "company_car";
+  const isVan = kind === "company_van";
+  const isLoan = kind === "preferential_loan";
+  const isMedical = kind === "medical_insurance";
+  const usesAmount = !isCar && !isVan;
+
+  return (
+    <div className="card" style={{ background: "#f8fafc" }}>
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <div className="field">
+          <label>Person</label>
+          <select value={personId} onChange={(e) => setPersonId(Number(e.target.value))}>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Kind</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as BenefitKind)}>
+            {(Object.entries(BENEFIT_KIND_LABELS) as [BenefitKind, string][]).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 180 }}>
+          <label>Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        {usesAmount && (
+          <div className="field">
+            <label>
+              {isLoan ? "Loan balance (€)" : isMedical ? "Annual premium (€)" : "Annual value (€)"}
+            </label>
+            <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+          </div>
+        )}
+        {(isCar || isVan) && (
+          <div className="field">
+            <label>
+              Original Market Value (€)
+              <HelpTip>List price when new. Cash equivalent = OMV × the BIK percentage.</HelpTip>
+            </label>
+            <input type="number" value={omv} onChange={(e) => setOmv(Number(e.target.value))} />
+          </div>
+        )}
+        {isCar && (
+          <div className="field">
+            <label>
+              BIK rate (%)
+              <HelpTip>Leave 0 to use the default mid-band. The 2023+ regime bands this by CO₂ and mileage.</HelpTip>
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              value={rate * 100}
+              onChange={(e) => setRate(Number(e.target.value) / 100)}
+            />
+          </div>
+        )}
+        {isLoan && (
+          <>
+            <div className="field">
+              <label>
+                Rate charged (%)
+                <HelpTip>The rate the employer charges. BIK = balance × (specified − this).</HelpTip>
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={rate * 100}
+                onChange={(e) => setRate(Number(e.target.value) / 100)}
+              />
+            </div>
+            <div className="field" style={{ alignSelf: "flex-end" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={loanIsQualifying}
+                  onChange={(e) => setLoanIsQualifying(e.target.checked)}
+                  style={{ width: "auto" }}
+                />
+                Qualifying home loan
+              </label>
+            </div>
+          </>
+        )}
+      </div>
+
+      {isMedical && (
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          <div className="field">
+            <label>
+              Adults covered
+              <HelpTip>Relief is 20% of the premium, capped at €1,000 per adult and €500 per child.</HelpTip>
+            </label>
+            <input
+              type="number"
+              value={reliefAdults}
+              onChange={(e) => setReliefAdults(Number(e.target.value))}
+            />
+          </div>
+          <div className="field">
+            <label>Children covered</label>
+            <input
+              type="number"
+              value={reliefChildren}
+              onChange={(e) => setReliefChildren(Number(e.target.value))}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <div className="field">
+          <label>Start year</label>
+          <input type="number" value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} />
+        </div>
+        <div className="field">
+          <label>End year (optional)</label>
+          <input
+            type="number"
+            value={endYear}
+            onChange={(e) => setEndYear(e.target.value === "" ? "" : Number(e.target.value))}
+          />
+        </div>
+        <div className="field">
+          <label>Escalation %</label>
+          <input
+            type="number"
+            step="0.5"
+            value={escalation * 100}
+            onChange={(e) => setEscalation(Number(e.target.value) / 100)}
+          />
+        </div>
+      </div>
+
+      <button
+        className="btn"
+        onClick={() =>
+          onSubmit({
+            person_id: personId,
+            kind,
+            name,
+            start_year: startYear,
+            end_year: endYear === "" ? null : endYear,
+            escalation_rate: escalation,
+            amount: usesAmount ? amount : 0,
+            omv: isCar || isVan ? omv : 0,
+            rate: isCar || isLoan ? rate : 0,
+            loan_is_qualifying: isLoan ? loanIsQualifying : false,
+            relief_adults: isMedical ? reliefAdults : 1,
+            relief_children: isMedical ? reliefChildren : 0,
           })
         }
       >

@@ -259,10 +259,22 @@ def _seed_official_tax_config() -> None:
         if rows:
             # Keep the oldest row, drop any duplicates from earlier crashed boots.
             keeper, *dupes = rows
-            for d in dupes:
-                db.delete(d)
-            keeper.config_json = IRELAND_2026_OFFICIAL.to_dict()
-            db.commit()
+            desired = IRELAND_2026_OFFICIAL.to_dict()
+            # Only write when something actually changed. Rewriting the row on
+            # every boot (the app cold-starts often on Cloud Run with
+            # min-instances=0) churns dead tuples + WAL that Neon retains in its
+            # history window — needless storage for a no-op. Compare via JSON so
+            # tuples (tax bands) match the lists round-tripped from the DB.
+            import json
+
+            same = json.dumps(keeper.config_json, sort_keys=True) == json.dumps(
+                desired, sort_keys=True
+            )
+            if dupes or not same:
+                for d in dupes:
+                    db.delete(d)
+                keeper.config_json = desired
+                db.commit()
             return
         db.add(
             TaxConfigRow(

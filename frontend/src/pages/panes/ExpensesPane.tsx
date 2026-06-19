@@ -21,7 +21,7 @@ const CATEGORIES: { value: ExpenseCategory; label: string; hint: string }[] = [
   {
     value: "basic",
     label: "Basic",
-    hint: "Essential recurring spend (food, utilities, mortgage). Runs from start year to end year.",
+    hint: "Essential recurring spend (food, utilities, insurance). Runs from start year to end year. Mortgages/loans go in Liabilities instead.",
   },
   {
     value: "discretionary",
@@ -144,7 +144,7 @@ export function ExpensesPane({ planId }: { planId: number }) {
         {data && data.length === 0 && (
           <EmptyState
             title="Add at least one basic expense."
-            hint="Without expenses the projection thinks you save 100% of net income — unrealistic. Start with a single 'Household running costs' line covering food, bills, and mortgage payments."
+            hint="Without expenses the projection thinks you save 100% of net income — unrealistic. Start with a single 'Household running costs' line covering food and bills. (Mortgage/loan repayments come from the Liabilities tab automatically.)"
           />
         )}
         {data && data.length > 0 && (

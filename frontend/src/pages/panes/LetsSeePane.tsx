@@ -996,7 +996,19 @@ function YearDetailCard({
           ))
         )}
       </div>
-      <div className="row" style={{ gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
+      {/* Fixed-height, internally-scrolling detail body. The income/expense/asset
+          columns have year-dependent conditional rows; pinning the height keeps
+          the card (and the page) from resizing as you hover across years. */}
+      <div
+        className="row"
+        style={{
+          gap: 32,
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          height: "clamp(260px, 40vh, 380px)",
+          overflowY: "auto",
+        }}
+      >
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Income</h4>
           <Row label="Gross income" value={fy(row.gross_income_total)} />
@@ -1170,15 +1182,29 @@ function YearDetailCard({
           )}
         </div>
       </div>
-      {row.notes.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          {row.notes.map((n, i) => (
+      {/* Fixed-height, scrollable notes region so a year's notes (death /
+          retirement warnings, varying in count) never resize the card. */}
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 8,
+          borderTop: "1px solid #f1f5f9",
+          height: 56,
+          overflowY: "auto",
+        }}
+      >
+        {row.notes.length > 0 ? (
+          row.notes.map((n, i) => (
             <p key={i} style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>
               ⚠ {n}
             </p>
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <p className="muted" style={{ fontSize: 13, margin: "4px 0" }}>
+            No notes for this year.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

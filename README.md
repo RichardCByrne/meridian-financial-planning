@@ -99,10 +99,11 @@ npm run build
 1. Create plan **Murphy household** — base year 2026, 30 years.
 2. **People** → `Liam`, DOB 1985-03-12, primary, retirement age 65.
 3. **Income** → on Liam, `Software engineer`, employment, €80,000, start 2026, 3% escalation, 10% pension contribution.
-4. **Expenses** → `Living` (basic, €24k, 2.5%), `Holidays` (discretionary, €5k, 2.5%), `Mortgage` (basic, €18k, 2026–2050).
-5. **Assets** → `Current account` (cash, €15,000), `Investment ETF` (etf_fund, €50,000, 6% growth).
-6. **Let's See** → switch chart modes, hover any year for the breakdown card, toggle **Probability bands** for the Monte Carlo fan.
-7. **Assumptions** → bump inflation to 3%, save → curve and expense bars react.
+4. **Expenses** → `Living` (basic, €24k, 2.5%), `Holidays` (discretionary, €5k, 2.5%).
+5. **Liabilities** → `Mortgage` (mortgage, €250k principal, 4%, 25-year term, start 2026). The engine amortises it and adds the repayment to your expenses automatically — don't also add a mortgage under Expenses.
+6. **Assets** → `Current account` (cash, €15,000), `Investment ETF` (etf_fund, €50,000, 6% growth).
+7. **Let's See** → switch chart modes, hover any year for the breakdown card, toggle **Probability bands** for the Monte Carlo fan.
+8. **Assumptions** → bump inflation to 3%, save → curve and expense bars react.
 
 ---
 

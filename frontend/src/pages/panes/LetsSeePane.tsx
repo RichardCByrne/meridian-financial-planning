@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -82,6 +82,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const tooltipTrigger = isMobile ? "click" : "hover";
   const [chart, setChart] = useState<ChartKind>("net_worth");
   const [hoverYear, setHoverYear] = useState<number | null>(null);
+  // A year the user has explicitly clicked to "pin". When set it overrides the
+  // hovered year for the guide line and detail card, and survives until the
+  // same year is clicked again or the user clicks outside the chart.
+  const [lockedYear, setLockedYear] = useState<number | null>(null);
+  const chartBoxRef = useRef<HTMLDivElement | null>(null);
   const [showEvents, setShowEvents] = useState(true);
   const [showMonteCarlo, setShowMonteCarlo] = useState(false);
   const [showLiquid, setShowLiquid] = useState<boolean>(() => {
@@ -182,6 +187,30 @@ export function LetsSeePane({ planId }: { planId: number }) {
   }, [data, mcData, series, deflate]);
 
   const lastYear = data?.years.at(-1)?.year ?? baseYear;
+
+  // The year whose guide line / chips are emphasised: a pinned (clicked) year
+  // wins over a transient hover.
+  const highlightYear = lockedYear ?? hoverYear;
+
+  // Click a year to pin it; click the same year again to unpin (back to
+  // default). Clicking a different year jumps the pin there.
+  const handleChartClick = (s: ChartMouseState) => {
+    const y = toYear(s?.activeLabel);
+    if (y === null) return;
+    setLockedYear((cur) => (cur === y ? null : y));
+  };
+
+  // Clicking anywhere outside the chart clears the pin, reverting to default.
+  useEffect(() => {
+    if (lockedYear === null) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (chartBoxRef.current && !chartBoxRef.current.contains(e.target as Node)) {
+        setLockedYear(null);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [lockedYear]);
 
   // Life-event markers overlaid on every chart: retirement, state pension,
   // goals, child births, first shortfall. All derived from already-loaded data.
@@ -293,7 +322,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const renderEvents = () =>
     showEvents
       ? eventLines.map((e) => {
-          const active = e.year === hoverYear;
+          const active = e.year === highlightYear;
           return (
             <ReferenceLine
               key={`ev-${e.year}`}
@@ -307,6 +336,19 @@ export function LetsSeePane({ planId }: { planId: number }) {
           );
         })
       : null;
+
+  // The pinned-year guide line. Only drawn while a year is locked; the default
+  // (unpinned) state shows no persistent line.
+  const renderLockedLine = () =>
+    lockedYear !== null ? (
+      <ReferenceLine
+        key="locked-year"
+        x={lockedYear}
+        stroke="#1d4ed8"
+        strokeWidth={2.5}
+        ifOverflow="extendDomain"
+      />
+    ) : null;
 
   if (isLoading)
     return (
@@ -341,8 +383,10 @@ export function LetsSeePane({ planId }: { planId: number }) {
     new Set(data.years.flatMap((y) => Object.keys(y.income_by_kind)))
   );
 
-  const defaultYearRow = pickDefaultYear(data.years, people ?? []);
-  const hovered: YearRow | undefined = data.years.find((y) => y.year === hoverYear) ?? defaultYearRow;
+  // Pinned year wins, then hover, then default to the final projection year.
+  const selectedYear = lockedYear ?? hoverYear ?? lastYear;
+  const hovered: YearRow | undefined =
+    data.years.find((y) => y.year === selectedYear) ?? data.years.at(-1);
 
   return (
     <div>
@@ -488,17 +532,18 @@ export function LetsSeePane({ planId }: { planId: number }) {
         />
 
         {goals && goals.length > 0 && (
-          <GoalStrip goals={goals} years={data.years} hoverYear={hoverYear} />
+          <GoalStrip goals={goals} years={data.years} hoverYear={highlightYear} />
         )}
 
         {showEvents && events.some((e) => e.source === "event") && (
           <EventLegend
             events={events.filter((e) => e.source === "event")}
-            hoverYear={hoverYear}
+            hoverYear={highlightYear}
           />
         )}
 
         <div
+          ref={chartBoxRef}
           style={{
             // Fluid chart height: never below 240px, never above 380px, tracks
             // viewport so tablet portrait isn't stuck on the mobile value.
@@ -512,6 +557,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <ComposedChart
                   data={mcSeries}
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
+                  onClick={handleChartClick}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   {renderShortfall()}
@@ -523,6 +569,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     labelFormatter={(l) => `Year ${l}`}
                   />
                   {renderEvents()}
+                  {renderLockedLine()}
                   <Legend />
                   {/* Fan band: transparent base offset + stacked delta layers */}
                   <Area type="monotone" dataKey="band_base" stackId="mc"
@@ -548,6 +595,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <AreaChart
                   data={series}
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
+                  onClick={handleChartClick}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   {renderShortfall()}
@@ -574,12 +622,14 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     />
                   )}
                   {renderEvents()}
+                  {renderLockedLine()}
                 </AreaChart>
               )
             ) : chart === "cash_flow" ? (
               <ComposedChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
+                onClick={handleChartClick}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -598,11 +648,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   dot={false}
                 />
                 {renderEvents()}
+                {renderLockedLine()}
               </ComposedChart>
             ) : chart === "income_vs_expenses" ? (
               <ComposedChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
+                onClick={handleChartClick}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -637,11 +689,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   name="Need (expenses + tax + savings)"
                 />
                 {renderEvents()}
+                {renderLockedLine()}
               </ComposedChart>
             ) : (
               <BarChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
+                onClick={handleChartClick}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -654,6 +708,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <Bar dataKey="prsi" stackId="t" fill={TAX_COLORS.prsi} name="PRSI" />
                 <Bar dataKey="investment_tax" stackId="t" fill="#f59e0b" name="Investment tax (CGT/ETF)" />
                 {renderEvents()}
+                {renderLockedLine()}
               </BarChart>
             )}
           </ResponsiveContainer>
@@ -671,22 +726,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
       />
     </div>
   );
-}
-
-function pickDefaultYear(years: YearRow[], people: { retirement_age: number | null; dob: string }[]): YearRow | undefined {
-  if (years.length === 0) return undefined;
-  const shortfall = years.find((y) => y.surplus_or_shortfall < 0);
-  if (shortfall) return shortfall;
-  const retYears = people
-    .filter((p) => p.retirement_age != null)
-    .map((p) => new Date(p.dob).getFullYear() + (p.retirement_age as number))
-    .filter((y) => Number.isFinite(y));
-  if (retYears.length > 0) {
-    const target = Math.min(...retYears);
-    const hit = years.find((y) => y.year >= target);
-    if (hit) return hit;
-  }
-  return years[0];
 }
 
 function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: number | null }) {
@@ -707,7 +746,7 @@ function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: n
       >
         Timeline events
         <span style={{ textTransform: "none", marginLeft: 6, opacity: 0.7 }}>
-          — hover the chart to highlight a year
+          — hover to preview a year, click to pin it
         </span>
       </div>
       {events.map((e, i) => {

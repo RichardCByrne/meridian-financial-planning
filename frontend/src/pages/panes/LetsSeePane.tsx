@@ -996,7 +996,19 @@ function YearDetailCard({
           ))
         )}
       </div>
-      <div className="row" style={{ gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
+      {/* Fixed-height, internally-scrolling detail body. The income/expense/asset
+          columns have year-dependent conditional rows; pinning the height keeps
+          the card (and the page) from resizing as you hover across years. */}
+      <div
+        className="row"
+        style={{
+          gap: 32,
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          height: "clamp(260px, 40vh, 380px)",
+          overflowY: "auto",
+        }}
+      >
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Income</h4>
           <Row label="Gross income" value={fy(row.gross_income_total)} />

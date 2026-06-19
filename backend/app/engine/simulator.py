@@ -1176,17 +1176,21 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         # ----- 5. Cash flow -----
         # net_income is take-home (true gross − tax) BEFORE the pension
         # contribution is diverted, so the contribution is subtracted exactly
-        # once here — it leaves spendable cash for the pension pot. Lump sum tax
-        # is a separate one-shot bill.
+        # once here — it leaves spendable cash for the pension pot.
+        #
+        # The pension lump-sum tax is NOT subtracted here: the crystallisation
+        # already credits cash with the lump sum NET of its tax (net_lump_sum
+        # above), so charging it again would double-count it.
         cash_flow = (
             net_income
             - expenses_total
             - deemed_tax
-            - pension_lump_sum_tax_total
             - pension_contributions_total
             - asset_contributions_total
         )
-        investment_tax = deemed_tax + pension_lump_sum_tax_total
+        # Reported separately for the card; CGT/ETF exit tax only. The pension
+        # lump-sum tax is surfaced via pension_lump_sum_tax + the retirement note.
+        investment_tax = deemed_tax
         realised_gains = 0.0
 
         # ----- 6. Apply surplus / shortfall -----

@@ -54,6 +54,37 @@ def test_pension_contribution_not_double_counted_in_surplus():
     assert abs(row.surplus_or_shortfall - (row.net_income_total - 10_000.0)) < 0.01
 
 
+def test_lump_sum_tax_not_double_counted():
+    """Regression: the pension lump-sum tax must hit net worth once.
+
+    Crystallisation credits cash with the lump sum NET of its tax; the cash flow
+    must NOT subtract the same tax again. With no expenses/contributions the
+    retirement-year surplus equals net income (the lump-sum tax is not in it).
+    """
+    person = PersonInput(
+        id=1, name="Mara", dob=date(1962, 1, 1), is_primary=True,
+        life_expectancy=95, retirement_age=65, lump_sum_pct=0.25, pension_option="arf",
+    )
+    plan = PlanInput(
+        base_year=2026, projection_years=2,
+        people=[person], incomes=[], expenses=[],
+        assets=[
+            AssetInput(id=1, name="PRSA", kind="prsa", value=1_000_000, growth_rate=0.0, cost_basis=0.0, owner_person_id=1),
+            AssetInput(id=2, name="Cash", kind="cash", value=0.0, growth_rate=0.0, cost_basis=0.0),
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0, default_growth_rate=0.0),
+    )
+    rows = simulate(plan)
+    retire = rows[1]  # 2027, age 65
+    assert abs(retire.pension_lump_sum_tax - 10_000) < 1  # €250k lump, €50k over €200k @ 20%
+    # Lump-sum tax is no longer folded into the cash-flow surplus.
+    assert abs(retire.surplus_or_shortfall - retire.net_income_total) < 0.01
+    # Net worth fell by exactly the lump tax + the ARF-drawdown income tax, not 2×.
+    drawdown_tax = retire.arf_drawdowns - retire.net_income_total
+    expected_nw = 1_000_000 - retire.pension_lump_sum_tax - drawdown_tax
+    assert abs(retire.net_worth - expected_nw) < 1.0
+
+
 # --- Contributions reduce taxable income and grow the wrapper ----------------
 
 

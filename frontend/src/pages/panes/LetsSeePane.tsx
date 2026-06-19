@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   ComposedChart,
+  Label,
   Legend,
   Line,
   ReferenceArea,
@@ -248,10 +249,22 @@ export function LetsSeePane({ planId }: { planId: number }) {
             key={`ev-${i}`}
             x={e.year}
             stroke={e.color}
-            strokeDasharray="3 3"
-            strokeOpacity={0.6}
-            label={{ value: e.label, position: "top", fontSize: 10, fill: e.color }}
-          />
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            strokeOpacity={0.9}
+            ifOverflow="extendDomain"
+          >
+            {/* Vertical label inside the plot, anchored at the bottom where the
+                net-worth/bar charts are usually least busy (recharts v3 drops
+                object labels positioned "top", clipping them above the plot). */}
+            <Label
+              value={e.label}
+              position="insideBottomLeft"
+              angle={-90}
+              fontSize={10}
+              fill={e.color}
+            />
+          </ReferenceLine>
         ))
       : null;
 

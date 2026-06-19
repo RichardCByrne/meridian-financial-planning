@@ -71,14 +71,18 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
         ],
         "assets": [
             {
-                **_strip_ids(_columns(a), drop=["id", "plan_id", "owner_person_id"]),
+                **_strip_ids(
+                    _columns(a), drop=["id", "plan_id", "owner_person_id", "linked_liability_id"]
+                ),
                 "_owner_local_id": a.owner_person_id,
+                "_linked_liability_local_id": a.linked_liability_id,
             }
             for a in plan.assets
         ],
         "liabilities": [
             {
                 **_strip_ids(_columns(li), drop=["id", "plan_id"]),
+                "_local_id": li.id,
                 "adjustments": [
                     _strip_ids(_columns(adj), drop=["id", "liability_id"])
                     for adj in li.adjustments
@@ -155,16 +159,32 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
     for e_payload in payload.get("expenses", []):
         db.add(Expense(**e_payload, plan_id=plan.id))
 
-    for a_payload in payload.get("assets", []):
-        owner_local = a_payload.pop("_owner_local_id", None)
-        owner_id = person_id_map.get(owner_local) if owner_local is not None else None
-        db.add(Asset(**a_payload, plan_id=plan.id, owner_person_id=owner_id))
-
+    # Liabilities before assets so an asset can resolve its linked mortgage
+    # (Phase 2 property transactions) to the freshly-minted liability id.
+    liability_id_map: dict[int, int] = {}
     for li_payload in payload.get("liabilities", []):
+        li_local_id = li_payload.pop("_local_id", None)
         adj_payloads = li_payload.pop("adjustments", [])
         liability = Liability(**li_payload, plan_id=plan.id)
         liability.adjustments = [LiabilityAdjustment(**a) for a in adj_payloads]
         db.add(liability)
+        db.flush()  # populate liability.id
+        if li_local_id is not None:
+            liability_id_map[li_local_id] = liability.id
+
+    for a_payload in payload.get("assets", []):
+        owner_local = a_payload.pop("_owner_local_id", None)
+        owner_id = person_id_map.get(owner_local) if owner_local is not None else None
+        linked_local = a_payload.pop("_linked_liability_local_id", None)
+        linked_id = liability_id_map.get(linked_local) if linked_local is not None else None
+        db.add(
+            Asset(
+                **a_payload,
+                plan_id=plan.id,
+                owner_person_id=owner_id,
+                linked_liability_id=linked_id,
+            )
+        )
 
     for g_payload in payload.get("goals", []):
         linked_local = g_payload.pop("_linked_person_local_id", None)

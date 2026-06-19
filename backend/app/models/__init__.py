@@ -266,6 +266,14 @@ class Asset(Base):
     purchase_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deposit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     disposal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Phase 2: the mortgage financing this property (settled on a planned sale)
+    # and transaction-cost percentages (stamp duty on purchase, agent/legal fees
+    # on sale).
+    linked_liability_id: Mapped[int | None] = mapped_column(
+        ForeignKey("liabilities.id", ondelete="SET NULL"), nullable=True
+    )
+    stamp_duty_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    selling_cost_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="assets")
 

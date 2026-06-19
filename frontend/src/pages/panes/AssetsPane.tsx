@@ -4,10 +4,11 @@ import {
   useAssets,
   useCreateAsset,
   useDeleteAsset,
+  useLiabilities,
   usePeople,
   useUpdateAsset,
 } from "../../api/hooks";
-import type { Asset, AssetKind } from "../../api/types";
+import type { Asset, AssetKind, Liability } from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { EmptyState } from "../../components/EmptyState";
 import { JargonTerm } from "../../components/JargonTerm";
@@ -91,6 +92,9 @@ type FormState = {
   purchase_year: number | "";
   deposit: number;
   disposal_year: number | "";
+  linked_liability_id: number | null;
+  stamp_duty_pct: number;
+  selling_cost_pct: number;
 };
 
 const blankForm: FormState = {
@@ -111,6 +115,9 @@ const blankForm: FormState = {
   purchase_year: "",
   deposit: 0,
   disposal_year: "",
+  linked_liability_id: null,
+  stamp_duty_pct: 0,
+  selling_cost_pct: 0,
 };
 
 function inferContribMode(a: Asset): ContribMode {
@@ -150,12 +157,16 @@ function fromAsset(a: Asset): FormState {
     purchase_year: a.purchase_year ?? "",
     deposit: a.deposit ?? 0,
     disposal_year: a.disposal_year ?? "",
+    linked_liability_id: a.linked_liability_id ?? null,
+    stamp_duty_pct: a.stamp_duty_pct ?? 0,
+    selling_cost_pct: a.selling_cost_pct ?? 0,
   };
 }
 
 export function AssetsPane({ planId }: { planId: number }) {
   const { data, isLoading } = useAssets(planId);
   const { data: people } = usePeople(planId);
+  const { data: liabilities } = useLiabilities(planId);
   const create = useCreateAsset(planId);
   const update = useUpdateAsset(planId);
   const del = useDeleteAsset(planId);
@@ -192,6 +203,9 @@ export function AssetsPane({ planId }: { planId: number }) {
             purchase_year: a.purchase_year,
             deposit: a.deposit,
             disposal_year: a.disposal_year,
+            linked_liability_id: a.linked_liability_id,
+            stamp_duty_pct: a.stamp_duty_pct,
+            selling_cost_pct: a.selling_cost_pct,
           });
         },
       },
@@ -232,6 +246,10 @@ export function AssetsPane({ planId }: { planId: number }) {
     purchase_year: f.purchase_year === "" ? null : f.purchase_year,
     deposit: f.purchase_year === "" ? 0 : Math.max(0, f.deposit),
     disposal_year: f.disposal_year === "" ? null : f.disposal_year,
+    // Link/cost only meaningful for a property with a planned sale.
+    linked_liability_id: f.disposal_year === "" ? null : f.linked_liability_id,
+    stamp_duty_pct: f.purchase_year === "" ? 0 : Math.max(0, f.stamp_duty_pct),
+    selling_cost_pct: f.disposal_year === "" ? 0 : Math.max(0, f.selling_cost_pct),
   });
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -258,6 +276,7 @@ export function AssetsPane({ planId }: { planId: number }) {
             setForm={setForm}
             onKindChange={(k) => onKindChange(k, form, setForm)}
             people={people ?? []}
+            liabilities={liabilities ?? []}
           />
           <button
             type="submit"
@@ -373,6 +392,7 @@ export function AssetsPane({ planId }: { planId: number }) {
           setForm={setEditForm}
           onKindChange={(k) => onKindChange(k, editForm, setEditForm)}
           people={people ?? []}
+          liabilities={liabilities ?? []}
         />
       </EditModal>
     </div>
@@ -384,11 +404,13 @@ function FormFields({
   setForm,
   onKindChange,
   people,
+  liabilities,
 }: {
   form: FormState;
   setForm: (f: FormState) => void;
   onKindChange: (kind: AssetKind) => void;
   people: { id: number; name: string }[];
+  liabilities: Liability[];
 }) {
   const meta = KINDS.find((k) => k.value === form.kind);
   const ownerRequired = PENSION_KINDS.includes(form.kind);
@@ -652,27 +674,45 @@ function FormFields({
               />
             </div>
             {form.purchase_year !== "" && (
-              <div className="field" style={{ flex: 1, minWidth: 120 }}>
-                <label>
-                  Deposit (€)
-                  <HelpTip>
-                    Cash paid from your savings on purchase. The remainder of the Value is assumed
-                    financed by a mortgage you add separately.
-                  </HelpTip>
-                </label>
-                <NumericInput
-                  value={form.deposit}
-                  onChange={(v) => Number.isFinite(v) && setForm({ ...form, deposit: Math.max(0, v) })}
-                />
-              </div>
+              <>
+                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                  <label>
+                    Deposit (€)
+                    <HelpTip>
+                      Cash paid from your savings on purchase. The remainder of the Value is assumed
+                      financed by a mortgage you add separately.
+                    </HelpTip>
+                  </label>
+                  <NumericInput
+                    value={form.deposit}
+                    onChange={(v) => Number.isFinite(v) && setForm({ ...form, deposit: Math.max(0, v) })}
+                  />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                  <label>
+                    Stamp duty %
+                    <HelpTip>
+                      Stamp duty paid from cash on purchase, as a % of the price. Irish residential:
+                      1% up to €1m, 2% above; non-residential 7.5%. Leave 0 to skip.
+                    </HelpTip>
+                  </label>
+                  <NumericInput
+                    value={form.stamp_duty_pct * 100}
+                    onChange={(v) =>
+                      Number.isFinite(v) && setForm({ ...form, stamp_duty_pct: Math.max(0, v) / 100 })
+                    }
+                  />
+                </div>
+              </>
             )}
             <div className="field" style={{ flex: 1, minWidth: 120 }}>
               <label>
                 Sell in year
                 <HelpTip>
                   Set a year to deliberately sell the whole asset: the proceeds land in your cash
-                  that year (a primary residence is CGT-exempt; ETFs/investments pay disposal tax).
-                  Selling the old home and buying a new one in the same year models moving house.
+                  that year (a primary residence is CGT-exempt; a buy-to-let pays CGT on the gain;
+                  ETFs/investments pay disposal tax). Selling the old home and buying a new one in
+                  the same year models moving house.
                 </HelpTip>
               </label>
               <NumericInput
@@ -682,6 +722,49 @@ function FormFields({
                 onChange={(v) => setForm({ ...form, disposal_year: Number.isFinite(v) ? v : "" })}
               />
             </div>
+            {form.disposal_year !== "" && (
+              <>
+                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                  <label>
+                    Selling costs %
+                    <HelpTip>
+                      Agent + legal fees taken off the sale proceeds, as a % of the sale price.
+                    </HelpTip>
+                  </label>
+                  <NumericInput
+                    value={form.selling_cost_pct * 100}
+                    onChange={(v) =>
+                      Number.isFinite(v) && setForm({ ...form, selling_cost_pct: Math.max(0, v) / 100 })
+                    }
+                  />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 160 }}>
+                  <label>
+                    Clears mortgage
+                    <HelpTip>
+                      The mortgage this property financed. On sale its outstanding balance is repaid
+                      from the proceeds and its amortisation stops.
+                    </HelpTip>
+                  </label>
+                  <select
+                    value={form.linked_liability_id ?? ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        linked_liability_id: e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value="">None</option>
+                    {liabilities.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         </details>
       )}

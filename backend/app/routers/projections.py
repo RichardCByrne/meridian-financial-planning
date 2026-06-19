@@ -158,6 +158,9 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             purchase_year=a.purchase_year,
             deposit=a.deposit,
             disposal_year=a.disposal_year,
+            linked_liability_id=a.linked_liability_id,
+            stamp_duty_pct=a.stamp_duty_pct,
+            selling_cost_pct=a.selling_cost_pct,
         )
         for a in plan.assets
     ]

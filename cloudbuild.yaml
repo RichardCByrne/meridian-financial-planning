@@ -1,5 +1,5 @@
-# Google Cloud Build pipeline: build the backend Docker image, push it to
-# Artifact Registry, deploy to Cloud Run.
+# Google Cloud Build pipeline: build the backend image (with registry layer
+# caching), then deploy to Cloud Run.
 #
 # Required substitutions (set via gcloud or Cloud Build trigger):
 #   _REGION                — e.g. europe-west1
@@ -12,26 +12,26 @@
 #   ALLOWED_ORIGINS                — comma-separated list of frontend origins
 
 steps:
-  # 1. Build the image (cached layers from prior builds via --cache-from).
-  - name: gcr.io/cloud-builders/docker
+  # 1. Build + push with Kaniko, which caches every layer (including the
+  #    multi-stage builder's pip-install layer) in Artifact Registry. The deps
+  #    layer is keyed only on pyproject.toml, so an app-code-only change — the
+  #    common case — reuses the cached install and skips pip entirely. This is
+  #    the bulk of the cold-build time (fastapi / sqlalchemy / psycopg /
+  #    firebase-admin → grpcio / cryptography / pydantic-core).
+  - name: gcr.io/kaniko-project/executor:latest
     id: build
     args:
-      - build
-      - --tag
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
-      - --tag
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
-      - backend
+      - --destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+      - --destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - --context=dir:///workspace/backend
+      - --dockerfile=Dockerfile
+      - --cache=true
+      - --cache-repo=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}/cache
+      - --cache-ttl=336h
 
-  # 2. Push both tags.
-  - name: gcr.io/cloud-builders/docker
-    id: push
-    args:
-      - push
-      - --all-tags
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
-
-  # 3. Deploy to Cloud Run with secrets mounted (Neon Postgres via plain TCP/TLS).
+  # 2. Deploy to Cloud Run with secrets mounted (Neon Postgres via plain TCP/TLS).
+  #    --cpu-boost gives the cold-start container extra CPU so `alembic upgrade`
+  #    + uvicorn import finish faster and the revision goes healthy sooner.
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: deploy
     entrypoint: gcloud
@@ -48,12 +48,9 @@ steps:
       - --set-secrets=/secrets/firebase.json=FIREBASE_SERVICE_ACCOUNT_JSON:latest
       - --cpu=1
       - --memory=512Mi
+      - --cpu-boost
       - --max-instances=4
       - --min-instances=0
-
-images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
 
 substitutions:
   _REGION: europe-west1
@@ -62,3 +59,5 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  # Faster cold builds (more CPU for pip on the rare dep-change build).
+  machineType: E2_HIGHCPU_8

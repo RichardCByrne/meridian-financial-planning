@@ -218,7 +218,7 @@ foreach ($r in @("roles/run.admin", "roles/iam.serviceAccountUser", "roles/artif
 
 ## 6. Deploy the backend
 
-The pipeline is described in `cloudbuild.yaml`: build → push → `gcloud run deploy` with secrets mounted. The committed file is already wired for Neon (no `--add-cloudsql-instances` flag). If you later switch to Cloud SQL, see Appendix A for the one-line restore.
+The pipeline is described in `cloudbuild.yaml`: a Kaniko build-and-push (with Artifact Registry layer caching) → `gcloud run deploy` with secrets mounted. Kaniko caches every image layer — including the multi-stage pip-install layer, keyed only on `pyproject.toml` — in a `<image>/cache` repo, so an app-code-only deploy reuses the cached dependencies and skips `pip install` entirely. The first build after this change is cold (it populates the cache); subsequent app-only deploys are markedly faster. The committed file is already wired for Neon (no `--add-cloudsql-instances` flag). If you later switch to Cloud SQL, see Appendix A for the one-line restore.
 
 Run the build:
 

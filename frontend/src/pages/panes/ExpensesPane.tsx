@@ -139,7 +139,13 @@ export function ExpensesPane({ planId }: { planId: number }) {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Expenses</h3>
+        <div
+          className="row"
+          style={{ marginTop: 0, marginBottom: 8, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
+        >
+          <h3 style={{ margin: 0 }}>Expenses</h3>
+          {data && data.length > 0 && <ExpensesTotal rows={data} />}
+        </div>
         {isLoading && <TableSkeleton rows={3} />}
         {data && data.length === 0 && (
           <EmptyState
@@ -221,6 +227,28 @@ export function ExpensesPane({ planId }: { planId: number }) {
       >
         <FormFields form={editForm} setForm={setEditForm} />
       </EditModal>
+    </div>
+  );
+}
+
+function ExpensesTotal({ rows }: { rows: Expense[] }) {
+  // Recurring spend (basic / discretionary / legacy) sums into an annual figure;
+  // single-year lines are one-off costs, so they're surfaced separately rather
+  // than folded into the per-year total.
+  const recurring = rows.filter((e) => e.category !== "single_year");
+  const oneOffs = rows.filter((e) => e.category === "single_year");
+  const annual = recurring.reduce((sum, e) => sum + e.amount, 0);
+  const oneOffTotal = oneOffs.reduce((sum, e) => sum + e.amount, 0);
+  return (
+    <div className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+      <span>
+        Total annual: <strong style={{ color: "#0f172a" }}>{fmtMoney(annual)}</strong> / yr
+      </span>
+      {oneOffs.length > 0 && (
+        <span style={{ marginLeft: 12 }}>
+          + {fmtMoney(oneOffTotal)} one-off
+        </span>
+      )}
     </div>
   );
 }

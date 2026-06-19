@@ -18,6 +18,8 @@ Shape:
       "expenses":    {"<id>": {"amount": 30000, ...},
                       "_added": [{"name": "Wedding", "category": "single_year",
                                   "amount": 20000, "start_year": 2029}]},
+      "children":    {"<id>": {"active": false},   # drop a child from this scenario
+                      "_added": [{"name": "Third child", "dob": "2028-01-01"}]},
       ...
       "assumptions": {"inflation_rate": 0.03, ...},
       "filing_status": "married",   # plan-level scalar override (optional)
@@ -35,9 +37,16 @@ want a stale override to 500 the projection.
 """
 
 from dataclasses import fields as dataclass_fields, replace
+from datetime import date
 from typing import Any
 
-from app.engine.simulator import BenefitInput, ExpenseInput, IncomeInput, PlanInput
+from app.engine.simulator import (
+    BenefitInput,
+    ChildInput,
+    ExpenseInput,
+    IncomeInput,
+    PlanInput,
+)
 
 _BUCKETS: tuple[str, ...] = (
     "people",
@@ -47,6 +56,7 @@ _BUCKETS: tuple[str, ...] = (
     "liabilities",
     "goals",
     "benefits",
+    "children",
 )
 
 
@@ -124,10 +134,26 @@ def _build_added_benefit(payload: dict[str, Any], synthetic_id: int) -> BenefitI
         return None
 
 
+def _build_added_child(payload: dict[str, Any], synthetic_id: int) -> ChildInput | None:
+    try:
+        dob_raw = payload["dob"]
+        dob = dob_raw if isinstance(dob_raw, date) else date.fromisoformat(str(dob_raw))
+        carer = payload.get("primary_carer_id")
+        return ChildInput(
+            id=synthetic_id,
+            name=str(payload.get("name", "Added child")),
+            dob=dob,
+            primary_carer_id=int(carer) if carer not in (None, "") else None,
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 _ADDED_BUILDERS = {
     "incomes": _build_added_income,
     "expenses": _build_added_expense,
     "benefits": _build_added_benefit,
+    "children": _build_added_child,
 }
 
 
@@ -188,6 +214,7 @@ def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanIn
         liabilities=new_lists["liabilities"],
         goals=new_lists["goals"],
         benefits=new_lists["benefits"],
+        children=new_lists["children"],
         assumptions=new_assumptions,
         **plan_scalars,
     )

@@ -220,6 +220,11 @@ class ChildInput:
     # Person who receives the Child Benefit payment (typically the primary
     # carer). None = pay to the plan's primary person.
     primary_carer_id: int | None = None
+    # Whether this child is counted in the projection. Always True for base-plan
+    # children; a scenario can flip it to False to model a smaller family
+    # (Child Benefit and any future child-driven costs are skipped). Not
+    # persisted on the ORM Child row — it only exists as a scenario override.
+    active: bool = True
 
 
 @dataclass
@@ -1136,6 +1141,8 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         # household gross + net income; no IT / USC / PRSI charge.
         child_benefit_total = 0.0
         for child in plan.children:
+            if not child.active:
+                continue
             child_age = year - child.dob.year
             if 0 <= child_age < tax_config.child_benefit_age_limit:
                 annual = _escalate(

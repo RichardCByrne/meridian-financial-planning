@@ -18,7 +18,7 @@ steps:
   #    common case — reuses the cached install and skips pip entirely. This is
   #    the bulk of the cold-build time (fastapi / sqlalchemy / psycopg /
   #    firebase-admin → grpcio / cryptography / pydantic-core).
-  - name: gcr.io/kaniko-project/executor:latest
+  - name: gcr.io/kaniko-project/executor:v1.23.2
     id: build
     args:
       - --destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

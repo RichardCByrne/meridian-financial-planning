@@ -125,6 +125,15 @@ class AssetInput:
     purchase_year: int | None = None
     deposit: float = 0.0
     disposal_year: int | None = None
+    # Phase 2. `linked_liability_id` ties this asset to the mortgage financing it
+    # — a planned disposal settles that liability's outstanding balance out of the
+    # sale proceeds and stops its amortisation. `stamp_duty_pct` is charged on the
+    # purchase price (paid from cash on purchase); `selling_cost_pct` (agent/legal
+    # fees) is taken off the sale proceeds. BTL disposals also attract CGT on the
+    # gain net of selling costs; a primary residence stays CGT-exempt.
+    linked_liability_id: int | None = None
+    stamp_duty_pct: float = 0.0
+    selling_cost_pct: float = 0.0
 
 
 @dataclass
@@ -443,6 +452,10 @@ class AssetState:
     deposit: float = 0.0
     disposal_year: int | None = None
     sold: bool = False
+    # Phase 2 transaction costs / mortgage link.
+    linked_liability_id: int | None = None
+    stamp_duty_pct: float = 0.0
+    selling_cost_pct: float = 0.0
 
 
 def _retirement_age_for(person: PersonInput, default: int) -> int:
@@ -480,6 +493,8 @@ def _validate_plan_input(plan: PlanInput) -> None:
         _ensure_finite(a.cost_basis, f"asset[{a.id}].cost_basis")
         _ensure_finite(a.annual_contribution, f"asset[{a.id}].annual_contribution")
         _ensure_finite(a.deposit, f"asset[{a.id}].deposit")
+        _ensure_finite(a.stamp_duty_pct, f"asset[{a.id}].stamp_duty_pct")
+        _ensure_finite(a.selling_cost_pct, f"asset[{a.id}].selling_cost_pct")
     for liability in plan.liabilities:
         _ensure_finite(liability.principal, f"liability[{liability.id}].principal")
         _ensure_finite(liability.interest_rate, f"liability[{liability.id}].interest_rate")
@@ -517,6 +532,9 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             purchase_value=a.value,
             deposit=max(0.0, a.deposit),
             disposal_year=a.disposal_year,
+            linked_liability_id=a.linked_liability_id,
+            stamp_duty_pct=max(0.0, a.stamp_duty_pct),
+            selling_cost_pct=max(0.0, a.selling_cost_pct),
         )
         for a in plan.assets
     }
@@ -623,26 +641,50 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 st.balance = st.purchase_value
                 st.basis = st.purchase_value
                 st.acquired = year
+                stamp_duty = st.purchase_value * st.stamp_duty_pct
+                cash_out = st.deposit + stamp_duty
+                if cash_out > 0:
+                    states[_cash_target()].balance -= cash_out
+                detail = []
                 if st.deposit > 0:
-                    states[_cash_target()].balance -= st.deposit
+                    detail.append(f"EUR {st.deposit:,.0f} deposit")
+                if stamp_duty > 0:
+                    detail.append(f"EUR {stamp_duty:,.0f} stamp duty")
                 notes.append(
                     f"Purchased asset {aid} for EUR {st.purchase_value:,.0f}"
-                    + (f" (EUR {st.deposit:,.0f} deposit from cash)." if st.deposit > 0 else ".")
+                    + (f" ({', '.join(detail)} from cash)." if detail else ".")
                 )
         for aid, st in states.items():
             if st.active and not st.sold and st.disposal_year == year:
-                proceeds = st.balance
-                rate = _disposal_tax_rate(st.kind, tax_config)
-                tax = max(0.0, proceeds - st.basis) * rate
-                states[_cash_target()].balance += proceeds - tax
+                gross = st.balance
+                selling_costs = gross * st.selling_cost_pct
+                net_sale = gross - selling_costs
+                # BTL attracts CGT on the gain (net of selling costs); a primary
+                # residence is PPR-exempt; ETF/unwrapped use their disposal rate.
+                rate = (
+                    tax_config.cgt_rate
+                    if st.kind == "property_btl"
+                    else _disposal_tax_rate(st.kind, tax_config)
+                )
+                tax = max(0.0, net_sale - st.basis) * rate
+                # Settle the linked mortgage out of the proceeds and stop it.
+                payoff = 0.0
+                if st.linked_liability_id is not None:
+                    payoff = max(0.0, liability_balances.get(st.linked_liability_id, 0.0))
+                    if payoff > 0:
+                        liability_balances[st.linked_liability_id] = 0.0
+                states[_cash_target()].balance += net_sale - tax - payoff
                 st.balance = 0.0
                 st.basis = 0.0
                 st.active = False
                 st.sold = True
-                notes.append(
-                    f"Sold asset {aid} for EUR {proceeds:,.0f}"
-                    + (f", CGT/exit tax EUR {tax:,.0f}." if tax > 0 else " (tax-free).")
-                )
+                bits = [f"Sold asset {aid} for EUR {gross:,.0f}"]
+                if selling_costs > 0:
+                    bits.append(f"costs EUR {selling_costs:,.0f}")
+                bits.append(f"tax EUR {tax:,.0f}" if tax > 0 else "tax-free")
+                if payoff > 0:
+                    bits.append(f"cleared mortgage EUR {payoff:,.0f}")
+                notes.append(", ".join(bits) + ".")
 
         # ----- 2b. ETF deemed disposal -----
         deemed_tax = 0.0

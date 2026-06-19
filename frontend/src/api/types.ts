@@ -207,6 +207,12 @@ export interface Asset {
   purchase_year: number | null;
   deposit: number;
   disposal_year: number | null;
+  // Phase 2. linked_liability_id = the mortgage financing this property (cleared
+  // on a planned sale). stamp_duty_pct charged on purchase; selling_cost_pct off
+  // the sale proceeds. Both fractions (0.075 = 7.5%).
+  linked_liability_id: number | null;
+  stamp_duty_pct: number;
+  selling_cost_pct: number;
 }
 
 export interface AssetCreate {
@@ -227,6 +233,9 @@ export interface AssetCreate {
   purchase_year?: number | null;
   deposit?: number;
   disposal_year?: number | null;
+  linked_liability_id?: number | null;
+  stamp_duty_pct?: number;
+  selling_cost_pct?: number;
 }
 
 export type LiabilityKind = "mortgage" | "loan";

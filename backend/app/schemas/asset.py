@@ -34,6 +34,9 @@ class AssetCreate(BaseModel):
     purchase_year: int | None = Field(default=None, ge=1900, le=2200)
     deposit: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     disposal_year: int | None = Field(default=None, ge=1900, le=2200)
+    linked_liability_id: int | None = None
+    stamp_duty_pct: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
+    selling_cost_pct: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 class AssetUpdate(BaseModel):
@@ -54,6 +57,9 @@ class AssetUpdate(BaseModel):
     purchase_year: int | None = Field(default=None, ge=1900, le=2200)
     deposit: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     disposal_year: int | None = Field(default=None, ge=1900, le=2200)
+    linked_liability_id: int | None = None
+    stamp_duty_pct: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
+    selling_cost_pct: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 class AssetRead(BaseModel):
@@ -78,3 +84,6 @@ class AssetRead(BaseModel):
     purchase_year: int | None
     deposit: float
     disposal_year: int | None
+    linked_liability_id: int | None
+    stamp_duty_pct: float
+    selling_cost_pct: float

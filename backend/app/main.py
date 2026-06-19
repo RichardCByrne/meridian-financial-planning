@@ -84,6 +84,15 @@ def _apply_lightweight_migrations() -> None:
                     "ALTER TABLE assets ADD COLUMN deposit FLOAT NOT NULL DEFAULT 0.0"
                 ))
                 conn.execute(text("ALTER TABLE assets ADD COLUMN disposal_year INTEGER"))
+        if "linked_liability_id" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE assets ADD COLUMN linked_liability_id INTEGER"))
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN stamp_duty_pct FLOAT NOT NULL DEFAULT 0.0"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN selling_cost_pct FLOAT NOT NULL DEFAULT 0.0"
+                ))
     if "people" in tables:
         cols = {c["name"] for c in insp.get_columns("people")}
         if "retirement_age" not in cols:

@@ -219,3 +219,30 @@ def test_delete_user_config_unpins_dependent_plans():
             # Plan still loads — pin was nulled out.
             refreshed = client.get(f"/api/plans/{plan['id']}").json()
             assert refreshed["tax_config_id"] is None
+
+
+def test_reseeding_official_config_is_a_noop_write():
+    """The official tax config is rewritten only when it actually changes, so a
+    cold-start re-seed doesn't churn the row (Neon storage hygiene)."""
+    import json
+
+    from sqlalchemy import select
+
+    from app.main import _seed_official_tax_config
+    from app.models import TaxConfigRow
+
+    with TestClient(app):  # lifespan seeds the official row once
+        _seed_official_tax_config()  # second call: must detect no change
+        with SessionLocal() as db:
+            rows = db.execute(
+                select(TaxConfigRow).where(
+                    TaxConfigRow.is_official.is_(True),
+                    TaxConfigRow.name == IRELAND_2026_OFFICIAL.name,
+                )
+            ).scalars().all()
+            assert len(rows) == 1  # no duplicate inserted
+            # Persisted JSON matches the source after a round-trip (tuples→lists),
+            # which is exactly the gate that skips the write.
+            assert json.dumps(rows[0].config_json, sort_keys=True) == json.dumps(
+                IRELAND_2026_OFFICIAL.to_dict(), sort_keys=True
+            )

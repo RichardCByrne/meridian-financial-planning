@@ -31,6 +31,7 @@ class YearRowOut(BaseModel):
     withdrawals_by_asset: dict[int, float]
     net_worth: float
     accessible_net_worth: float = 0.0
+    liquid_assets: float = 0.0
     liability_balances: dict[int, float] = {}
     debt_outstanding: float = 0.0
     investment_tax: float = 0.0

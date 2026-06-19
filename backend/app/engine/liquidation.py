@@ -4,10 +4,18 @@ Pure functions — no DB, no HTTP, no simulator state. Imported by
 `engine/simulator.py` when a year ends in shortfall and assets must be drawn
 down to fund the gap.
 
-Default order is taxable-first (cash → deposits) → unwrapped investments →
-ETFs → BTL property → primary residence. Pension wrappers are intentionally
-excluded; ARF drawdown is driven by retirement-age logic in the simulator,
-not the shortfall-funding path.
+Only *liquid* assets are drawn down to cover a shortfall: cash → deposits →
+unwrapped investments → ETFs. Property (primary residence and BTL) and every
+pension wrapper are intentionally excluded — the engine will never force-sell a
+house or raid a pension to plug a cash-flow gap. A deliberate property sale is a
+separate, user-initiated event (`disposal_year` in the simulator), not part of
+shortfall funding. ARF drawdown is likewise driven by retirement-age logic, not
+this path.
+
+`LIQUIDATION_ORDER` therefore enumerates exactly the liquid asset kinds, in the
+order they're tapped. `LIQUID_ASSET_KINDS` is the same set as a membership test
+(used by the simulator to compute the liquid-asset total that gates goal
+affordability/achievability).
 
 Disposal-tax rates come from a `TaxConfig` so a per-plan ruleset can edit
 CGT or ETF exit tax independently of the seeded official.
@@ -22,9 +30,13 @@ LIQUIDATION_ORDER: tuple[str, ...] = (
     "deposit",
     "investment_unwrapped",
     "etf_fund",
-    "property_btl",
-    "property_primary",
 )
+
+# Asset kinds considered liquid: readily convertible to cash without a forced
+# sale of an illiquid holding (property) or breaking into a restricted wrapper
+# (pensions / ARF). Kept in sync with LIQUIDATION_ORDER — they describe the same
+# set, one as an ordered tuple, the other as a membership frozenset.
+LIQUID_ASSET_KINDS: frozenset[str] = frozenset(LIQUIDATION_ORDER)
 
 
 def disposal_tax_rate(kind: str, tax_config: TaxConfig | None = None) -> float:

@@ -68,6 +68,7 @@ const KIND_COLORS = ["#2563eb", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#7c
 
 const REAL_TOGGLE_KEY = (id: number) => `meridian:letsSee:real:${id}`;
 const MC_N_KEY = (id: number) => `meridian:letsSee:mcN:${id}`;
+const LIQUID_TOGGLE_KEY = (id: number) => `meridian:letsSee:liquid:${id}`;
 
 export function LetsSeePane({ planId }: { planId: number }) {
   const { data, isLoading, error, refetch, isFetching } = useProjection(planId);
@@ -83,6 +84,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const [hoverYear, setHoverYear] = useState<number | null>(null);
   const [showEvents, setShowEvents] = useState(true);
   const [showMonteCarlo, setShowMonteCarlo] = useState(false);
+  const [showLiquid, setShowLiquid] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LIQUID_TOGGLE_KEY(planId)) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [realMode, setRealMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem(REAL_TOGGLE_KEY(planId)) === "1";
@@ -128,6 +136,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
       return {
         year: y.year,
         net_worth: f(y.net_worth),
+        liquid_assets: f(y.liquid_assets),
         gross_assets: f(Object.values(y.asset_balances_by_kind).reduce((s, v) => s + v, 0)),
         debt: f(-y.debt_outstanding),
         gross_income: f(y.gross_income_total),
@@ -246,6 +255,17 @@ export function LetsSeePane({ planId }: { planId: number }) {
       return next;
     });
   };
+  const onToggleLiquid = () => {
+    setShowLiquid((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(LIQUID_TOGGLE_KEY(planId), next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
   const onChangeMcN = (n: number) => {
     setMcN(n);
     try {
@@ -348,6 +368,15 @@ export function LetsSeePane({ planId }: { planId: number }) {
             >
               {showEvents ? "Events on" : "Events off"}
             </button>
+            {chart === "net_worth" && (
+              <button
+                className={`btn ${showLiquid ? "" : "btn-secondary"}`}
+                onClick={onToggleLiquid}
+                title="Overlay a line showing liquid assets only (cash, deposits, unwrapped investments and ETFs — excludes property and pensions). This is what goal affordability is graded against."
+              >
+                {showLiquid ? "Liquid assets on" : "Liquid assets off"}
+              </button>
+            )}
             {chart === "net_worth" && (
               <button
                 className={`btn ${showMonteCarlo ? "" : "btn-secondary"}`}
@@ -510,6 +539,10 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     strokeWidth={2} dot={false} name="Median (p50)" />
                   <Line type="monotone" dataKey="net_worth" stroke="#64748b"
                     strokeWidth={1.5} strokeDasharray="4 2" dot={false} name="Deterministic" />
+                  {showLiquid && (
+                    <Line type="monotone" dataKey="liquid_assets" stroke="#10b981"
+                      strokeWidth={2} dot={false} name="Liquid assets" />
+                  )}
                 </ComposedChart>
               ) : (
                 <AreaChart
@@ -521,6 +554,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
+                  {showLiquid && <Legend />}
                   <Area
                     type="monotone"
                     dataKey="net_worth"
@@ -529,6 +563,16 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     fillOpacity={0.18}
                     name="Net worth"
                   />
+                  {showLiquid && (
+                    <Line
+                      type="monotone"
+                      dataKey="liquid_assets"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Liquid assets"
+                    />
+                  )}
                   {renderEvents()}
                 </AreaChart>
               )

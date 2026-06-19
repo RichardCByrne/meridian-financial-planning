@@ -4,6 +4,7 @@ import {
   useAssets,
   useAssumptions,
   useBenefits,
+  useChildren,
   useCreateScenario,
   useDeleteScenario,
   useExpenses,
@@ -16,6 +17,7 @@ import {
 } from "../../api/hooks";
 import type {
   AddedBenefit,
+  AddedChild,
   AddedExpense,
   AddedIncome,
   BenefitKind,
@@ -41,7 +43,7 @@ type Bucket = Exclude<keyof ScenarioOverrides, "filing_status" | "marriage_year"
 type FieldDef = {
   name: string;
   label: string;
-  kind: "number" | "percent" | "int" | "text";
+  kind: "number" | "percent" | "int" | "text" | "bool";
   help?: string;
 };
 
@@ -83,6 +85,14 @@ const FIELDS: Record<Bucket, FieldDef[]> = {
     { name: "start_year", label: "Start year", kind: "int" },
     { name: "end_year", label: "End year", kind: "int" },
   ],
+  children: [
+    {
+      name: "active",
+      label: "Included in scenario",
+      kind: "bool",
+      help: "Set to Excluded to model a smaller family — Child Benefit for this child is dropped in this scenario only. The base plan is untouched.",
+    },
+  ],
   assumptions: [
     { name: "inflation_rate", label: "Inflation rate", kind: "percent" },
     { name: "default_growth_rate", label: "Default growth", kind: "percent" },
@@ -101,10 +111,12 @@ const BUCKET_LABELS: Record<Bucket, string> = {
   liabilities: "Liability",
   goals: "Goal",
   benefits: "Benefit-in-kind",
+  children: "Child",
   assumptions: "Assumptions",
 };
 
 function formatValue(field: FieldDef, raw: unknown): string {
+  if (field.kind === "bool") return raw === false ? "Excluded" : "Included";
   if (raw === null || raw === undefined || raw === "") return "—";
   if (field.kind === "percent") return `${(Number(raw) * 100).toFixed(2)}%`;
   if (field.kind === "number") return `€${Number(raw).toLocaleString()}`;
@@ -112,6 +124,7 @@ function formatValue(field: FieldDef, raw: unknown): string {
 }
 
 function parseValue(field: FieldDef, raw: string): unknown {
+  if (field.kind === "bool") return raw === "true";
   if (raw === "") return null;
   if (field.kind === "percent" || field.kind === "number" || field.kind === "int") {
     const n = Number(raw);
@@ -234,6 +247,7 @@ function ScenarioCard({
   const { data: liabilities } = useLiabilities(planId);
   const { data: goals } = useGoals(planId);
   const { data: benefits } = useBenefits(planId);
+  const { data: children } = useChildren(planId);
   const { data: assumptions } = useAssumptions(planId);
   const { incomes } = useIncomeForPeople(people ?? []);
 
@@ -277,6 +291,8 @@ function ScenarioCard({
           id: b.id,
           label: `${b.name} (${people?.find((p) => p.id === b.person_id)?.name ?? "?"})`,
         }));
+      case "children":
+        return (children ?? []).map((c) => ({ id: c.id, label: c.name }));
       case "assumptions":
         return assumptions ? [{ id: 0, label: "Plan assumptions" }] : [];
     }
@@ -292,10 +308,14 @@ function ScenarioCard({
       liabilities,
       goals,
       benefits,
+      children,
     } as Record<Bucket, unknown[] | undefined>)[bucket];
     const row = (list ?? []).find((r) => (r as { id: number }).id === id) as
       | Record<string, unknown>
       | undefined;
+    // Base-plan children are always included; `active` isn't stored on the row,
+    // so default it to true for the override grid's "base value".
+    if (bucket === "children" && fieldName === "active") return row ? true : undefined;
     return row?.[fieldName];
   };
 
@@ -389,6 +409,33 @@ function ScenarioCard({
     });
   };
 
+  const addChildAdded = (payload: AddedChild) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      const bucket = { ...((next.children ?? {}) as Record<string, unknown>) };
+      const list = Array.isArray(bucket._added) ? [...(bucket._added as unknown[])] : [];
+      list.push(payload);
+      bucket._added = list;
+      next.children = bucket as ScenarioOverrides["children"];
+      return next;
+    });
+  };
+
+  const removeAddedChild = (idx: number) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      const bucket = { ...((next.children ?? {}) as Record<string, unknown>) };
+      const list = Array.isArray(bucket._added) ? [...(bucket._added as unknown[])] : [];
+      list.splice(idx, 1);
+      if (list.length === 0) delete bucket._added;
+      else bucket._added = list;
+      next.children = bucket as ScenarioOverrides["children"];
+      return next;
+    });
+  };
+
   const setMarriageYear = (year: number | null) => {
     setDirty(true);
     setOverrides((prev) => {
@@ -402,7 +449,8 @@ function ScenarioCard({
   const addedCount =
     ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
     ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0) +
-    ((overrides.benefits?._added as unknown[] | undefined)?.length ?? 0);
+    ((overrides.benefits?._added as unknown[] | undefined)?.length ?? 0) +
+    ((overrides.children?._added as unknown[] | undefined)?.length ?? 0);
   const summaryParts: string[] = [];
   if (overrideRows.length) summaryParts.push(`${overrideRows.length} override${overrideRows.length === 1 ? "" : "s"}`);
   if (addedCount) summaryParts.push(`${addedCount} added`);
@@ -582,6 +630,8 @@ function ScenarioCard({
       <AddedItemsSection
         overrides={overrides}
         people={people ?? []}
+        onAddChild={addChildAdded}
+        onRemoveAddedChild={removeAddedChild}
         onAddIncome={addIncomeAdded}
         onRemoveAddedIncome={(idx) => {
           setDirty(true);
@@ -734,7 +784,7 @@ function ModeTabs({
   const tabs: { id: "override" | "step" | "added"; label: string; sub: string; count?: number }[] = [
     { id: "override", label: "Override a field", sub: "Change a value on something in your base plan", count: overrideCount },
     { id: "step", label: "Schedule a step change", sub: "End one income/expense, start another at year Y" },
-    { id: "added", label: "Add income / expense / benefit", sub: "Promotion, wedding, inheritance, employer perk — not in base plan", count: addedCount },
+    { id: "added", label: "Add income / expense / benefit / child", sub: "Promotion, wedding, inheritance, employer perk, another child — not in base plan", count: addedCount },
   ];
   return (
     <div className="row" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -791,6 +841,20 @@ function OverrideInput({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
+  if (field.kind === "bool") {
+    // Stored value: true = included (base default), false = excluded.
+    const included = value !== false;
+    return (
+      <select
+        value={included ? "true" : "false"}
+        onChange={(e) => onChange(e.target.value === "true")}
+        style={{ padding: "4px 8px", border: "1px solid #cbd5e1", borderRadius: 4, width: 140 }}
+      >
+        <option value="true">Included</option>
+        <option value="false">Excluded</option>
+      </select>
+    );
+  }
   if (field.kind === "percent") {
     // Show/edit whole percent (2.5), store the fraction (0.025) the engine wants.
     const shown =
@@ -1051,6 +1115,8 @@ function StepChangeWizard({
 function AddedItemsSection({
   overrides,
   people,
+  onAddChild,
+  onRemoveAddedChild,
   onAddIncome,
   onRemoveAddedIncome,
   onAddExpense,
@@ -1060,6 +1126,8 @@ function AddedItemsSection({
 }: {
   overrides: ScenarioOverrides;
   people: Person[];
+  onAddChild: (payload: AddedChild) => void;
+  onRemoveAddedChild: (idx: number) => void;
   onAddIncome: (payload: AddedIncome) => void;
   onRemoveAddedIncome: (idx: number) => void;
   onAddExpense: (payload: AddedExpense) => void;
@@ -1070,9 +1138,11 @@ function AddedItemsSection({
   const addedIncomes = (overrides.incomes?._added ?? []) as AddedIncome[];
   const addedExpenses = (overrides.expenses?._added ?? []) as AddedExpense[];
   const addedBenefits = (overrides.benefits?._added ?? []) as AddedBenefit[];
+  const addedChildren = (overrides.children?._added ?? []) as AddedChild[];
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddBenefit, setShowAddBenefit] = useState(false);
+  const [showAddChild, setShowAddChild] = useState(false);
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -1081,8 +1151,9 @@ function AddedItemsSection({
         <HelpTip>
           Use this to model events that don't exist in the base plan: a promotion (extra
           income source from year X), a one-off cost like a wedding, an inheritance, an
-          additional ongoing expense, or a new employer perk like medical insurance taxed as
-          benefit-in-kind. The base plan stays untouched.
+          additional ongoing expense, a new employer perk like medical insurance taxed as
+          benefit-in-kind, or another child. The base plan stays untouched. To model fewer
+          children instead, use the "Override a field" tab and set a child to Excluded.
         </HelpTip>
       </h4>
 
@@ -1095,6 +1166,9 @@ function AddedItemsSection({
         </button>
         <button className="btn btn-secondary" onClick={() => setShowAddBenefit((s) => !s)}>
           {showAddBenefit ? "Cancel" : "+ Add benefit-in-kind"}
+        </button>
+        <button className="btn btn-secondary" onClick={() => setShowAddChild((s) => !s)}>
+          {showAddChild ? "Cancel" : "+ Add child (e.g. another baby)"}
         </button>
       </div>
 
@@ -1123,6 +1197,46 @@ function AddedItemsSection({
             setShowAddBenefit(false);
           }}
         />
+      )}
+      {showAddChild && (
+        <AddChildForm
+          people={people}
+          onSubmit={(payload) => {
+            onAddChild(payload);
+            setShowAddChild(false);
+          }}
+        />
+      )}
+
+      {addedChildren.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <ResponsiveTable<{ idx: number; row: AddedChild }>
+            rows={addedChildren.map((row, idx) => ({ idx, row }))}
+            getKey={(r) => `child-${r.idx}`}
+            cardTitle={(r) => r.row.name}
+            columns={[
+              { header: "Type", cell: () => <span className="muted">Child</span> },
+              { header: "Name", cell: (r) => r.row.name, hideOnMobile: true },
+              { header: "Date of birth", cell: (r) => r.row.dob },
+              {
+                header: "Carer",
+                cell: (r) => (
+                  <span className="muted">
+                    {r.row.primary_carer_id == null
+                      ? "Primary"
+                      : people.find((p) => p.id === r.row.primary_carer_id)?.name ??
+                        `person ${r.row.primary_carer_id}`}
+                  </span>
+                ),
+              },
+            ]}
+            renderActions={(r) => (
+              <button className="btn btn-secondary" onClick={() => onRemoveAddedChild(r.idx)}>
+                Remove
+              </button>
+            )}
+          />
+        </div>
       )}
 
       {(addedIncomes.length > 0 || addedExpenses.length > 0 || addedBenefits.length > 0) && (
@@ -1624,6 +1738,66 @@ function AddBenefitForm({
             loan_is_qualifying: isLoan ? loanIsQualifying : false,
             relief_adults: isMedical ? reliefAdults : 1,
             relief_children: isMedical ? reliefChildren : 0,
+          })
+        }
+      >
+        Add to scenario
+      </button>
+    </div>
+  );
+}
+
+function AddChildForm({
+  people,
+  onSubmit,
+}: {
+  people: Person[];
+  onSubmit: (payload: AddedChild) => void;
+}) {
+  const [name, setName] = useState("Third child");
+  const [dob, setDob] = useState(`${new Date().getFullYear() + 1}-01-01`);
+  const [carerId, setCarerId] = useState<number | "">("");
+
+  return (
+    <div className="card" style={{ background: "#f8fafc" }}>
+      <div className="row" style={{ flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div className="field" style={{ flex: 1, minWidth: 180 }}>
+          <label>Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>
+            Date of birth
+            <HelpTip>
+              Child Benefit (€140/mo, tax-free) runs from this child's birth year until they turn
+              18. A future date models a planned/expected child.
+            </HelpTip>
+          </label>
+          <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Primary carer</label>
+          <select
+            value={carerId}
+            onChange={(e) => setCarerId(e.target.value === "" ? "" : Number(e.target.value))}
+          >
+            <option value="">— Primary —</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button
+        className="btn"
+        disabled={!name.trim() || !dob}
+        onClick={() =>
+          onSubmit({
+            name: name.trim(),
+            dob,
+            primary_carer_id: carerId === "" ? null : carerId,
           })
         }
       >

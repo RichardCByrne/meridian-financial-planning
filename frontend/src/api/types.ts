@@ -486,6 +486,11 @@ export interface ProjectionResponse {
 export type AddedIncome = IncomeSourceCreate & { person_id: number };
 export type AddedExpense = ExpenseCreate;
 export type AddedBenefit = BenefitCreate;
+export type AddedChild = ChildCreate;
+
+// A child override patch carries the editable child fields plus a scenario-only
+// `active` flag (false drops the child from this scenario to model fewer kids).
+export type ChildPatch = Partial<ChildCreate> & { active?: boolean };
 
 export type BucketPatch<TPatch, TAdded> = Record<string, TPatch> & { _added?: TAdded[] };
 
@@ -497,6 +502,7 @@ export type ScenarioOverrides = {
   liabilities?: Record<string, Partial<LiabilityCreate>>;
   goals?: Record<string, Partial<GoalCreate>>;
   benefits?: BucketPatch<Partial<BenefitCreate>, AddedBenefit>;
+  children?: BucketPatch<ChildPatch, AddedChild>;
   assumptions?: Partial<AssumptionsUpsert>;
   // Plan-level scalar overrides (not bucketed).
   filing_status?: "single" | "married" | "cohabiting";

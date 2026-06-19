@@ -1170,15 +1170,29 @@ function YearDetailCard({
           )}
         </div>
       </div>
-      {row.notes.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          {row.notes.map((n, i) => (
+      {/* Fixed-height, scrollable notes region so a year's notes (death /
+          retirement warnings, varying in count) never resize the card. */}
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 8,
+          borderTop: "1px solid #f1f5f9",
+          height: 56,
+          overflowY: "auto",
+        }}
+      >
+        {row.notes.length > 0 ? (
+          row.notes.map((n, i) => (
             <p key={i} style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>
               ⚠ {n}
             </p>
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <p className="muted" style={{ fontSize: 13, margin: "4px 0" }}>
+            No notes for this year.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

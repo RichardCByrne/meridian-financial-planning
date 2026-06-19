@@ -185,7 +185,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
         evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a", icon: "🏖", source: "event" });
       }
       if (assumptions?.state_pension_age) {
-        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "🪙", source: "event" });
+        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "💰", source: "event" });
       }
     }
     for (const g of goals ?? []) {

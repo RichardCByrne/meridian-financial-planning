@@ -117,6 +117,16 @@ class AssetInput:
 
 
 @dataclass
+class LiabilityAdjustmentInput:
+    id: int
+    # "rate" → new annual rate (fraction); "overpayment" → new €/mo overpayment;
+    # "lump_sum" → one-off € paid off capital in effective_year only.
+    kind: str
+    effective_year: int
+    value: float
+
+
+@dataclass
 class LiabilityInput:
     id: int
     name: str
@@ -130,6 +140,8 @@ class LiabilityInput:
     # typically allow ±10% of the contracted monthly_payment fee-free; we
     # don't model the breakage-fee threshold — out of scope for most users.
     monthly_overpayment: float = 0.0
+    # Time-keyed rate steps / overpayment changes / lump sums (Voyant-style).
+    adjustments: list[LiabilityAdjustmentInput] = field(default_factory=list)
 
 
 @dataclass
@@ -354,6 +366,21 @@ def _amortise_year(
     return balance, interest_paid, paid
 
 
+def _amortised_payment(principal: float, annual_rate: float, term_months: int) -> float:
+    """Standard fixed-rate amortised monthly payment over `term_months`.
+
+    Used to re-derive the payment when a rate step takes effect: the outstanding
+    balance is re-amortised over the *remaining* term at the new rate, exactly as
+    a lender recalculates on a fixed→follow-on rollover. Straight-line if rate=0.
+    """
+    if term_months <= 0:
+        return 0.0
+    if annual_rate <= 0:
+        return principal / term_months
+    r = annual_rate / 12.0
+    return principal * r / (1.0 - (1.0 + r) ** -term_months)
+
+
 _PENSION_WRAPPERS = ("prsa", "occupational_pension")
 
 # State-pension Total Contributions Approach (TCA) constants. From 2025 the
@@ -429,6 +456,8 @@ def _validate_plan_input(plan: PlanInput) -> None:
         _ensure_finite(liability.interest_rate, f"liability[{liability.id}].interest_rate")
         if liability.monthly_payment is not None:
             _ensure_finite(liability.monthly_payment, f"liability[{liability.id}].monthly_payment")
+        for adj in liability.adjustments:
+            _ensure_finite(adj.value, f"liability[{liability.id}].adjustment[{adj.id}].value")
     for g in plan.goals:
         _ensure_finite(g.target_amount, f"goal[{g.id}].target_amount")
     a = plan.assumptions
@@ -461,6 +490,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         for liability in plan.liabilities
         if liability.start_year <= plan.base_year
     }
+    # Per-liability mutable amortisation state: the rate, contracted payment and
+    # recurring overpayment currently in force, plus the effective_year of the
+    # last rate step we re-amortised on (so we recompute the payment once per
+    # step, not every year — otherwise overpayments would re-lower the payment
+    # instead of shortening the term).
+    liability_state: dict[int, dict[str, float | None]] = {}
     retired_persons: set[int] = set()  # person ids who have already crystallised
     deceased_persons: set[int] = set()  # person ids who have already died
     # Level annuity income per person, set at retirement when pension_option ==
@@ -965,12 +1000,48 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 continue
             if liability.id not in liability_balances:
                 liability_balances[liability.id] = liability.principal
+            st = liability_state.get(liability.id)
+            if st is None:
+                st = {
+                    "rate": liability.interest_rate,
+                    "payment": liability.monthly_payment,
+                    "overpay": liability.monthly_overpayment,
+                    "last_rate_year": None,
+                }
+                liability_state[liability.id] = st
             bal = liability_balances[liability.id]
+            # One-off lump-sum capital repayments effective this exact year.
+            for adj in liability.adjustments:
+                if adj.kind == "lump_sum" and adj.effective_year == year:
+                    bal = max(0.0, bal - max(0.0, adj.value))
             if bal <= 0:
+                liability_balances[liability.id] = 0.0
                 continue
-            monthly_rate = liability.interest_rate / 12.0
+            # Rate step: when a new rate first takes effect, re-amortise the
+            # outstanding balance over the remaining term at the new rate and
+            # hold that payment (lender-style fixed→follow-on recalculation).
+            rate_adjs = [
+                a for a in liability.adjustments
+                if a.kind == "rate" and a.effective_year <= year
+            ]
+            if rate_adjs:
+                latest = max(rate_adjs, key=lambda a: a.effective_year)
+                if st["last_rate_year"] != latest.effective_year:
+                    months_elapsed = 12 * (year - liability.start_year)
+                    remaining = max(1, liability.term_months - months_elapsed)
+                    st["rate"] = latest.value
+                    st["payment"] = _amortised_payment(bal, latest.value, remaining)
+                    st["last_rate_year"] = latest.effective_year
+            # Overpayment step: latest effective change overrides the base value.
+            op_adjs = [
+                a for a in liability.adjustments
+                if a.kind == "overpayment" and a.effective_year <= year
+            ]
+            if op_adjs:
+                st["overpay"] = max(op_adjs, key=lambda a: a.effective_year).value
+            monthly_rate = st["rate"] / 12.0
             new_bal, _interest_paid, paid = _amortise_year(
-                bal, monthly_rate, liability.monthly_payment, liability.monthly_overpayment
+                bal, monthly_rate, st["payment"], st["overpay"]
             )
             liability_balances[liability.id] = new_bal
             debt_service += paid

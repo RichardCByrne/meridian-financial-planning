@@ -279,6 +279,35 @@ class Liability(Base):
     monthly_overpayment: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="liabilities")
+    adjustments: Mapped[list["LiabilityAdjustment"]] = relationship(
+        back_populates="liability",
+        cascade="all, delete-orphan",
+        order_by="LiabilityAdjustment.effective_year",
+    )
+
+
+class LiabilityAdjustment(Base):
+    """Time-keyed change to a liability: a rate step, an overpayment change, or a
+    one-off lump-sum capital repayment. Mirrors Voyant's mortgage rate periods /
+    overpayment events. `value` is interpreted by `kind`:
+
+    - ``rate``       → new annual interest rate as a fraction (0.055 = 5.5%).
+                        Payment is re-amortised over the remaining term.
+    - ``overpayment``→ new recurring extra €/mo applied to capital from this year.
+    - ``lump_sum``   → one-off € paid off the balance in ``effective_year`` only.
+    """
+
+    __tablename__ = "liability_adjustments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    liability_id: Mapped[int] = mapped_column(
+        ForeignKey("liabilities.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    effective_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    liability: Mapped[Liability] = relationship(back_populates="adjustments")
 
 
 class Goal(Base):

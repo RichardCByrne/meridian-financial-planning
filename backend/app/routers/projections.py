@@ -17,6 +17,7 @@ from app.engine.simulator import (
     ExpenseInput,
     GoalInput,
     IncomeInput,
+    LiabilityAdjustmentInput,
     LiabilityInput,
     PersonInput,
     PlanInput,
@@ -24,7 +25,17 @@ from app.engine.simulator import (
 )
 from app.engine import montecarlo as _mc
 from app.engine.tax_config import TaxConfig
-from app.models import Assumptions, Bequest, Child, IncomeSource, Plan, Scenario, TaxConfigRow, User
+from app.models import (
+    Assumptions,
+    Bequest,
+    Child,
+    IncomeSource,
+    Liability,
+    Plan,
+    Scenario,
+    TaxConfigRow,
+    User,
+)
 from app.schemas.projection import (
     MonteCarloResponse,
     MonteCarloYearRow,
@@ -158,6 +169,15 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             start_year=liability.start_year,
             monthly_payment=liability.monthly_payment,
             monthly_overpayment=liability.monthly_overpayment,
+            adjustments=[
+                LiabilityAdjustmentInput(
+                    id=adj.id,
+                    kind=adj.kind,
+                    effective_year=adj.effective_year,
+                    value=adj.value,
+                )
+                for adj in liability.adjustments
+            ],
         )
         for liability in plan.liabilities
     ]
@@ -253,7 +273,7 @@ def _load_plan(plan_id: int, db: Session) -> Plan:
             selectinload(Plan.people),
             selectinload(Plan.expenses),
             selectinload(Plan.assets),
-            selectinload(Plan.liabilities),
+            selectinload(Plan.liabilities).selectinload(Liability.adjustments),
             selectinload(Plan.goals),
             selectinload(Plan.assumptions),
         )

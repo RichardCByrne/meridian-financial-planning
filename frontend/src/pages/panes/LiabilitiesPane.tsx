@@ -6,7 +6,13 @@ import {
   useLiabilities,
   useUpdateLiability,
 } from "../../api/hooks";
-import type { Liability, LiabilityCreate, LiabilityKind } from "../../api/types";
+import type {
+  Liability,
+  LiabilityAdjustmentCreate,
+  LiabilityAdjustmentKind,
+  LiabilityCreate,
+  LiabilityKind,
+} from "../../api/types";
 import { HelpTip } from "../../components/HelpTip";
 import { NumericInput } from "../../components/NumericInput";
 import { EmptyState } from "../../components/EmptyState";
@@ -18,6 +24,12 @@ import { useSoftDelete } from "../../lib/useSoftDelete";
 const KINDS: { value: LiabilityKind; label: string }[] = [
   { value: "mortgage", label: "Mortgage" },
   { value: "loan", label: "Loan" },
+];
+
+const ADJUSTMENT_KINDS: { value: LiabilityAdjustmentKind; label: string }[] = [
+  { value: "rate", label: "Rate change" },
+  { value: "overpayment", label: "Overpayment change" },
+  { value: "lump_sum", label: "Lump-sum repayment" },
 ];
 
 function amortisedPayment(principal: number, annualRate: number, termMonths: number): number {
@@ -35,6 +47,8 @@ type FormState = {
   term_months: number;
   start_year: number;
   monthly_overpayment: number;
+  // Stored in backend units: rate as a fraction, overpayment/lump_sum in €.
+  adjustments: LiabilityAdjustmentCreate[];
 };
 
 const blankForm: FormState = {
@@ -45,6 +59,7 @@ const blankForm: FormState = {
   term_months: 300,
   start_year: 2026,
   monthly_overpayment: 0,
+  adjustments: [],
 };
 
 function fromLiability(l: Liability): FormState {
@@ -56,6 +71,11 @@ function fromLiability(l: Liability): FormState {
     term_months: l.term_months,
     start_year: l.start_year,
     monthly_overpayment: l.monthly_overpayment ?? 0,
+    adjustments: (l.adjustments ?? []).map((a) => ({
+      kind: a.kind,
+      effective_year: a.effective_year,
+      value: a.value,
+    })),
   };
 }
 
@@ -80,6 +100,11 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
       start_year: l.start_year,
       monthly_payment: l.monthly_payment,
       monthly_overpayment: l.monthly_overpayment,
+      adjustments: (l.adjustments ?? []).map((a) => ({
+        kind: a.kind,
+        effective_year: a.effective_year,
+        value: a.value,
+      })),
     }),
     remove: (id) => del.mutate(id),
     recreate: (payload) => create.mutate(payload),
@@ -109,6 +134,11 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
       term_months: f.term_months,
       start_year: f.start_year,
       monthly_overpayment: Math.max(0, f.monthly_overpayment),
+      adjustments: f.adjustments.map((a) => ({
+        kind: a.kind,
+        effective_year: a.effective_year,
+        value: Math.max(0, a.value),
+      })),
     };
     return includeMonthly
       ? { ...base, monthly_payment: amortisedPayment(f.principal, f.interest_rate, f.term_months) }
@@ -176,6 +206,15 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
               {
                 header: "Overpay",
                 cell: (l) => (l.monthly_overpayment > 0 ? fmtMoney(l.monthly_overpayment) : "—"),
+              },
+              {
+                header: "Changes",
+                cell: (l) =>
+                  l.adjustments && l.adjustments.length > 0 ? (
+                    <span className="muted">{l.adjustments.length} scheduled</span>
+                  ) : (
+                    "—"
+                  ),
               },
             ]}
             renderActions={(l) => (
@@ -278,6 +317,7 @@ function FormFields({
   setForm: (f: FormState) => void;
 }) {
   return (
+    <>
     <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
       <div className="field" style={{ flex: 1, minWidth: 140 }}>
         <label>Type</label>
@@ -339,6 +379,108 @@ function FormFields({
           }
         />
       </div>
+    </div>
+    <AdjustmentsEditor form={form} setForm={setForm} />
+    </>
+  );
+}
+
+function AdjustmentsEditor({
+  form,
+  setForm,
+}: {
+  form: FormState;
+  setForm: (f: FormState) => void;
+}) {
+  const adjustments = form.adjustments;
+
+  const update = (next: LiabilityAdjustmentCreate[]) => setForm({ ...form, adjustments: next });
+
+  const add = () =>
+    update([
+      ...adjustments,
+      { kind: "rate", effective_year: form.start_year + 1, value: form.interest_rate },
+    ]);
+
+  const patch = (i: number, partial: Partial<LiabilityAdjustmentCreate>) =>
+    update(adjustments.map((a, j) => (j === i ? { ...a, ...partial } : a)));
+
+  const remove = (i: number) => update(adjustments.filter((_, j) => j !== i));
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <label style={{ fontWeight: 600, fontSize: 13 }}>
+        Future changes
+        <HelpTip>
+          Schedule rate steps (fixed → follow-on), recurring overpayment changes, or one-off
+          lump-sum repayments. On a rate change the monthly payment is recalculated over the
+          remaining term, exactly as a lender re-amortises.
+        </HelpTip>
+      </label>
+      {adjustments.length === 0 && (
+        <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+          None — the rate and payment stay fixed for the whole term.
+        </p>
+      )}
+      {adjustments.map((a, i) => {
+        const isRate = a.kind === "rate";
+        const valueLabel = isRate ? "New rate %" : a.kind === "lump_sum" ? "Amount €" : "New €/mo";
+        const displayValue = isRate ? a.value * 100 : a.value;
+        return (
+          <div
+            key={i}
+            className="row"
+            style={{ alignItems: "flex-end", flexWrap: "wrap", marginTop: 8 }}
+          >
+            <div className="field" style={{ flex: 1, minWidth: 150 }}>
+              <label>Change</label>
+              <select
+                value={a.kind}
+                onChange={(e) => {
+                  const kind = e.target.value as LiabilityAdjustmentKind;
+                  // Re-seed the value to a sensible default for the new kind.
+                  const value = kind === "rate" ? form.interest_rate : 0;
+                  patch(i, { kind, value });
+                }}
+              >
+                {ADJUSTMENT_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 100 }}>
+              <label>From year</label>
+              <NumericInput
+                integer
+                value={a.effective_year}
+                onChange={(v) => Number.isFinite(v) && patch(i, { effective_year: v })}
+              />
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 110 }}>
+              <label>{valueLabel}</label>
+              <NumericInput
+                value={displayValue}
+                onChange={(v) =>
+                  Number.isFinite(v) && patch(i, { value: isRate ? v / 100 : Math.max(0, v) })
+                }
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ marginBottom: 2 }}
+              onClick={() => remove(i)}
+            >
+              Remove
+            </button>
+          </div>
+        );
+      })}
+      <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={add}>
+        + Add change
+      </button>
     </div>
   );
 }

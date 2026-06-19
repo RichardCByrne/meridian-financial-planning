@@ -25,6 +25,7 @@ from app.models import (
     Goal,
     IncomeSource,
     Liability,
+    LiabilityAdjustment,
     Person,
     Plan,
     Scenario,
@@ -76,7 +77,14 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
             for a in plan.assets
         ],
         "liabilities": [
-            _strip_ids(_columns(li), drop=["id", "plan_id"]) for li in plan.liabilities
+            {
+                **_strip_ids(_columns(li), drop=["id", "plan_id"]),
+                "adjustments": [
+                    _strip_ids(_columns(adj), drop=["id", "liability_id"])
+                    for adj in li.adjustments
+                ],
+            }
+            for li in plan.liabilities
         ],
         "goals": [
             {
@@ -153,7 +161,10 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
         db.add(Asset(**a_payload, plan_id=plan.id, owner_person_id=owner_id))
 
     for li_payload in payload.get("liabilities", []):
-        db.add(Liability(**li_payload, plan_id=plan.id))
+        adj_payloads = li_payload.pop("adjustments", [])
+        liability = Liability(**li_payload, plan_id=plan.id)
+        liability.adjustments = [LiabilityAdjustment(**a) for a in adj_payloads]
+        db.add(liability)
 
     for g_payload in payload.get("goals", []):
         linked_local = g_payload.pop("_linked_person_local_id", None)

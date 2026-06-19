@@ -678,10 +678,10 @@ function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: n
               padding: "4px 10px",
               borderRadius: 999,
               background: active ? `${e.color}1a` : "#f8fafc",
-              border: `${active ? 2 : 1}px solid ${e.color}`,
-              boxShadow: active ? `0 0 0 2px ${e.color}33` : "none",
-              transform: active ? "scale(1.04)" : "none",
-              transition: "transform 80ms ease",
+              // Constant 1px border — only the boxShadow changes on hover so the
+              // chip's layout box never resizes (no reflow / page-height jump).
+              border: `1px solid ${e.color}`,
+              boxShadow: active ? `0 0 0 2px ${e.color}` : "none",
               color: e.color,
               fontSize: 12,
               fontWeight: 600,
@@ -731,9 +731,8 @@ function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[
               color: meta.fg,
               fontSize: 12,
               fontWeight: 600,
-              boxShadow: active ? `0 0 0 2px ${meta.fg}55` : "none",
-              transform: active ? "scale(1.04)" : "none",
-              transition: "transform 80ms ease",
+              // boxShadow only — no size change, so hover never reflows the page.
+              boxShadow: active ? `0 0 0 2px ${meta.fg}` : "none",
             }}
           >
             <span>{meta.icon}</span>
@@ -966,9 +965,16 @@ function YearDetailCard({
           </span>
         )}
       </h3>
-      {yearEvents.length > 0 && (
-        <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-          {yearEvents.map((e, i) => (
+      {/* Always rendered with a one-line minHeight so switching years (events
+          appearing/disappearing) never resizes the card and scrolls the page. */}
+      <div
+        className="row"
+        style={{ gap: 6, flexWrap: "wrap", marginBottom: 12, minHeight: 26, alignItems: "center" }}
+      >
+        {yearEvents.length === 0 ? (
+          <span className="muted" style={{ fontSize: 12 }}>No timeline events this year.</span>
+        ) : (
+          yearEvents.map((e, i) => (
             <span
               key={`${e.year}-${i}`}
               style={{
@@ -987,9 +993,9 @@ function YearDetailCard({
               <span aria-hidden>{e.icon}</span>
               <span>{e.label}</span>
             </span>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
       <div className="row" style={{ gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Income</h4>

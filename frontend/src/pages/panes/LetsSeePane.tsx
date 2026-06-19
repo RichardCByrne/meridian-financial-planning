@@ -482,7 +482,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <ComposedChart
                   data={mcSeries}
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
-                  onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   {renderShortfall()}
@@ -515,7 +514,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <AreaChart
                   data={series}
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
-                  onMouseLeave={() => setHoverYear(null)}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   {renderShortfall()}
@@ -537,7 +535,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
               <ComposedChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
-                onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -561,7 +558,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
               <ComposedChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
-                onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -601,7 +597,6 @@ export function LetsSeePane({ planId }: { planId: number }) {
               <BarChart
                 data={series}
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
-                onMouseLeave={() => setHoverYear(null)}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 {renderShortfall()}
@@ -625,6 +620,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
         assets={assets ?? []}
         goals={goals ?? []}
         people={people ?? []}
+        events={showEvents ? events.filter((e) => e.source === "event") : []}
         deflate={deflate}
         realMode={realMode}
       />
@@ -936,6 +932,7 @@ function YearDetailCard({
   assets,
   goals,
   people,
+  events,
   deflate,
   realMode,
 }: {
@@ -943,6 +940,7 @@ function YearDetailCard({
   assets: { id: number; name: string }[];
   goals: Goal[];
   people: { id: number; name: string }[];
+  events: ChartEvent[];
   deflate: (v: number, year: number) => number;
   realMode: boolean;
 }) {
@@ -954,6 +952,7 @@ function YearDetailCard({
     .map(([id, v]) => ({ id: Number(id), amount: v }))
     .filter((w) => w.amount > 0);
   const yearGoals = goals.filter((g) => row.goal_status?.[g.id]);
+  const yearEvents = events.filter((e) => e.year === row.year);
   const estateRows = Object.entries(row.estate_transfers ?? {})
     .map(([pid, amt]) => ({ pid: Number(pid), amount: amt }))
     .filter((e) => e.amount > 0);
@@ -967,6 +966,30 @@ function YearDetailCard({
           </span>
         )}
       </h3>
+      {yearEvents.length > 0 && (
+        <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          {yearEvents.map((e, i) => (
+            <span
+              key={`${e.year}-${i}`}
+              style={{
+                display: "inline-flex",
+                gap: 6,
+                alignItems: "center",
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: `${e.color}1a`,
+                border: `1px solid ${e.color}`,
+                color: e.color,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              <span aria-hidden>{e.icon}</span>
+              <span>{e.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="row" style={{ gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h4 style={{ margin: "0 0 6px 0", color: "#475569", fontSize: 13 }}>Income</h4>

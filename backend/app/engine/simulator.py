@@ -21,6 +21,7 @@ from datetime import date
 
 from app.engine import bik_ie, cat_ie, pension_ie, tax_ie
 from app.engine.liquidation import (
+    LIQUID_ASSET_KINDS,
     LIQUIDATION_ORDER,
     disposal_tax_rate as _disposal_tax_rate,
     withdraw_with_tax as _withdraw_with_tax,
@@ -322,6 +323,13 @@ class YearRow:
     # they only exist post-retirement and are drawn down automatically. Property,
     # cash, investments stay accessible regardless of age.
     accessible_net_worth: float = 0.0
+    # Gross value of liquid assets only — cash, deposits, unwrapped investments
+    # and ETFs (see `engine.liquidation.LIQUID_ASSET_KINDS`). Excludes property
+    # (illiquid) and every pension/ARF (restricted), and is NOT netted against
+    # debt. This is the figure goal affordability/achievability is graded
+    # against: you shouldn't have to sell the house or raid a pension to hit a
+    # target or fund a planned spend.
+    liquid_assets: float = 0.0
 
 
 def _age_in_year(dob: date, year: int) -> int:
@@ -1368,6 +1376,15 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 locked += bal
         accessible_net_worth = net_worth - locked
 
+        # Gross liquid-asset value: cash / deposits / unwrapped investments /
+        # ETFs only, never netted against debt. Property and pensions/ARFs are
+        # excluded. Gates goal affordability/achievability below.
+        liquid_assets = sum(
+            bal
+            for aid, bal in balances_snapshot.items()
+            if states[aid].kind in LIQUID_ASSET_KINDS
+        )
+
         # ----- 7. Goal status for this year -----
         goal_status: dict[int, str] = {}
         for g in plan.goals:
@@ -1383,9 +1400,11 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             if g.kind == "retirement":
                 status = "achieved"
             elif g.kind == "net_worth":
-                # Grade against accessible (non-locked-pension) net worth so a
-                # high PRSA balance doesn't falsely satisfy a pre-retirement target.
-                status = "met" if accessible_net_worth >= g.target_amount else "below_target"
+                # Grade against liquid assets only (cash / deposits / unwrapped
+                # investments / ETFs). Property and pensions don't count — a
+                # target is only "met" if it's reachable from liquid wealth
+                # without selling the house or raiding a pension.
+                status = "met" if liquid_assets >= g.target_amount else "below_target"
             elif g.kind in _COST_BEARING_GOAL_KINDS:
                 status = "missed" if had_shortfall else "achieved"
             else:
@@ -1413,6 +1432,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 withdrawals_by_asset={k: round(v, 2) for k, v in withdrawals.items()},
                 net_worth=round(net_worth, 2),
                 accessible_net_worth=round(accessible_net_worth, 2),
+                liquid_assets=round(liquid_assets, 2),
                 liability_balances=liability_snapshot,
                 debt_outstanding=round(debt_outstanding, 2),
                 investment_tax=round(investment_tax, 2),

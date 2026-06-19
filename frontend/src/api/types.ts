@@ -445,6 +445,7 @@ export interface YearRow {
   withdrawals_by_asset: Record<number, number>;
   net_worth: number;
   accessible_net_worth: number;
+  liquid_assets: number;
   liability_balances: Record<number, number>;
   debt_outstanding: number;
   investment_tax: number;

@@ -28,6 +28,7 @@ import {
 } from "../../api/hooks";
 import type { Goal, MonteCarloResponse, YearRow } from "../../api/types";
 import { fmtMoney } from "../../lib/format";
+import { HelpTip } from "../../components/HelpTip";
 import { JargonTerm } from "../../components/JargonTerm";
 import { ChartSkeleton } from "../../components/Skeleton";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -1102,8 +1103,27 @@ function YearDetailCard({
             <Row key={cat} label={cat.replace(/_/g, " ")} value={fy(amt)} />
           ))}
           <Row label="Total" value={fy(row.expenses_total)} bold />
+          {row.pension_contributions > 0 && (
+            <Row label="Pension contributions" value={`−${fy(row.pension_contributions)}`} muted />
+          )}
+          {row.asset_contributions > 0 && (
+            <Row label="Savings / investments" value={`−${fy(row.asset_contributions)}`} muted />
+          )}
+          {row.investment_tax > 0 && (
+            <Row label="Investment tax" value={`−${fy(row.investment_tax)}`} muted />
+          )}
           <Row
-            label="Surplus / shortfall"
+            label={
+              <span>
+                Surplus / shortfall
+                <HelpTip>
+                  Free cash flow: net income minus expenses <em>and</em> every other committed
+                  outflow that year — your own pension contributions, regular savings into assets,
+                  and any ETF/pension-lump-sum tax. A negative figure is funded by drawing down
+                  assets (below).
+                </HelpTip>
+              </span>
+            }
             value={fy(row.surplus_or_shortfall)}
             bold
             color={row.surplus_or_shortfall < 0 ? "#dc2626" : "#10b981"}

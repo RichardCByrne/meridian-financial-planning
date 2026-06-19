@@ -1,0 +1,11 @@
+[
+  {
+    "name": "delete-stale-build-cache",
+    "action": { "type": "Delete" },
+    "condition": {
+      "tagState": "any",
+      "packageNamePrefixes": ["meridian-api/cache"],
+      "olderThan": "1209600s"
+    }
+  }
+]

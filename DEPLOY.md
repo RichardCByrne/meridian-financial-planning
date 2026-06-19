@@ -218,7 +218,25 @@ foreach ($r in @("roles/run.admin", "roles/iam.serviceAccountUser", "roles/artif
 
 ## 6. Deploy the backend
 
-The pipeline is described in `cloudbuild.yaml`: build → push → `gcloud run deploy` with secrets mounted. The committed file is already wired for Neon (no `--add-cloudsql-instances` flag). If you later switch to Cloud SQL, see Appendix A for the one-line restore.
+The pipeline is described in `cloudbuild.yaml`: a Kaniko build-and-push (with Artifact Registry layer caching) → `gcloud run deploy` with secrets mounted. Kaniko caches every image layer — including the multi-stage pip-install layer, keyed only on `pyproject.toml` — in a `<image>/cache` repo, so an app-code-only deploy reuses the cached dependencies and skips `pip install` entirely. The first build after this change is cold (it populates the cache); subsequent app-only deploys are markedly faster. The committed file is already wired for Neon (no `--add-cloudsql-instances` flag). If you later switch to Cloud SQL, see Appendix A for the one-line restore.
+
+Kaniko is pinned to a specific version (`executor:v1.23.2`) for reproducible builds rather than `:latest`. No extra setup is needed for caching — the cache lives in the existing Artifact Registry repo under the `meridian-api/cache` path, covered by the same `artifactregistry.writer` grant above.
+
+### Prune the build cache (one-time)
+
+Cache blobs accumulate in Artifact Registry. A committed cleanup policy deletes cache layers older than 14 days (matching the Kaniko `--cache-ttl`), leaving the live image tags untouched. Apply it once per repo:
+
+```powershell
+# Preview first (lists what would be deleted, deletes nothing):
+gcloud artifacts repositories set-cleanup-policies $env:_REPO `
+  --location=$env:_REGION --policy=cleanup-policy.json --dry-run
+
+# Then enable deletion:
+gcloud artifacts repositories set-cleanup-policies $env:_REPO `
+  --location=$env:_REGION --policy=cleanup-policy.json --no-dry-run
+```
+
+The policy targets only the `meridian-api/cache` package — if you rename `_SERVICE`, update `packageNamePrefixes` in `cleanup-policy.json` to match.
 
 Run the build:
 

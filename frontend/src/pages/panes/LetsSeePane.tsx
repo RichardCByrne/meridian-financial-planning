@@ -6,7 +6,6 @@ import {
   BarChart,
   CartesianGrid,
   ComposedChart,
-  Label,
   Legend,
   Line,
   ReferenceArea,
@@ -35,7 +34,7 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 
 type ChartKind = "net_worth" | "cash_flow" | "income_vs_expenses" | "tax";
 
-type ChartEvent = { year: number; label: string; color: string };
+type ChartEvent = { year: number; label: string; color: string; icon: string };
 
 // Minimal subset of recharts' CategoricalChartState — just what we read.
 type ChartMouseState = { activeLabel?: string | number | null } | undefined;
@@ -174,23 +173,41 @@ export function LetsSeePane({ planId }: { planId: number }) {
     const dobYear = (iso: string) => new Date(iso).getFullYear();
     for (const p of people ?? []) {
       if (p.retirement_age != null) {
-        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a" });
+        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a", icon: "🏖" });
       }
       if (assumptions?.state_pension_age) {
-        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2" });
+        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "🪙" });
       }
     }
     for (const g of goals ?? []) {
-      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed" });
+      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed", icon: "🎯" });
     }
     for (const c of children ?? []) {
-      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777" });
+      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777", icon: "👶" });
     }
     if (data.summary.first_shortfall_year) {
-      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626" });
+      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626", icon: "⚠" });
     }
-    return evs.filter((e) => e.year >= baseYear && e.year <= lastYear);
+    return evs
+      .filter((e) => e.year >= baseYear && e.year <= lastYear)
+      .sort((a, b) => a.year - b.year);
   }, [data, people, goals, children, assumptions, baseYear, lastYear]);
+
+  // One marker line per distinct year (events sharing a year collapse to a
+  // single line). Mixed-category years use a neutral colour; the legend below
+  // the chart carries each event's own colour + label.
+  const eventLines = useMemo(() => {
+    const byYear = new Map<number, ChartEvent[]>();
+    for (const e of events) {
+      const arr = byYear.get(e.year) ?? [];
+      arr.push(e);
+      byYear.set(e.year, arr);
+    }
+    return [...byYear.entries()].map(([year, evs]) => {
+      const colors = new Set(evs.map((e) => e.color));
+      return { year, color: colors.size === 1 ? evs[0].color : "#475569" };
+    });
+  }, [events]);
 
   // Contiguous runs of shortfall years (surplus < 0), for red shading.
   const shortfallRuns = useMemo<{ start: number; end: number }[]>(() => {
@@ -242,29 +259,20 @@ export function LetsSeePane({ planId }: { planId: number }) {
         stroke="none"
       />
     ));
+  // Bare colour-coded guide lines (one per event-year). The readable detail
+  // lives in the Events legend below the chart, not crammed into the plot.
   const renderEvents = () =>
     showEvents
-      ? events.map((e, i) => (
+      ? eventLines.map((e) => (
           <ReferenceLine
-            key={`ev-${i}`}
+            key={`ev-${e.year}`}
             x={e.year}
             stroke={e.color}
             strokeDasharray="4 3"
             strokeWidth={1.5}
-            strokeOpacity={0.9}
+            strokeOpacity={0.85}
             ifOverflow="extendDomain"
-          >
-            {/* Vertical label inside the plot, anchored at the bottom where the
-                net-worth/bar charts are usually least busy (recharts v3 drops
-                object labels positioned "top", clipping them above the plot). */}
-            <Label
-              value={e.label}
-              position="insideBottomLeft"
-              angle={-90}
-              fontSize={10}
-              fill={e.color}
-            />
-          </ReferenceLine>
+          />
         ))
       : null;
 
@@ -441,6 +449,8 @@ export function LetsSeePane({ planId }: { planId: number }) {
         {goals && goals.length > 0 && (
           <GoalStrip goals={goals} years={data.years} />
         )}
+
+        {showEvents && events.length > 0 && <EventLegend events={events} />}
 
         <div
           style={{
@@ -620,6 +630,50 @@ function pickDefaultYear(years: YearRow[], people: { retirement_age: number | nu
     if (hit) return hit;
   }
   return years[0];
+}
+
+function EventLegend({ events }: { events: ChartEvent[] }) {
+  return (
+    <div
+      className="row"
+      style={{
+        marginTop: 12,
+        paddingTop: 12,
+        borderTop: "1px solid #e2e8f0",
+        gap: 8,
+        flexWrap: "wrap",
+      }}
+    >
+      <div
+        className="muted"
+        style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.04, width: "100%" }}
+      >
+        Timeline events
+      </div>
+      {events.map((e, i) => (
+        <span
+          key={`${e.year}-${i}`}
+          title={`${e.label} — ${e.year}`}
+          style={{
+            display: "inline-flex",
+            gap: 6,
+            alignItems: "center",
+            padding: "4px 10px",
+            borderRadius: 999,
+            background: "#f8fafc",
+            border: `1px solid ${e.color}`,
+            color: e.color,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          <span aria-hidden>{e.icon}</span>
+          <span>{e.label}</span>
+          <span style={{ opacity: 0.7, fontWeight: 400 }}>· {e.year}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function GoalStrip({ goals, years }: { goals: Goal[]; years: YearRow[] }) {

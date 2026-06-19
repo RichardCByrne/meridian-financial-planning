@@ -77,6 +77,13 @@ def _apply_lightweight_migrations() -> None:
                 conn.execute(text(
                     "ALTER TABLE assets ADD COLUMN contribution_end_year INTEGER"
                 ))
+        if "purchase_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE assets ADD COLUMN purchase_year INTEGER"))
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN deposit FLOAT NOT NULL DEFAULT 0.0"
+                ))
+                conn.execute(text("ALTER TABLE assets ADD COLUMN disposal_year INTEGER"))
     if "people" in tables:
         cols = {c["name"] for c in insp.get_columns("people")}
         if "retirement_age" not in cols:

@@ -31,6 +31,9 @@ class AssetCreate(BaseModel):
     contribution_end_year: int | None = Field(default=None, ge=1900, le=2200)
     avc_annual: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     avc_pct_of_gross: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
+    purchase_year: int | None = Field(default=None, ge=1900, le=2200)
+    deposit: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    disposal_year: int | None = Field(default=None, ge=1900, le=2200)
 
 
 class AssetUpdate(BaseModel):
@@ -48,6 +51,9 @@ class AssetUpdate(BaseModel):
     contribution_end_year: int | None = Field(default=None, ge=1900, le=2200)
     avc_annual: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     avc_pct_of_gross: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
+    purchase_year: int | None = Field(default=None, ge=1900, le=2200)
+    deposit: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    disposal_year: int | None = Field(default=None, ge=1900, le=2200)
 
 
 class AssetRead(BaseModel):
@@ -69,3 +75,6 @@ class AssetRead(BaseModel):
     contribution_end_year: int | None
     avc_annual: float
     avc_pct_of_gross: float
+    purchase_year: int | None
+    deposit: float
+    disposal_year: int | None

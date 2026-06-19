@@ -155,6 +155,9 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             contribution_end_year=a.contribution_end_year,
             avc_annual=a.avc_annual,
             avc_pct_of_gross=a.avc_pct_of_gross,
+            purchase_year=a.purchase_year,
+            deposit=a.deposit,
+            disposal_year=a.disposal_year,
         )
         for a in plan.assets
     ]

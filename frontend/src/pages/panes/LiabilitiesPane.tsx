@@ -134,6 +134,10 @@ export function LiabilitiesPane({ planId }: { planId: number }) {
     <div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Add liability</h3>
+        <p className="muted" style={{ marginTop: -4, fontSize: 13 }}>
+          Add mortgages and loans here only — the engine amortises the balance and adds each
+          repayment to your expenses automatically. Don't also add the repayment as an expense.
+        </p>
         <form onSubmit={onSubmit}>
           <FormFields form={form} setForm={setForm} />
           <button type="submit" className="btn" disabled={create.isPending}>

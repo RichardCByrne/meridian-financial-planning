@@ -17,6 +17,7 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { EditModal } from "../../components/EditModal";
 import { useToast } from "../../components/Toast";
 import { fmtMoney, fmtPctDisplay } from "../../lib/format";
+import { PaneTotal } from "../../components/PaneTotal";
 
 const PENSION_KINDS: AssetKind[] = ["prsa", "occupational_pension", "arf"];
 const AVC_KINDS: AssetKind[] = ["prsa", "occupational_pension"];  // ARF excluded — no new contributions
@@ -289,7 +290,13 @@ export function AssetsPane({ planId }: { planId: number }) {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Assets</h3>
+        <div
+          className="row"
+          style={{ marginTop: 0, marginBottom: 8, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
+        >
+          <h3 style={{ margin: 0 }}>Assets</h3>
+          {data && data.length > 0 && <PaneTotal label="Total value" amount={data.reduce((s, a) => s + a.value, 0)} />}
+        </div>
         {isLoading && <p className="muted">Loading…</p>}
         {data && data.length === 0 && (
           <EmptyState

@@ -15,6 +15,7 @@ import { NumericInput } from "../../components/NumericInput";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { EditModal } from "../../components/EditModal";
 import { fmtMoney, fmtPctDisplay } from "../../lib/format";
+import { PaneTotal } from "../../components/PaneTotal";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
 const KINDS: { value: IncomeKind; label: string; defaultPaysPRSI: boolean; defaultPaysUSC: boolean }[] = [
@@ -179,7 +180,19 @@ function PersonIncomeBlock({
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>{personName}</h3>
+      <div
+        className="row"
+        style={{ marginTop: 0, marginBottom: 8, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
+      >
+        <h3 style={{ margin: 0 }}>{personName}</h3>
+        {data && data.length > 0 && (
+          <PaneTotal
+            label="Total gross"
+            amount={data.reduce((s, i) => s + i.gross_amount, 0)}
+            suffix="/ yr"
+          />
+        )}
+      </div>
 
       <form onSubmit={onSubmit}>
         <FormFields form={form} setForm={setForm} />

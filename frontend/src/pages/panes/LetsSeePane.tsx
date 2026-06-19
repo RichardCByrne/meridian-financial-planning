@@ -1157,6 +1157,7 @@ function YearDetailCard({
             />
           )}
           <Row label="Net worth" value={fy(row.net_worth)} bold />
+          <NetWorthBreakdown byKind={row.asset_balances_by_kind} debt={row.debt_outstanding} fy={fy} />
           {row.accessible_net_worth < row.net_worth - 1 && (
             <Row
               label="Accessible (ex-locked pensions)"
@@ -1234,6 +1235,46 @@ function syntheticAssetName(id: number): string {
   if (id <= -2000) return `ARF (person ${-(id + 2000)})`;
   if (id <= -1000) return `Pension wrapper (person ${-(id + 1000)})`;
   return `Asset ${id}`;
+}
+
+// Friendly net-worth composition: collapse the raw asset kinds into the
+// buckets people actually think in (cash, property, investments, pensions),
+// netting off debt. Shown under the Net worth total in the year detail card.
+const NET_WORTH_GROUPS: { label: string; kinds: string[] }[] = [
+  { label: "Liquid cash", kinds: ["cash", "deposit"] },
+  { label: "Property", kinds: ["property_primary", "property_btl"] },
+  { label: "Stocks & investments", kinds: ["etf_fund", "investment_unwrapped"] },
+  { label: "Pensions", kinds: ["prsa", "occupational_pension", "arf"] },
+];
+
+function NetWorthBreakdown({
+  byKind,
+  debt,
+  fy,
+}: {
+  byKind: Record<string, number>;
+  debt: number;
+  fy: (v: number) => string;
+}) {
+  const grouped = NET_WORTH_GROUPS.map((g) => ({
+    label: g.label,
+    total: g.kinds.reduce((sum, k) => sum + (byKind[k] ?? 0), 0),
+  }));
+  // Anything that doesn't fall into a known bucket (future kinds) → "Other".
+  const known = new Set(NET_WORTH_GROUPS.flatMap((g) => g.kinds));
+  const other = Object.entries(byKind)
+    .filter(([k]) => !known.has(k))
+    .reduce((sum, [, v]) => sum + v, 0);
+  const lines = [...grouped, { label: "Other", total: other }].filter((l) => Math.abs(l.total) > 0.5);
+  if (lines.length === 0 && debt <= 0) return null;
+  return (
+    <div style={{ marginLeft: 10, marginTop: 2 }}>
+      {lines.map((l) => (
+        <Row key={l.label} label={l.label} value={fy(l.total)} muted />
+      ))}
+      {debt > 0 && <Row label="Less debt" value={`-${fy(debt)}`} muted color="#dc2626" />}
+    </div>
+  );
 }
 
 function Row({

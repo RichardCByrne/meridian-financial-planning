@@ -58,6 +58,9 @@ substitutions:
   _SERVICE: meridian-api
 
 options:
+  # Default machine on purpose: it's covered by Cloud Build's free 120
+  # build-min/day (HIGHCPU machines are not and bill from minute 1). Kaniko
+  # caching already keeps the common app-only build short, so the bigger machine
+  # only helped the rare cold (dep-change) build — not worth forfeiting the free
+  # tier on every deploy.
   logging: CLOUD_LOGGING_ONLY
-  # Faster cold builds (more CPU for pip on the rare dep-change build).
-  machineType: E2_HIGHCPU_8

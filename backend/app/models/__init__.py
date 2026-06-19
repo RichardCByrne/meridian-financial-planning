@@ -139,6 +139,46 @@ class Plan(Base):
     children: Mapped[list["Child"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"
     )
+    benefits: Mapped[list["Benefit"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan"
+    )
+
+
+class Benefit(Base):
+    """An employer-provided benefit-in-kind (BIK) attached to a person.
+
+    The cash equivalent is charged to the employee as notional pay (IT + USC +
+    PRSI) but is not a cash inflow or a household expense — the employer funds
+    it. `kind` selects the cash-equivalent calculation (see engine/bik_ie.py):
+    medical_insurance / company_car / company_van / preferential_loan / other.
+    Field meaning is kind-dependent (see schemas/benefit.py + BenefitInput).
+    """
+
+    __tablename__ = "benefits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    start_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    escalation_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Cash equivalent / premium / loan balance, interpreted by kind.
+    amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Company car/van Original Market Value (cash-equiv = omv × rate).
+    omv: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Car BIK %, or the interest rate the employer charges on a preferential loan.
+    rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Preferential loan: True = qualifying home loan (lower specified rate).
+    loan_is_qualifying: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Medical-insurance relief cap sizing (per adult/child covered).
+    relief_adults: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    relief_children: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    plan: Mapped[Plan] = relationship(back_populates="benefits")
 
 
 class Child(Base):
@@ -455,6 +495,8 @@ __all__ = [
     "PlanInvite",
     "TaxConfigRow",
     "Bequest",
+    "Benefit",
+    "Child",
     "PLAN_ROLES",
     "register_all_models",
 ]

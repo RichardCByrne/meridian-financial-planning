@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     Asset,
     Assumptions,
+    Benefit,
     Bequest,
     Expense,
     Goal,
@@ -112,6 +113,13 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
             }
             for b in plan.bequests
         ],
+        "benefits": [
+            {
+                **_strip_ids(_columns(b), drop=["id", "plan_id", "person_id"]),
+                "_person_local_id": b.person_id,
+            }
+            for b in plan.benefits
+        ],
         "assumptions": (
             _strip_ids(_columns(plan.assumptions), drop=["id", "plan_id"])
             if plan.assumptions
@@ -201,6 +209,12 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
         to_id = person_id_map.get(to_local) if to_local is not None else None
         if from_id is not None:
             db.add(Bequest(**b_payload, plan_id=plan.id, from_person_id=from_id, to_person_id=to_id))
+
+    for ben_payload in payload.get("benefits", []):
+        person_local = ben_payload.pop("_person_local_id", None)
+        person_id = person_id_map.get(person_local) if person_local is not None else None
+        if person_id is not None:
+            db.add(Benefit(**ben_payload, plan_id=plan.id, person_id=person_id))
 
     a_payload = payload.get("assumptions")
     if a_payload:

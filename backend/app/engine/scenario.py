@@ -37,7 +37,7 @@ want a stale override to 500 the projection.
 from dataclasses import fields as dataclass_fields, replace
 from typing import Any
 
-from app.engine.simulator import ExpenseInput, IncomeInput, PlanInput
+from app.engine.simulator import BenefitInput, ExpenseInput, IncomeInput, PlanInput
 
 _BUCKETS: tuple[str, ...] = (
     "people",
@@ -46,6 +46,7 @@ _BUCKETS: tuple[str, ...] = (
     "assets",
     "liabilities",
     "goals",
+    "benefits",
 )
 
 
@@ -102,9 +103,31 @@ def _build_added_expense(payload: dict[str, Any], synthetic_id: int) -> ExpenseI
         return None
 
 
+def _build_added_benefit(payload: dict[str, Any], synthetic_id: int) -> BenefitInput | None:
+    try:
+        return BenefitInput(
+            id=synthetic_id,
+            person_id=int(payload["person_id"]),
+            kind=str(payload.get("kind", "other")),
+            name=str(payload.get("name", "Added benefit")),
+            start_year=int(payload["start_year"]),
+            end_year=int(payload["end_year"]) if payload.get("end_year") not in (None, "") else None,
+            escalation_rate=float(payload.get("escalation_rate", 0.0)),
+            amount=float(payload.get("amount", 0.0)),
+            omv=float(payload.get("omv", 0.0)),
+            rate=float(payload.get("rate", 0.0)),
+            loan_is_qualifying=bool(payload.get("loan_is_qualifying", False)),
+            relief_adults=int(payload.get("relief_adults", 1)),
+            relief_children=int(payload.get("relief_children", 0)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 _ADDED_BUILDERS = {
     "incomes": _build_added_income,
     "expenses": _build_added_expense,
+    "benefits": _build_added_benefit,
 }
 
 
@@ -164,6 +187,7 @@ def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanIn
         assets=new_lists["assets"],
         liabilities=new_lists["liabilities"],
         goals=new_lists["goals"],
+        benefits=new_lists["benefits"],
         assumptions=new_assumptions,
         **plan_scalars,
     )

@@ -7,6 +7,9 @@ import type {
   AssetUpdate,
   Assumptions,
   AssumptionsUpsert,
+  Benefit,
+  BenefitCreate,
+  BenefitUpdate,
   Bequest,
   BequestCreate,
   BequestUpdate,
@@ -58,6 +61,7 @@ const keys = {
   scenarios: (planId: number) => ["plan", planId, "scenarios"] as const,
   bequests: (planId: number) => ["plan", planId, "bequests"] as const,
   children: (planId: number) => ["plan", planId, "children"] as const,
+  benefits: (planId: number) => ["plan", planId, "benefits"] as const,
   members: (planId: number) => ["plan", planId, "members"] as const,
   invites: (planId: number) => ["plan", planId, "invites"] as const,
   taxConfigs: () => ["tax-configs"] as const,
@@ -602,6 +606,53 @@ export function useDeleteChild(planId: number) {
     mutationFn: (id: number) => api.del(`/children/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.children(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+// ---------- Benefits (benefit-in-kind) ----------
+
+export function useBenefits(planId: number) {
+  return useQuery({
+    queryKey: keys.benefits(planId),
+    queryFn: () => api.get<Benefit[]>(`/plans/${planId}/benefits`),
+    enabled: Number.isFinite(planId),
+  });
+}
+
+export function useCreateBenefit(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (body: BenefitCreate) => api.post<Benefit>(`/plans/${planId}/benefits`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.benefits(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useUpdateBenefit(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: ({ id, body }: { id: number; body: BenefitUpdate }) =>
+      api.patch<Benefit>(`/benefits/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.benefits(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useDeleteBenefit(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (id: number) => api.del(`/benefits/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.benefits(planId) });
       invalidateProjection(qc, planId);
     },
   });

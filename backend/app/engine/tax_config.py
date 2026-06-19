@@ -26,6 +26,10 @@ class FilingStatus:
     home_carer: bool = False
     age: int = 35
     claims_rent_credit: bool = False
+    # Euro value of medical-insurance relief due on employer-paid (BIK) premiums.
+    # Computed per-person by the simulator (20% of premium, capped per adult/
+    # child) and applied as a tax credit. Defaults to 0 for filers with no BIK.
+    medical_insurance_relief: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -119,6 +123,26 @@ class TaxConfig:
     child_benefit_monthly: float = 140.0
     child_benefit_escalation: float = 0.0075
     child_benefit_age_limit: int = 18
+
+    # Benefit-in-kind (BIK). Cash-equivalent rates for non-cash perks an
+    # employer provides; the cash equivalent is charged to IT/USC/PRSI as
+    # notional pay. See `engine/bik_ie.py`.
+    #   - Medical insurance: when the employer pays the premium, tax relief at
+    #     source is not granted, so the employee claims 20% relief capped at
+    #     €1,000/adult and €500/child.
+    #   - Company car: cash equivalent = OMV × percentage. The 2023+ regime
+    #     bands this by CO2 emissions and business mileage (≈6%–37.5%); we use a
+    #     single mid-band default (22.5%) the user can override per benefit.
+    #   - Company van: flat 8% of OMV.
+    #   - Preferential loan: BIK = balance × (specified rate − rate charged).
+    #     Specified rates are 4% for qualifying home loans, 13.5% otherwise.
+    medical_insurance_relief_rate: float = 0.20
+    medical_insurance_relief_cap_adult: float = 1_000.0
+    medical_insurance_relief_cap_child: float = 500.0
+    bik_company_car_default_rate: float = 0.225
+    bik_company_van_rate: float = 0.08
+    bik_preferential_loan_rate_qualifying: float = 0.04
+    bik_preferential_loan_rate_other: float = 0.135
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-serialisable representation. Tuples become lists."""

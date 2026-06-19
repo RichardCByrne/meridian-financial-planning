@@ -77,6 +77,10 @@ def income_tax(
         credits += cfg.credit_rent * (2 if status.married else 1)
     if status.age >= cfg.age_credit_threshold_age:
         credits += cfg.credit_age_married if status.married else cfg.credit_age_single
+    if status.medical_insurance_relief > 0:
+        # Relief on employer-paid (BIK) medical insurance — already capped to
+        # the per-adult/child limit by the caller (engine.bik_ie).
+        credits += status.medical_insurance_relief
 
     return max(0.0, gross_tax - credits), band
 

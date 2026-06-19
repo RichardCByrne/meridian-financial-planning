@@ -47,6 +47,7 @@ class YearRowOut(BaseModel):
     estate_transfers: dict[int, float] = {}
     asset_contributions: float = 0.0
     had_shortfall: bool = False
+    benefits_in_kind_total: float = 0.0
 
 
 class MonteCarloYearRow(BaseModel):

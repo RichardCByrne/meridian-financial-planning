@@ -20,6 +20,7 @@ from app.db import SessionLocal
 from app.models import (
     Asset,
     Assumptions,
+    Benefit,
     Bequest,
     Expense,
     Goal,
@@ -41,6 +42,7 @@ from app.models import (
 _WIPE_ORDER = (
     PlanInvite,
     PlanMember,
+    Benefit,
     Bequest,
     Goal,
     Scenario,

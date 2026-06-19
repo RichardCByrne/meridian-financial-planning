@@ -12,6 +12,7 @@ from app.models import register_all_models  # noqa: F401  ensure models import
 from app.routers import (
     assets,
     assumptions,
+    benefits,
     bequests,
     children,
     expenses,
@@ -196,7 +197,8 @@ def _apply_lightweight_migrations() -> None:
                 conn.execute(
                     text("ALTER TABLE people ADD COLUMN annuity_rate FLOAT NOT NULL DEFAULT 0.04")
                 )
-    # children table picked up by Base.metadata.create_all on the dev path.
+    # children + benefits tables are picked up by Base.metadata.create_all on
+    # the dev path (whole-table additions need no ALTER bridging).
     if "liabilities" in tables:
         cols = {c["name"] for c in insp.get_columns("liabilities")}
         if "monthly_overpayment" not in cols:
@@ -353,6 +355,7 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
 app.include_router(plans.router, prefix="/api")
 app.include_router(bequests.router, prefix="/api")
 app.include_router(children.router, prefix="/api")
+app.include_router(benefits.router, prefix="/api")
 app.include_router(people.router, prefix="/api")
 app.include_router(assumptions.router, prefix="/api")
 app.include_router(income.router, prefix="/api")

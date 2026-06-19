@@ -385,6 +385,47 @@ export interface ChildCreate {
 
 export type ChildUpdate = Partial<ChildCreate>;
 
+export type BenefitKind =
+  | "medical_insurance"
+  | "company_car"
+  | "company_van"
+  | "preferential_loan"
+  | "other";
+
+export interface Benefit {
+  id: number;
+  plan_id: number;
+  person_id: number;
+  kind: BenefitKind;
+  name: string;
+  start_year: number;
+  end_year: number | null;
+  escalation_rate: number;
+  amount: number;
+  omv: number;
+  rate: number;
+  loan_is_qualifying: boolean;
+  relief_adults: number;
+  relief_children: number;
+}
+
+export interface BenefitCreate {
+  person_id: number;
+  kind: BenefitKind;
+  name: string;
+  start_year: number;
+  end_year?: number | null;
+  escalation_rate?: number;
+  amount?: number;
+  omv?: number;
+  rate?: number;
+  loan_is_qualifying?: boolean;
+  relief_adults?: number;
+  relief_children?: number;
+}
+
+export type BenefitUpdate = Partial<BenefitCreate>;
+
 export interface YearRow {
   year: number;
   ages: Record<number, number>;
@@ -419,6 +460,7 @@ export interface YearRow {
   cat_paid: number;
   estate_transfers: Record<number, number>;
   asset_contributions: number;
+  benefits_in_kind_total: number;
 }
 
 export interface ProjectionSummary {

@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 export const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -16,6 +16,13 @@ export function useFocusTrap({
   onClose,
   lockBodyScroll = true,
 }: FocusTrapOptions) {
+  // Hold onClose in a ref so an unstable inline `onClose={() => …}` from the
+  // caller doesn't re-run this effect on every render — which would otherwise
+  // re-fire the focus-on-open timeout and steal focus from inputs on each
+  // keystroke. The effect should only set up/tear down when `open` flips.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -25,7 +32,7 @@ export function useFocusTrap({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -67,5 +74,5 @@ export function useFocusTrap({
         document.body.focus?.();
       }
     };
-  }, [open, onClose, panelRef, lockBodyScroll]);
+  }, [open, panelRef, lockBodyScroll]);
 }

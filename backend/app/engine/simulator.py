@@ -1013,16 +1013,24 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             )
             total = it + u + p_prsi
 
+            # Report TRUE gross (before the pension contribution, which only
+            # reduces the IT-taxable base, not actual earnings). net_income here
+            # is gross − tax, i.e. take-home BEFORE the pension contribution is
+            # diverted; the contribution is subtracted once later in the cash
+            # flow (it lands in the pension pot, not in spendable cash). Using
+            # taxable_for_it as "gross" previously double-removed the pension —
+            # once here and again in the cash flow.
+            true_gross = taxable_for_it + pension_contribution
             person_rows.append(
                 PersonYear(
                     person_id=person.id,
                     name=person.name,
                     age=age,
-                    gross_income=round(taxable_for_it, 2),
+                    gross_income=round(true_gross, 2),
                     income_tax=round(it, 2),
                     usc=round(u, 2),
                     prsi=round(p_prsi, 2),
-                    net_income=round(taxable_for_it - total, 2),
+                    net_income=round(true_gross - total, 2),
                 )
             )
 
@@ -1166,8 +1174,10 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         expenses_total = sum(expenses_by_category.values())
 
         # ----- 5. Cash flow -----
-        # Pension contribution is funded out of gross earnings (already deducted from net
-        # income via the IT computation). Lump sum tax is a separate one-shot bill.
+        # net_income is take-home (true gross − tax) BEFORE the pension
+        # contribution is diverted, so the contribution is subtracted exactly
+        # once here — it leaves spendable cash for the pension pot. Lump sum tax
+        # is a separate one-shot bill.
         cash_flow = (
             net_income
             - expenses_total

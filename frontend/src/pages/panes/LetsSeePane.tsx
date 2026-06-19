@@ -34,7 +34,15 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 
 type ChartKind = "net_worth" | "cash_flow" | "income_vs_expenses" | "tax";
 
-type ChartEvent = { year: number; label: string; color: string; icon: string };
+type ChartEvent = {
+  year: number;
+  label: string;
+  color: string;
+  icon: string;
+  // "goal" events are shown in the Goal-status strip, not the events legend,
+  // to avoid duplicating them — but they still get a guide line on the chart.
+  source: "event" | "goal";
+};
 
 // Minimal subset of recharts' CategoricalChartState — just what we read.
 type ChartMouseState = { activeLabel?: string | number | null } | undefined;
@@ -173,20 +181,20 @@ export function LetsSeePane({ planId }: { planId: number }) {
     const dobYear = (iso: string) => new Date(iso).getFullYear();
     for (const p of people ?? []) {
       if (p.retirement_age != null) {
-        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a", icon: "🏖" });
+        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a", icon: "🏖", source: "event" });
       }
       if (assumptions?.state_pension_age) {
-        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "🪙" });
+        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "🪙", source: "event" });
       }
     }
     for (const g of goals ?? []) {
-      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed", icon: "🎯" });
+      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed", icon: "🎯", source: "goal" });
     }
     for (const c of children ?? []) {
-      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777", icon: "👶" });
+      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777", icon: "👶", source: "event" });
     }
     if (data.summary.first_shortfall_year) {
-      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626", icon: "⚠" });
+      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626", icon: "⚠", source: "event" });
     }
     return evs
       .filter((e) => e.year >= baseYear && e.year <= lastYear)
@@ -263,17 +271,20 @@ export function LetsSeePane({ planId }: { planId: number }) {
   // lives in the Events legend below the chart, not crammed into the plot.
   const renderEvents = () =>
     showEvents
-      ? eventLines.map((e) => (
-          <ReferenceLine
-            key={`ev-${e.year}`}
-            x={e.year}
-            stroke={e.color}
-            strokeDasharray="4 3"
-            strokeWidth={1.5}
-            strokeOpacity={0.85}
-            ifOverflow="extendDomain"
-          />
-        ))
+      ? eventLines.map((e) => {
+          const active = e.year === hoverYear;
+          return (
+            <ReferenceLine
+              key={`ev-${e.year}`}
+              x={e.year}
+              stroke={e.color}
+              strokeDasharray={active ? undefined : "4 3"}
+              strokeWidth={active ? 2.5 : 1.5}
+              strokeOpacity={active ? 1 : 0.85}
+              ifOverflow="extendDomain"
+            />
+          );
+        })
       : null;
 
   if (isLoading)
@@ -447,10 +458,15 @@ export function LetsSeePane({ planId }: { planId: number }) {
         />
 
         {goals && goals.length > 0 && (
-          <GoalStrip goals={goals} years={data.years} />
+          <GoalStrip goals={goals} years={data.years} hoverYear={hoverYear} />
         )}
 
-        {showEvents && events.length > 0 && <EventLegend events={events} />}
+        {showEvents && events.some((e) => e.source === "event") && (
+          <EventLegend
+            events={events.filter((e) => e.source === "event")}
+            hoverYear={hoverYear}
+          />
+        )}
 
         <div
           style={{
@@ -632,7 +648,7 @@ function pickDefaultYear(years: YearRow[], people: { retirement_age: number | nu
   return years[0];
 }
 
-function EventLegend({ events }: { events: ChartEvent[] }) {
+function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: number | null }) {
   return (
     <div
       className="row"
@@ -649,34 +665,43 @@ function EventLegend({ events }: { events: ChartEvent[] }) {
         style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.04, width: "100%" }}
       >
         Timeline events
-      </div>
-      {events.map((e, i) => (
-        <span
-          key={`${e.year}-${i}`}
-          title={`${e.label} — ${e.year}`}
-          style={{
-            display: "inline-flex",
-            gap: 6,
-            alignItems: "center",
-            padding: "4px 10px",
-            borderRadius: 999,
-            background: "#f8fafc",
-            border: `1px solid ${e.color}`,
-            color: e.color,
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          <span aria-hidden>{e.icon}</span>
-          <span>{e.label}</span>
-          <span style={{ opacity: 0.7, fontWeight: 400 }}>· {e.year}</span>
+        <span style={{ textTransform: "none", marginLeft: 6, opacity: 0.7 }}>
+          — hover the chart to highlight a year
         </span>
-      ))}
+      </div>
+      {events.map((e, i) => {
+        const active = e.year === hoverYear;
+        return (
+          <span
+            key={`${e.year}-${i}`}
+            title={`${e.label} — ${e.year}`}
+            style={{
+              display: "inline-flex",
+              gap: 6,
+              alignItems: "center",
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: active ? `${e.color}1a` : "#f8fafc",
+              border: `${active ? 2 : 1}px solid ${e.color}`,
+              boxShadow: active ? `0 0 0 2px ${e.color}33` : "none",
+              transform: active ? "scale(1.04)" : "none",
+              transition: "transform 80ms ease",
+              color: e.color,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <span aria-hidden>{e.icon}</span>
+            <span>{e.label}</span>
+            <span style={{ opacity: 0.7, fontWeight: 400 }}>· {e.year}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function GoalStrip({ goals, years }: { goals: Goal[]; years: YearRow[] }) {
+function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[]; hoverYear: number | null }) {
   return (
     <div
       className="row"
@@ -695,6 +720,7 @@ function GoalStrip({ goals, years }: { goals: Goal[]; years: YearRow[] }) {
         const targetRow = years.find((y) => y.year === g.target_year);
         const status = targetRow?.goal_status?.[g.id] ?? "pending";
         const meta = goalStatusMeta(status);
+        const active = g.target_year === hoverYear;
         return (
           <span
             key={g.id}
@@ -709,6 +735,9 @@ function GoalStrip({ goals, years }: { goals: Goal[]; years: YearRow[] }) {
               color: meta.fg,
               fontSize: 12,
               fontWeight: 600,
+              boxShadow: active ? `0 0 0 2px ${meta.fg}55` : "none",
+              transform: active ? "scale(1.04)" : "none",
+              transition: "transform 80ms ease",
             }}
           >
             <span>{meta.icon}</span>

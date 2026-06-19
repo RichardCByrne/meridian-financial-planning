@@ -125,6 +125,11 @@ export function ExpensesPane({ planId }: { planId: number }) {
     <div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Add expense</h3>
+        <p className="muted" style={{ marginTop: -4, fontSize: 13 }}>
+          Mortgages and loans go in <strong>Liabilities</strong>, not here — the engine
+          amortises them and feeds each repayment into expenses automatically. Adding one
+          here too would double-count it.
+        </p>
         <form onSubmit={onSubmit}>
           <FormFields form={form} setForm={setForm} />
           <button type="submit" className="btn" disabled={create.isPending}>

@@ -222,6 +222,26 @@ export interface AssetCreate {
 
 export type LiabilityKind = "mortgage" | "loan";
 
+// Time-keyed change to a liability. `value` interpreted by `kind`:
+//   rate        → new annual rate as a fraction (0.055 = 5.5%)
+//   overpayment → new recurring extra €/mo to capital
+//   lump_sum    → one-off € off the balance in effective_year
+export type LiabilityAdjustmentKind = "rate" | "overpayment" | "lump_sum";
+
+export interface LiabilityAdjustment {
+  id: number;
+  liability_id: number;
+  kind: LiabilityAdjustmentKind;
+  effective_year: number;
+  value: number;
+}
+
+export interface LiabilityAdjustmentCreate {
+  kind: LiabilityAdjustmentKind;
+  effective_year: number;
+  value: number;
+}
+
 export interface Liability {
   id: number;
   plan_id: number;
@@ -233,6 +253,7 @@ export interface Liability {
   start_year: number;
   monthly_payment: number;
   monthly_overpayment: number;
+  adjustments: LiabilityAdjustment[];
 }
 
 export interface LiabilityCreate {
@@ -244,6 +265,7 @@ export interface LiabilityCreate {
   start_year: number;
   monthly_payment?: number | null;
   monthly_overpayment?: number;
+  adjustments?: LiabilityAdjustmentCreate[];
 }
 
 export type GoalKind =

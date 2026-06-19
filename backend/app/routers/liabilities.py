@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, require_plan_access
 from app.db import get_db
-from app.models import Liability, Plan, User
+from app.models import Liability, LiabilityAdjustment, Plan, User
 from app.routers._helpers import get_or_404
 from app.schemas.liability import LiabilityCreate, LiabilityRead, LiabilityUpdate
 
@@ -48,11 +48,13 @@ def create_liability(
     if db.get(Plan, plan_id) is None:
         raise HTTPException(status_code=404, detail="Plan not found")
     data = payload.model_dump()
+    adjustments = data.pop("adjustments", []) or []
     if data.get("monthly_payment") in (None, 0):
         data["monthly_payment"] = _amortised_monthly_payment(
             data["principal"], data["interest_rate"], data["term_months"]
         )
     liability = Liability(plan_id=plan_id, **data)
+    liability.adjustments = [LiabilityAdjustment(**a) for a in adjustments]
     db.add(liability)
     db.commit()
     db.refresh(liability)
@@ -68,8 +70,13 @@ def update_liability(
 ) -> Liability:
     liability = get_or_404(Liability, liability_id, db)
     require_plan_access(liability.plan_id, user, db, min_role="editor")
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    fields = payload.model_dump(exclude_unset=True)
+    adjustments = fields.pop("adjustments", None)
+    for k, v in fields.items():
         setattr(liability, k, v)
+    if adjustments is not None:
+        # Replace the full set; orphan-delete cascade clears the old rows.
+        liability.adjustments = [LiabilityAdjustment(**a) for a in adjustments]
     db.commit()
     db.refresh(liability)
     return liability

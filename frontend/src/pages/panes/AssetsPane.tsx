@@ -88,6 +88,9 @@ type FormState = {
   contribution_end_year: number | "";
   avc_mode: AvcMode;
   avc_value: number;
+  purchase_year: number | "";
+  deposit: number;
+  disposal_year: number | "";
 };
 
 const blankForm: FormState = {
@@ -105,6 +108,9 @@ const blankForm: FormState = {
   contribution_end_year: "",
   avc_mode: "none",
   avc_value: 0,
+  purchase_year: "",
+  deposit: 0,
+  disposal_year: "",
 };
 
 function inferContribMode(a: Asset): ContribMode {
@@ -141,6 +147,9 @@ function fromAsset(a: Asset): FormState {
     contribution_end_year: a.contribution_end_year ?? "",
     avc_mode: avcMode,
     avc_value: avcMode === "pct_gross" ? a.avc_pct_of_gross : a.avc_annual,
+    purchase_year: a.purchase_year ?? "",
+    deposit: a.deposit ?? 0,
+    disposal_year: a.disposal_year ?? "",
   };
 }
 
@@ -180,6 +189,9 @@ export function AssetsPane({ planId }: { planId: number }) {
             contribution_end_year: a.contribution_end_year,
             avc_annual: a.avc_annual,
             avc_pct_of_gross: a.avc_pct_of_gross,
+            purchase_year: a.purchase_year,
+            deposit: a.deposit,
+            disposal_year: a.disposal_year,
           });
         },
       },
@@ -217,6 +229,9 @@ export function AssetsPane({ planId }: { planId: number }) {
       f.contribution_end_year === "" ? null : f.contribution_end_year,
     avc_annual: f.avc_mode === "fixed" ? f.avc_value : 0,
     avc_pct_of_gross: f.avc_mode === "pct_gross" ? f.avc_value : 0,
+    purchase_year: f.purchase_year === "" ? null : f.purchase_year,
+    deposit: f.purchase_year === "" ? 0 : Math.max(0, f.deposit),
+    disposal_year: f.disposal_year === "" ? null : f.disposal_year,
   });
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -603,6 +618,70 @@ function FormFields({
               </div>
             </>
           )}
+          </div>
+        </details>
+      )}
+
+      {/* Planned purchase / sale (move house, buy a second home). Works for any
+          asset but is built for property. */}
+      {!AVC_KINDS.includes(form.kind) && !NO_CONTRIB_KINDS.includes(form.kind) && (
+        <details
+          open={form.purchase_year !== "" || form.disposal_year !== ""}
+          style={{ flexBasis: "100%", marginTop: 4, borderTop: "1px dashed #e2e8f0", paddingTop: 8 }}
+        >
+          <summary style={{ cursor: "pointer", fontSize: 13, color: "#2563eb", userSelect: "none" }}>
+            {form.purchase_year === "" && form.disposal_year === ""
+              ? "+ Buy in future / sell later"
+              : "Planned purchase / sale"}
+          </summary>
+          <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap", marginTop: 8 }}>
+            <div className="field" style={{ flex: 1, minWidth: 120 }}>
+              <label>
+                Buy in year
+                <HelpTip>
+                  Leave blank if you already own it. Set a future year to buy it then: it holds no
+                  value until that year, when its Value above appears and the deposit below leaves
+                  your cash. Fund the rest by adding a mortgage (Liabilities) starting the same year.
+                </HelpTip>
+              </label>
+              <NumericInput
+                integer
+                placeholder="already owned"
+                value={form.purchase_year === "" ? NaN : form.purchase_year}
+                onChange={(v) => setForm({ ...form, purchase_year: Number.isFinite(v) ? v : "" })}
+              />
+            </div>
+            {form.purchase_year !== "" && (
+              <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                <label>
+                  Deposit (€)
+                  <HelpTip>
+                    Cash paid from your savings on purchase. The remainder of the Value is assumed
+                    financed by a mortgage you add separately.
+                  </HelpTip>
+                </label>
+                <NumericInput
+                  value={form.deposit}
+                  onChange={(v) => Number.isFinite(v) && setForm({ ...form, deposit: Math.max(0, v) })}
+                />
+              </div>
+            )}
+            <div className="field" style={{ flex: 1, minWidth: 120 }}>
+              <label>
+                Sell in year
+                <HelpTip>
+                  Set a year to deliberately sell the whole asset: the proceeds land in your cash
+                  that year (a primary residence is CGT-exempt; ETFs/investments pay disposal tax).
+                  Selling the old home and buying a new one in the same year models moving house.
+                </HelpTip>
+              </label>
+              <NumericInput
+                integer
+                placeholder="never"
+                value={form.disposal_year === "" ? NaN : form.disposal_year}
+                onChange={(v) => setForm({ ...form, disposal_year: Number.isFinite(v) ? v : "" })}
+              />
+            </div>
           </div>
         </details>
       )}

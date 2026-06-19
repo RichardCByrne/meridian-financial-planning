@@ -258,6 +258,14 @@ class Asset(Base):
     # Tax-relievable, jointly capped with salary-linked contributions by the age-based limit.
     avc_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     avc_pct_of_gross: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Planned property/asset transactions (Phase 1). purchase_year in the future
+    # gates the asset (dormant, no value/growth) until then, when `value` becomes
+    # its balance and `deposit` is paid out of cash. disposal_year triggers a
+    # deliberate full sale into cash. Both NULL = owned from base year, never
+    # deliberately sold. Distinct from acquired_year (ETF deemed-disposal clock).
+    purchase_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deposit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    disposal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     plan: Mapped[Plan] = relationship(back_populates="assets")
 

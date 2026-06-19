@@ -114,6 +114,17 @@ class AssetInput:
     contribution_end_year: int | None = None
     avc_annual: float = 0.0
     avc_pct_of_gross: float = 0.0
+    # Planned property/asset transactions (Phase 1). `purchase_year` in the
+    # future gates the asset: it holds no value and doesn't grow until then,
+    # when `value` becomes its balance and `deposit` is paid out of cash (the
+    # rest of the price is a separately-added mortgage). `disposal_year`
+    # triggers a deliberate full sale — net proceeds (after any disposal tax)
+    # land in cash. Both None = today's behaviour (owned from base year, never
+    # deliberately sold). Distinct from `acquired_year`, which is only the ETF
+    # deemed-disposal clock.
+    purchase_year: int | None = None
+    deposit: float = 0.0
+    disposal_year: int | None = None
 
 
 @dataclass
@@ -420,10 +431,27 @@ class AssetState:
     basis: float
     acquired: int
     owner: int | None
+    # Planned-transaction state (Phase 1 property purchase/sale; works for any
+    # asset kind). `active` is False for a future purchase that hasn't happened
+    # yet — such an asset holds no value, doesn't grow, and is excluded from net
+    # worth and the ETF clock until `purchase_year`. `purchase_value`/`deposit`
+    # are consumed once on activation. `disposal_year` triggers a planned full
+    # sale; `sold` latches so it only fires once.
+    active: bool = True
+    purchase_year: int | None = None
+    purchase_value: float = 0.0
+    deposit: float = 0.0
+    disposal_year: int | None = None
+    sold: bool = False
 
 
 def _retirement_age_for(person: PersonInput, default: int) -> int:
     return person.retirement_age if person.retirement_age is not None else default
+
+
+def _is_future_purchase(asset: AssetInput, base_year: int) -> bool:
+    """True if the asset is bought after the base year (dormant until then)."""
+    return asset.purchase_year is not None and asset.purchase_year > base_year
 
 
 def _ensure_finite(value: float, field_label: str) -> None:
@@ -451,6 +479,7 @@ def _validate_plan_input(plan: PlanInput) -> None:
         _ensure_finite(a.growth_rate, f"asset[{a.id}].growth_rate")
         _ensure_finite(a.cost_basis, f"asset[{a.id}].cost_basis")
         _ensure_finite(a.annual_contribution, f"asset[{a.id}].annual_contribution")
+        _ensure_finite(a.deposit, f"asset[{a.id}].deposit")
     for liability in plan.liabilities:
         _ensure_finite(liability.principal, f"liability[{liability.id}].principal")
         _ensure_finite(liability.interest_rate, f"liability[{liability.id}].interest_rate")
@@ -476,11 +505,18 @@ def simulate(plan: PlanInput) -> list[YearRow]:
     states: dict[int, AssetState] = {
         a.id: AssetState(
             kind=a.kind,
-            balance=a.value,
+            # A future purchase starts dormant: no balance, no growth, excluded
+            # from net worth until its purchase_year.
+            balance=0.0 if _is_future_purchase(a, plan.base_year) else a.value,
             growth=a.growth_rate,
             basis=a.cost_basis,
             acquired=a.acquired_year if a.acquired_year is not None else plan.base_year,
             owner=a.owner_person_id,
+            active=not _is_future_purchase(a, plan.base_year),
+            purchase_year=a.purchase_year,
+            purchase_value=a.value,
+            deposit=max(0.0, a.deposit),
+            disposal_year=a.disposal_year,
         )
         for a in plan.assets
     }
@@ -571,7 +607,42 @@ def simulate(plan: PlanInput) -> list[YearRow]:
 
         # ----- 2. Asset growth (start-of-year balances grow over the year) -----
         for st in states.values():
+            # Dormant future purchases hold no value and don't grow yet.
+            if not st.active:
+                continue
             st.balance *= 1.0 + st.growth
+
+        # ----- 2a. Planned asset transactions (Phase 1: property purchase/sale).
+        # Purchases activate at face value (no growth in the purchase year) and
+        # pay their deposit out of cash; the rest of the price is a separately
+        # added mortgage. Planned disposals sell the whole position, net of any
+        # disposal tax, into cash. Both fire once.
+        for aid, st in states.items():
+            if not st.active and st.purchase_year == year and not st.sold:
+                st.active = True
+                st.balance = st.purchase_value
+                st.basis = st.purchase_value
+                st.acquired = year
+                if st.deposit > 0:
+                    states[_cash_target()].balance -= st.deposit
+                notes.append(
+                    f"Purchased asset {aid} for EUR {st.purchase_value:,.0f}"
+                    + (f" (EUR {st.deposit:,.0f} deposit from cash)." if st.deposit > 0 else ".")
+                )
+        for aid, st in states.items():
+            if st.active and not st.sold and st.disposal_year == year:
+                proceeds = st.balance
+                rate = _disposal_tax_rate(st.kind, tax_config)
+                tax = max(0.0, proceeds - st.basis) * rate
+                states[_cash_target()].balance += proceeds - tax
+                st.balance = 0.0
+                st.basis = 0.0
+                st.active = False
+                st.sold = True
+                notes.append(
+                    f"Sold asset {aid} for EUR {proceeds:,.0f}"
+                    + (f", CGT/exit tax EUR {tax:,.0f}." if tax > 0 else " (tax-free).")
+                )
 
         # ----- 2b. ETF deemed disposal -----
         deemed_tax = 0.0

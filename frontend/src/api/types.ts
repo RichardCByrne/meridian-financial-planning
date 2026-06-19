@@ -201,6 +201,12 @@ export interface Asset {
   contribution_end_year: number | null;
   avc_annual: number;
   avc_pct_of_gross: number;
+  // Planned transactions (Phase 1). purchase_year in the future = bought then
+  // (dormant until, deposit paid from cash). disposal_year = deliberately sold
+  // that year (proceeds → cash). null = owned from start / never sold.
+  purchase_year: number | null;
+  deposit: number;
+  disposal_year: number | null;
 }
 
 export interface AssetCreate {
@@ -218,6 +224,9 @@ export interface AssetCreate {
   contribution_end_year?: number | null;
   avc_annual?: number;
   avc_pct_of_gross?: number;
+  purchase_year?: number | null;
+  deposit?: number;
+  disposal_year?: number | null;
 }
 
 export type LiabilityKind = "mortgage" | "loan";

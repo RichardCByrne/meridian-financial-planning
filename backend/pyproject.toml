@@ -10,7 +10,7 @@ requires-python = ">=3.14"
 # code on the next `pip install`. Upgrade process: bump the pin, run
 # `pytest` + `pip-audit`, PR. See DEPLOY.md §"Supply-chain policy".
 dependencies = [
-    "fastapi==0.137.1",
+    "fastapi==0.138.0",
     # Plain uvicorn (not [standard]): the speed extras uvloop/httptools have no
     # cp314 wheels yet, so they'd break the python:3.14-slim build (no toolchain
     # to source-compile). Plain uvicorn is pure-Python (asyncio loop + h11) and

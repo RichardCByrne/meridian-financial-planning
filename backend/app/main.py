@@ -278,6 +278,14 @@ def _apply_lightweight_migrations() -> None:
                 )
             )
 
+    # Fold the redundant "legacy" expense category into "discretionary" (Alembic
+    # 0025). Idempotent.
+    if "expenses" in tables:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE expenses SET category = 'discretionary' WHERE category = 'legacy'")
+            )
+
     # Re-stamp Alembic to head so a dev DB that's been kept up via these
     # lightweight patches doesn't try to re-create tables on the next
     # `alembic upgrade head`. Production never enters this path — it runs

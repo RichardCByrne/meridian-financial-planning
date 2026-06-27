@@ -26,17 +26,12 @@ const CATEGORIES: { value: ExpenseCategory; label: string; hint: string }[] = [
   {
     value: "discretionary",
     label: "Discretionary",
-    hint: "Optional recurring spend (holidays, dining out). Same shape as basic but can be cut in tight years.",
+    hint: "Optional / lifestyle recurring spend (holidays, dining out). Shown separately in the spend breakdown; in the projection it's treated the same as basic.",
   },
   {
     value: "single_year",
     label: "Single year (one-off)",
     hint: "Fires only in start_year and never again — perfect for a wedding, car, big trip, or any one-off cost. End_year and escalation are ignored.",
-  },
-  {
-    value: "legacy",
-    label: "Legacy",
-    hint: "Recurring legacy / gifting provision.",
   },
 ];
 
@@ -170,7 +165,8 @@ export function ExpensesPane({ planId }: { planId: number }) {
                 thExtra: (
                   <HelpTip>
                     Basic = essentials (rent, food). Discretionary = lifestyle (holidays).
-                    Single-year = one-off (car). Legacy = gifts/charity.
+                    Single-year = one-off (car). Basic and discretionary are grouping labels for
+                    the breakdown — the projection treats them the same; only single-year differs.
                   </HelpTip>
                 ),
               },
@@ -232,7 +228,7 @@ export function ExpensesPane({ planId }: { planId: number }) {
 }
 
 function ExpensesTotal({ rows }: { rows: Expense[] }) {
-  // Recurring spend (basic / discretionary / legacy) sums into an annual figure;
+  // Recurring spend (basic / discretionary) sums into an annual figure;
   // single-year lines are one-off costs, so they're surfaced separately rather
   // than folded into the per-year total.
   const recurring = rows.filter((e) => e.category !== "single_year");

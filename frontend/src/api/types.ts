@@ -151,7 +151,7 @@ export type AssetUpdate = Partial<AssetCreate>;
 export type LiabilityUpdate = Partial<LiabilityCreate>;
 export type PersonUpdate = Partial<PersonCreate>;
 
-export type ExpenseCategory = "basic" | "discretionary" | "single_year" | "legacy";
+export type ExpenseCategory = "basic" | "discretionary" | "single_year";
 
 export interface Expense {
   id: number;

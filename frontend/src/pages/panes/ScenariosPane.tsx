@@ -1636,7 +1636,6 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; help: string 
   { value: "single_year", label: "One-off (single year)", help: "Fires once in start year only — wedding, car, big trip." },
   { value: "basic", label: "Basic (recurring)", help: "Recurring essential expense from start year to end year (or forever)." },
   { value: "discretionary", label: "Discretionary (recurring)", help: "Recurring optional spend." },
-  { value: "legacy", label: "Legacy / inheritance plan", help: "Recurring legacy provision." },
 ];
 
 function AddExpenseForm({ onSubmit }: { onSubmit: (payload: AddedExpense) => void }) {

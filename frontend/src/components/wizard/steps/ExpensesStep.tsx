@@ -8,7 +8,6 @@ const CATEGORIES: { value: ExpenseCategory; label: string; description?: string 
   { value: "basic", label: "Basic", description: "Essential year-on-year living costs" },
   { value: "discretionary", label: "Discretionary", description: "Holidays, dining out, hobbies" },
   { value: "single_year", label: "One-off", description: "A single year (e.g. wedding)" },
-  { value: "legacy", label: "Legacy", description: "Continues after the owner dies" },
 ];
 
 export function ExpensesStep() {

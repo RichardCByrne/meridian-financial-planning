@@ -1096,6 +1096,11 @@ function YearDetailCard({
           flexWrap: "wrap",
           height: "clamp(260px, 40vh, 380px)",
           overflowY: "auto",
+          // Keep the scrollbar clear of the right-aligned amounts: reserve a
+          // gutter on classic scrollbars and pad for mobile overlay scrollbars
+          // (which paint over content regardless of gutter).
+          scrollbarGutter: "stable",
+          paddingRight: 12,
         }}
       >
         <div style={{ flex: 1, minWidth: 220 }}>

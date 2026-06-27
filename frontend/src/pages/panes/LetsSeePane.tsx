@@ -409,6 +409,10 @@ export function LetsSeePane({ planId }: { planId: number }) {
               className={`btn ${showEvents ? "" : "btn-secondary"}`}
               onClick={() => setShowEvents((v) => !v)}
               title="Mark life events (retirement, state pension, goals, births, shortfall) on the chart"
+              // Fixed width covering both labels so the "on"/"off" flip never
+              // changes the toolbar width and reflows the chart-type select onto
+              // a new line.
+              style={{ minWidth: 104, textAlign: "center" }}
             >
               {showEvents ? "Events on" : "Events off"}
             </button>

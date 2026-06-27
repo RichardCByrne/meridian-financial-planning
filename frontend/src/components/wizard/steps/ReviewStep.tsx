@@ -29,11 +29,13 @@ const INCOME_KIND_LABELS: Record<string, string> = {
 
 const GOAL_KIND_LABELS: Record<string, string> = {
   retirement: "Retirement nest egg",
-  pre_retirement_spend: "Pre-retirement spend",
-  milestone: "Milestone",
-  education: "Education",
+  spend: "One-off spend",
   net_worth: "Net worth target",
-  gift: "Gift",
+  // Legacy kinds (pre-consolidation) kept as fallback labels.
+  pre_retirement_spend: "One-off spend",
+  milestone: "One-off spend",
+  education: "One-off spend",
+  gift: "One-off spend",
 };
 
 const FILING_LABELS: Record<string, string> = {

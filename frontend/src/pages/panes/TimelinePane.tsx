@@ -12,11 +12,8 @@ import { NumericInput } from "../../components/NumericInput";
 
 const GOAL_COLORS: Record<GoalKind, string> = {
   retirement: "#7c3aed",
-  pre_retirement_spend: "#0891b2",
-  milestone: "#2563eb",
-  education: "#0d9488",
+  spend: "#2563eb",
   net_worth: "#f59e0b",
-  gift: "#db2777",
 };
 
 const RETIREMENT_COLOR = "#0f172a";

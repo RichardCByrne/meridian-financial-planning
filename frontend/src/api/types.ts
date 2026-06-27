@@ -288,13 +288,7 @@ export interface LiabilityCreate {
   adjustments?: LiabilityAdjustmentCreate[];
 }
 
-export type GoalKind =
-  | "retirement"
-  | "pre_retirement_spend"
-  | "milestone"
-  | "education"
-  | "net_worth"
-  | "gift";
+export type GoalKind = "retirement" | "spend" | "net_worth";
 
 export interface Goal {
   id: number;

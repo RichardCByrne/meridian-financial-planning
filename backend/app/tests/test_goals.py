@@ -37,20 +37,20 @@ def _cash(value: float = 50_000) -> AssetInput:
     )
 
 
-def test_milestone_goal_becomes_expense_in_target_year():
-    goal = GoalInput(
-        id=10, kind="milestone", name="New car", target_amount=30_000, target_year=2028,
-    )
-    plan = PlanInput(
+def _spend_plan(kind: str) -> PlanInput:
+    return PlanInput(
         base_year=2026, projection_years=4,
         people=[_employee()],
         incomes=[_salary()],
         expenses=[],
         assets=[_cash()],
         assumptions=AssumptionsInput(),
-        goals=[goal],
+        goals=[GoalInput(id=10, kind=kind, name="New car", target_amount=30_000, target_year=2028)],
     )
-    rows = simulate(plan)
+
+
+def test_spend_goal_becomes_expense_in_target_year():
+    rows = simulate(_spend_plan("spend"))
     # Year 2026 (idx 0): no goal expense.
     assert "goals" not in rows[0].expenses_by_category
     # Year 2028 (idx 2): 30k goal expense.
@@ -60,6 +60,25 @@ def test_milestone_goal_becomes_expense_in_target_year():
     assert rows[1].goal_status[10] == "pending"
     assert rows[2].goal_status[10] == "achieved"
     assert rows[3].goal_status[10] == "achieved"
+
+
+def test_legacy_spend_kinds_still_behave_as_one_off_costs():
+    # Un-migrated rows (or old scenario data) keep working as one-off spends.
+    for legacy in ("milestone", "education", "gift", "pre_retirement_spend"):
+        rows = simulate(_spend_plan(legacy))
+        assert abs(rows[2].expenses_by_category.get("goals", 0) - 30_000) < 1
+        assert rows[2].goal_status[10] == "achieved"
+
+
+def test_goal_schema_normalises_legacy_kinds_to_spend():
+    from app.schemas.goal import GoalCreate
+
+    for legacy in ("milestone", "education", "gift", "pre_retirement_spend"):
+        g = GoalCreate(kind=legacy, name="X", target_amount=1_000, target_year=2030)
+        assert g.kind == "spend"
+    # Canonical kinds pass through unchanged.
+    for canonical in ("spend", "net_worth", "retirement"):
+        assert GoalCreate(kind=canonical, name="X", target_amount=0, target_year=2030).kind == canonical
 
 
 def test_net_worth_goal_evaluates_at_target_year():

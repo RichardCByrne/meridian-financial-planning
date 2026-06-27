@@ -30,26 +30,14 @@ const KINDS: KindMeta[] = [
     ),
   },
   {
-    value: "pre_retirement_spend",
-    label: "Pre-retirement spend",
-    amountLabel: "Amount to spend (€)",
-    amountHelp: <>One-off spend in the target year. Added to that year's expenses.</>,
-  },
-  {
-    value: "milestone",
-    label: "Milestone",
-    description: "One-off event (car, wedding, etc.)",
-    amountLabel: "Cost (€)",
-    amountHelp: <>One-off cost in the target year. Added to that year's expenses.</>,
-  },
-  {
-    value: "education",
-    label: "Education",
+    value: "spend",
+    label: "One-off spend",
+    description: "A one-off cost (car, wedding, college fees, gift, etc.)",
     amountLabel: "Cost (€)",
     amountHelp: (
       <>
-        Lump-sum cost in the target year (e.g. tuition). For recurring fees, add expenses
-        separately.
+        One-off cost in the target year — the name says what it's for. Added to that year's
+        expenses. For recurring costs, add expenses separately.
       </>
     ),
   },
@@ -63,12 +51,6 @@ const KINDS: KindMeta[] = [
         wrappers don't count toward this.
       </>
     ),
-  },
-  {
-    value: "gift",
-    label: "Gift / inheritance",
-    amountLabel: "Amount (€)",
-    amountHelp: <>One-off transfer out in the target year. Added to that year's expenses.</>,
   },
 ];
 

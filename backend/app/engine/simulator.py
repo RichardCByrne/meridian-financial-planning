@@ -649,7 +649,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
     goal_resolved: dict[int, str] = {}  # goal id -> last resolved status (sticks once set)
     rows: list[YearRow] = []
 
-    _COST_BEARING_GOAL_KINDS = {"milestone", "gift", "pre_retirement_spend", "education"}
+    # "spend" is the canonical one-off-cost goal kind. The legacy kinds were all
+    # financially identical one-off spends (consolidated in migration 0024); kept
+    # here so an un-migrated row still behaves correctly.
+    _COST_BEARING_GOAL_KINDS = {
+        "spend", "milestone", "gift", "pre_retirement_spend", "education",
+    }
 
     if len(plan.people) >= 2:
         earners = {

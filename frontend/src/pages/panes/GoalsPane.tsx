@@ -21,27 +21,9 @@ import { useSoftDelete } from "../../lib/useSoftDelete";
 
 const KINDS: { value: GoalKind; label: string; help: string; costBearing: boolean }[] = [
   {
-    value: "milestone",
-    label: "Milestone",
-    help: "One-shot spend in target year (e.g. car, wedding). Adds to expenses.",
-    costBearing: true,
-  },
-  {
-    value: "education",
-    label: "Education",
-    help: "Tuition / school fees. One-shot in target year (extend with recurring expenses).",
-    costBearing: true,
-  },
-  {
-    value: "gift",
-    label: "Gift / inheritance",
-    help: "One-shot transfer out in target year. Adds to expenses.",
-    costBearing: true,
-  },
-  {
-    value: "pre_retirement_spend",
-    label: "Pre-retirement spend",
-    help: "One-shot spend before retirement (e.g. lump-sum holiday). Adds to expenses.",
+    value: "spend",
+    label: "One-off spend",
+    help: "A one-off cost in the target year — car, wedding, college fees, gift, etc. Adds to expenses; the name says what it's for. Achieved if it's affordable that year.",
     costBearing: true,
   },
   {
@@ -68,7 +50,7 @@ type FormState = {
 };
 
 const blankForm: FormState = {
-  kind: "milestone",
+  kind: "spend",
   name: "New car",
   target_amount: 30_000,
   target_year: 2030,
@@ -205,8 +187,8 @@ export function GoalsPane({ planId }: { planId: number }) {
                 cell: (g) => <StatusBadge status={statusForGoal(g.id, g.target_year)} />,
                 thExtra: (
                   <HelpTip>
-                    Resolves at target year and stays sticky thereafter. Cost-bearing goals
-                    (milestone, education, gift, pre-retirement spend): <strong>Achieved</strong> if
+                    Resolves at target year and stays sticky thereafter. One-off spend goals:
+                    <strong> Achieved</strong> if
                     funded that year, <strong>Missed</strong> if the year ran into a shortfall.
                     Net-worth goals: <strong>Met</strong> if net worth ≥ target at the snapshot year,
                     <strong> Below target</strong> otherwise — this is a snapshot, not a guarantee

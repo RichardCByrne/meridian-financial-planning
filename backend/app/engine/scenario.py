@@ -20,6 +20,17 @@ Shape:
                                   "amount": 20000, "start_year": 2029}]},
       "children":    {"<id>": {"active": false},   # drop a child from this scenario
                       "_added": [{"name": "Third child", "dob": "2028-01-01"}]},
+      "assets":      {"<id>": {"growth_rate": 0.04, ...},
+                      "_added": [{"name": "BTL flat", "kind": "property_btl",
+                                  "value": 350000, "purchase_year": 2029,
+                                  "deposit": 105000, "stamp_duty_pct": 0.075,
+                                  "growth_rate": 0.03, "owner_person_id": 1,
+                                  "_linked_liability_ref": "btl-mortgage"}]},
+      "liabilities": {"<id>": {"interest_rate": 0.045, ...},
+                      "_added": [{"_ref": "btl-mortgage", "name": "BTL mortgage",
+                                  "kind": "mortgage", "principal": 245000,
+                                  "interest_rate": 0.055, "term_months": 300,
+                                  "start_year": 2029}]},   # monthly_payment auto-computed
       ...
       "assumptions": {"inflation_rate": 0.03, ...},
       "filing_status": "married",   # plan-level scalar override (optional)
@@ -41,11 +52,14 @@ from datetime import date
 from typing import Any
 
 from app.engine.simulator import (
+    AssetInput,
     BenefitInput,
     ChildInput,
     ExpenseInput,
     IncomeInput,
+    LiabilityInput,
     PlanInput,
+    _amortised_payment,
 )
 
 _BUCKETS: tuple[str, ...] = (
@@ -149,12 +163,94 @@ def _build_added_child(payload: dict[str, Any], synthetic_id: int) -> ChildInput
         return None
 
 
+def _build_added_liability(payload: dict[str, Any], synthetic_id: int) -> LiabilityInput | None:
+    try:
+        principal = float(payload["principal"])
+        rate = float(payload.get("interest_rate", 0.0))
+        term = int(payload.get("term_months", 0))
+        mp_raw = payload.get("monthly_payment")
+        # Auto-derive the contracted payment from principal/rate/term when the
+        # caller doesn't supply one — a scenario typically only knows price,
+        # deposit, rate and term, not the exact monthly figure.
+        monthly_payment = (
+            float(mp_raw) if mp_raw not in (None, "")
+            else _amortised_payment(principal, rate, term)
+        )
+        return LiabilityInput(
+            id=synthetic_id,
+            name=str(payload.get("name", "Added liability")),
+            kind=str(payload.get("kind", "mortgage")),
+            principal=principal,
+            interest_rate=rate,
+            term_months=term,
+            start_year=int(payload["start_year"]),
+            monthly_payment=monthly_payment,
+            monthly_overpayment=float(payload.get("monthly_overpayment", 0.0)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _build_added_asset(
+    payload: dict[str, Any],
+    synthetic_id: int,
+    liability_ref_map: dict[str, int],
+) -> AssetInput | None:
+    try:
+        # Resolve the mortgage link: prefer a ref to a same-scenario _added
+        # liability, else an explicit numeric id of a base-plan liability.
+        linked: int | None = None
+        ref = payload.get("_linked_liability_ref")
+        if isinstance(ref, str) and ref in liability_ref_map:
+            linked = liability_ref_map[ref]
+        elif payload.get("linked_liability_id") not in (None, ""):
+            linked = int(payload["linked_liability_id"])
+        value = float(payload["value"])
+        return AssetInput(
+            id=synthetic_id,
+            name=str(payload.get("name", "Added asset")),
+            kind=str(payload.get("kind", "property_btl")),
+            value=value,
+            growth_rate=float(payload.get("growth_rate", 0.0)),
+            # Property basis defaults to the purchase price for CGT on disposal.
+            cost_basis=float(payload.get("cost_basis", value)),
+            acquired_year=int(payload["acquired_year"])
+            if payload.get("acquired_year") not in (None, "") else None,
+            owner_person_id=int(payload["owner_person_id"])
+            if payload.get("owner_person_id") not in (None, "") else None,
+            purchase_year=int(payload["purchase_year"])
+            if payload.get("purchase_year") not in (None, "") else None,
+            deposit=float(payload.get("deposit", 0.0)),
+            disposal_year=int(payload["disposal_year"])
+            if payload.get("disposal_year") not in (None, "") else None,
+            linked_liability_id=linked,
+            stamp_duty_pct=float(payload.get("stamp_duty_pct", 0.0)),
+            selling_cost_pct=float(payload.get("selling_cost_pct", 0.0)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 _ADDED_BUILDERS = {
     "incomes": _build_added_income,
     "expenses": _build_added_expense,
     "benefits": _build_added_benefit,
     "children": _build_added_child,
 }
+
+# Scenario-added assets get ids well below the simulator's reserved synthetic
+# asset ids (cash = -1, implicit PRSA = -1000-pid, implicit ARF = -2000-pid) so
+# they never alias an auto-created wrapper. Liabilities have no reserved
+# negatives, so they reuse the generic -1, -2, ... allocator.
+_SCENARIO_ASSET_ID_BASE = -1_000_000
+
+
+def _next_synthetic_asset_id(items: list[Any]) -> int:
+    used = {item.id for item in items if hasattr(item, "id")}
+    candidate = _SCENARIO_ASSET_ID_BASE
+    while candidate in used:
+        candidate -= 1
+    return candidate
 
 
 def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanInput:
@@ -185,6 +281,36 @@ def apply_overrides(plan: PlanInput, overrides: dict[str, Any] | None) -> PlanIn
                     if built is not None:
                         items.append(built)
         new_lists[bucket] = items
+
+    # Assets and liabilities support `_added` too, but an added asset can be
+    # financed by an added liability (a buy-to-let property + its new mortgage),
+    # so they're built here with cross-reference resolution rather than via the
+    # generic single-bucket builders above. Liabilities first so an asset can
+    # resolve its mortgage by `_ref`.
+    liability_ref_map: dict[str, int] = {}
+    liab_added = (overrides.get("liabilities") or {}).get("_added")
+    if isinstance(liab_added, list):
+        for raw in liab_added:
+            if not isinstance(raw, dict):
+                continue
+            new_id = _next_synthetic_id(new_lists["liabilities"])
+            built = _build_added_liability(raw, new_id)
+            if built is None:
+                continue
+            new_lists["liabilities"].append(built)
+            ref = raw.get("_ref")
+            if isinstance(ref, str) and ref:
+                liability_ref_map[ref] = new_id
+
+    asset_added = (overrides.get("assets") or {}).get("_added")
+    if isinstance(asset_added, list):
+        for raw in asset_added:
+            if not isinstance(raw, dict):
+                continue
+            new_id = _next_synthetic_asset_id(new_lists["assets"])
+            built = _build_added_asset(raw, new_id, liability_ref_map)
+            if built is not None:
+                new_lists["assets"].append(built)
 
     new_assumptions = plan.assumptions
     a_patch = overrides.get("assumptions") or {}

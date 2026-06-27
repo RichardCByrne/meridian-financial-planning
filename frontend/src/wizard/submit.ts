@@ -2,6 +2,10 @@ import { api } from "../api/client";
 import type {
   Asset,
   AssetCreate,
+  Benefit,
+  BenefitCreate,
+  Child,
+  ChildCreate,
   Expense,
   ExpenseCreate,
   Goal,
@@ -21,7 +25,9 @@ import type { DraftId, WizardState } from "./store";
 export type SubmitPhase =
   | "plan"
   | "people"
+  | "children"
   | "income"
+  | "benefits"
   | "assets"
   | "liabilities"
   | "expenses"
@@ -95,7 +101,9 @@ export async function submitWizard(
   const totalRows =
     1 +
     state.people.length +
+    state.children.length +
     state.incomes.length +
+    state.benefits.length +
     state.assets.length +
     state.properties.length +
     state.liabilities.length +
@@ -142,6 +150,31 @@ export async function submitWizard(
     }),
   );
 
+  // Phase: children (carer resolves to a server person id)
+  await Promise.all(
+    state.children.map(async (c) => {
+      if (serverIds[c.draftId] != null) {
+        completed += 1;
+        report("children");
+        return;
+      }
+      const { draftId: _i, primaryCarerDraftId, ...rest } = c;
+      const payload: ChildCreate = {
+        ...rest,
+        primary_carer_id: primaryCarerDraftId ? serverIds[primaryCarerDraftId] ?? null : null,
+      };
+      try {
+        const created = await api.post<Child>(`/plans/${planId}/children`, payload);
+        serverIds[c.draftId] = created.id;
+      } catch (e) {
+        errors.push({ draftId: c.draftId, phase: "children", message: errMessage(e) });
+      } finally {
+        completed += 1;
+        report("children");
+      }
+    }),
+  );
+
   // Phase: income (per person, parallel within phase)
   await Promise.all(
     state.incomes.map(async (i) => {
@@ -172,6 +205,39 @@ export async function submitWizard(
       } finally {
         completed += 1;
         report("income");
+      }
+    }),
+  );
+
+  // Phase: benefits (BIK belongs to a server person id)
+  await Promise.all(
+    state.benefits.map(async (b) => {
+      if (serverIds[b.draftId] != null) {
+        completed += 1;
+        report("benefits");
+        return;
+      }
+      const personId = serverIds[b.personDraftId];
+      if (personId == null) {
+        errors.push({
+          draftId: b.draftId,
+          phase: "benefits",
+          message: "Owning person failed to create",
+        });
+        completed += 1;
+        report("benefits");
+        return;
+      }
+      const { draftId: _i, personDraftId: _p, ...rest } = b;
+      const payload: BenefitCreate = { ...rest, person_id: personId };
+      try {
+        const created = await api.post<Benefit>(`/plans/${planId}/benefits`, payload);
+        serverIds[b.draftId] = created.id;
+      } catch (e) {
+        errors.push({ draftId: b.draftId, phase: "benefits", message: errMessage(e) });
+      } finally {
+        completed += 1;
+        report("benefits");
       }
     }),
   );

@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import type {
   AssetCreate,
+  BenefitCreate,
+  ChildCreate,
   ExpenseCreate,
   FilingStatus,
   GoalCreate,
@@ -15,7 +17,9 @@ import type {
 export type WizardStepId =
   | "plan"
   | "people"
+  | "children"
   | "income"
+  | "benefits"
   | "assets"
   | "properties"
   | "liabilities"
@@ -26,7 +30,9 @@ export type WizardStepId =
 export const WIZARD_STEPS: WizardStepId[] = [
   "plan",
   "people",
+  "children",
   "income",
+  "benefits",
   "assets",
   "properties",
   "liabilities",
@@ -76,10 +82,22 @@ export interface GoalDraft extends GoalCreate {
   linkedPersonDraftId?: DraftId | null;
 }
 
+export interface ChildDraft extends Omit<ChildCreate, "primary_carer_id"> {
+  draftId: DraftId;
+  primaryCarerDraftId?: DraftId | null;
+}
+
+export interface BenefitDraft extends Omit<BenefitCreate, "person_id"> {
+  draftId: DraftId;
+  personDraftId: DraftId;
+}
+
 export interface WizardState {
   plan: PlanDraft;
   people: PersonDraft[];
+  children: ChildDraft[];
   incomes: IncomeDraft[];
+  benefits: BenefitDraft[];
   assets: AssetDraft[];
   properties: AssetDraft[];
   liabilities: LiabilityDraft[];
@@ -118,6 +136,14 @@ export interface WizardState {
   updateGoal: (id: DraftId, g: Partial<GoalDraft>) => void;
   removeGoal: (id: DraftId) => void;
 
+  addChild: (c: Omit<ChildDraft, "draftId">) => DraftId;
+  updateChild: (id: DraftId, c: Partial<ChildDraft>) => void;
+  removeChild: (id: DraftId) => void;
+
+  addBenefit: (b: Omit<BenefitDraft, "draftId">) => DraftId;
+  updateBenefit: (id: DraftId, b: Partial<BenefitDraft>) => void;
+  removeBenefit: (id: DraftId) => void;
+
   goTo: (step: WizardStepId) => void;
   reset: () => void;
 }
@@ -133,7 +159,9 @@ const initialState = (): Pick<
   WizardState,
   | "plan"
   | "people"
+  | "children"
   | "incomes"
+  | "benefits"
   | "assets"
   | "properties"
   | "liabilities"
@@ -144,7 +172,9 @@ const initialState = (): Pick<
 > => ({
   plan: defaultPlan(),
   people: [],
+  children: [],
   incomes: [],
+  benefits: [],
   assets: [],
   properties: [],
   liabilities: [],
@@ -184,6 +214,12 @@ export const useWizard = create<WizardState>()(
           ),
           goals: s.goals.map((g) =>
             g.linkedPersonDraftId === id ? { ...g, linkedPersonDraftId: null } : g,
+          ),
+          // A benefit-in-kind belongs to a person, so drop it with that person.
+          benefits: s.benefits.filter((b) => b.personDraftId !== id),
+          // Children only reference a carer — null it, keep the child.
+          children: s.children.map((c) =>
+            c.primaryCarerDraftId === id ? { ...c, primaryCarerDraftId: null } : c,
           ),
           dirty: true,
         })),
@@ -278,6 +314,32 @@ export const useWizard = create<WizardState>()(
       removeGoal: (id) =>
         set((s) => ({ goals: s.goals.filter((x) => x.draftId !== id), dirty: true })),
 
+      addChild: (c) => {
+        const draftId = newDraftId();
+        set((s) => ({ children: [...s.children, { ...c, draftId }], dirty: true }));
+        return draftId;
+      },
+      updateChild: (id, c) =>
+        set((s) => ({
+          children: s.children.map((x) => (x.draftId === id ? { ...x, ...c } : x)),
+          dirty: true,
+        })),
+      removeChild: (id) =>
+        set((s) => ({ children: s.children.filter((x) => x.draftId !== id), dirty: true })),
+
+      addBenefit: (b) => {
+        const draftId = newDraftId();
+        set((s) => ({ benefits: [...s.benefits, { ...b, draftId }], dirty: true }));
+        return draftId;
+      },
+      updateBenefit: (id, b) =>
+        set((s) => ({
+          benefits: s.benefits.map((x) => (x.draftId === id ? { ...x, ...b } : x)),
+          dirty: true,
+        })),
+      removeBenefit: (id) =>
+        set((s) => ({ benefits: s.benefits.filter((x) => x.draftId !== id), dirty: true })),
+
       goTo: (step) => set({ currentStep: step }),
       reset: () => set(initialState()),
     }),
@@ -287,7 +349,9 @@ export const useWizard = create<WizardState>()(
       partialize: (s) => ({
         plan: s.plan,
         people: s.people,
+        children: s.children,
         incomes: s.incomes,
+        benefits: s.benefits,
         assets: s.assets,
         properties: s.properties,
         liabilities: s.liabilities,

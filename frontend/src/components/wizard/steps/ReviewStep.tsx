@@ -38,6 +38,14 @@ const GOAL_KIND_LABELS: Record<string, string> = {
   gift: "One-off spend",
 };
 
+const BENEFIT_KIND_LABELS: Record<string, string> = {
+  medical_insurance: "Medical insurance",
+  company_car: "Company car",
+  company_van: "Company van",
+  preferential_loan: "Preferential loan",
+  other: "Other",
+};
+
 const FILING_LABELS: Record<string, string> = {
   single: "Single",
   married: "Married / civil partnership",
@@ -69,6 +77,61 @@ export function ReviewStep({ progress }: { progress: SubmitProgress | null }) {
         {s.people.map((p) => (
           <PersonCard key={p.draftId} person={p} incomes={s.incomes} />
         ))}
+      </Section>
+
+      <Section
+        title="Children"
+        count={s.children.length}
+        editStep="children"
+        empty="No children added."
+      >
+        {s.children.map((c) => {
+          const costs =
+            (c.childcare_annual ?? 0) +
+            (c.primary_annual ?? 0) +
+            (c.secondary_annual ?? 0) +
+            (c.secondary_is_private ? c.secondary_private_fee_annual ?? 0 : 0) +
+            (c.everyday_annual ?? 0);
+          return (
+            <RowLine
+              key={c.draftId}
+              primary={c.name || "(unnamed)"}
+              secondary={`Born ${c.dob}`}
+              tertiary={
+                costs > 0
+                  ? `Carer: ${personName(c.primaryCarerDraftId)} · rearing costs set`
+                  : `Carer: ${personName(c.primaryCarerDraftId)}`
+              }
+            />
+          );
+        })}
+      </Section>
+
+      <Section
+        title="Benefits-in-kind"
+        count={s.benefits.length}
+        editStep="benefits"
+        empty="No benefits added."
+      >
+        {s.benefits.map((b) => {
+          const person = s.people.find((p) => p.draftId === b.personDraftId);
+          const detail =
+            b.kind === "company_car" || b.kind === "company_van"
+              ? b.omv
+                ? `OMV ${fmtMoney(b.omv)}`
+                : ""
+              : b.amount
+                ? fmtMoney(b.amount)
+                : "";
+          return (
+            <RowLine
+              key={b.draftId}
+              primary={b.name || "(unnamed)"}
+              secondary={`${BENEFIT_KIND_LABELS[b.kind] ?? b.kind}${detail ? ` · ${detail}` : ""}`}
+              tertiary={`${person?.name ?? "(unassigned)"} · from ${b.start_year}${b.end_year ? `–${b.end_year}` : ""}`}
+            />
+          );
+        })}
       </Section>
 
       <Section

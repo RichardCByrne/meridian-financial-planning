@@ -91,8 +91,14 @@ export function canAdvance(step: WizardStepId, s: WizardState): boolean {
       if (primaries !== 1) return false;
       return s.people.every((p) => validatePerson(p).length === 0);
     }
+    case "children":
+      // Optional step; the add form enforces name + dob, so nothing blocks here.
+      return true;
     case "income":
       return s.incomes.every((i) => validateIncome(i, s.plan).length === 0);
+    case "benefits":
+      // Optional step; the add form enforces the required fields per kind.
+      return true;
     case "assets":
       return s.assets.every((a) => validateAsset(a).length === 0);
     case "properties":

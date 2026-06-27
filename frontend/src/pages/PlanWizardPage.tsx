@@ -7,7 +7,9 @@ import { confirmDialog } from "../components/ConfirmDialog";
 import { WizardStep } from "../components/wizard/WizardStep";
 import { PlanStep } from "../components/wizard/steps/PlanStep";
 import { PeopleStep } from "../components/wizard/steps/PeopleStep";
+import { ChildrenStep } from "../components/wizard/steps/ChildrenStep";
 import { IncomeStep } from "../components/wizard/steps/IncomeStep";
+import { BenefitsStep } from "../components/wizard/steps/BenefitsStep";
 import { AssetsStep } from "../components/wizard/steps/AssetsStep";
 import { PropertiesStep } from "../components/wizard/steps/PropertiesStep";
 import { LiabilitiesStep } from "../components/wizard/steps/LiabilitiesStep";
@@ -21,7 +23,9 @@ import { submitWizard, type SubmitProgress, type SubmitResult } from "../wizard/
 const STEP_META: Record<WizardStepId, { title: string; subtitle?: string }> = {
   plan: { title: "Your plan", subtitle: "Name and time horizon" },
   people: { title: "People", subtitle: "Plan holder and any partner" },
+  children: { title: "Children", subtitle: "Child Benefit and rearing costs (optional)" },
   income: { title: "Income", subtitle: "Salaries, pensions, and bonuses" },
+  benefits: { title: "Benefits", subtitle: "Employer benefits-in-kind (optional)" },
   assets: { title: "Assets", subtitle: "Cash, deposits, investments, and pensions" },
   properties: { title: "Properties", subtitle: "Homes and buy-to-lets" },
   liabilities: { title: "Liabilities", subtitle: "Mortgages and loans" },
@@ -145,7 +149,9 @@ export function PlanWizardPage() {
       >
         {step === "plan" && <PlanStep />}
         {step === "people" && <PeopleStep />}
+        {step === "children" && <ChildrenStep />}
         {step === "income" && <IncomeStep />}
+        {step === "benefits" && <BenefitsStep />}
         {step === "assets" && <AssetsStep />}
         {step === "properties" && <PropertiesStep />}
         {step === "liabilities" && <LiabilitiesStep />}

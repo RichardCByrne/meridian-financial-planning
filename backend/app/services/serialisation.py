@@ -22,6 +22,7 @@ from app.models import (
     Assumptions,
     Benefit,
     Bequest,
+    Child,
     Expense,
     Goal,
     IncomeSource,
@@ -120,6 +121,13 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
             }
             for b in plan.benefits
         ],
+        "children": [
+            {
+                **_strip_ids(_columns(c), drop=["id", "plan_id", "primary_carer_id"]),
+                "_carer_local_id": c.primary_carer_id,
+            }
+            for c in plan.children
+        ],
         "assumptions": (
             _strip_ids(_columns(plan.assumptions), drop=["id", "plan_id"])
             if plan.assumptions
@@ -215,6 +223,13 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
         person_id = person_id_map.get(person_local) if person_local is not None else None
         if person_id is not None:
             db.add(Benefit(**ben_payload, plan_id=plan.id, person_id=person_id))
+
+    for c_payload in payload.get("children", []):
+        carer_local = c_payload.pop("_carer_local_id", None)
+        carer_id = person_id_map.get(carer_local) if carer_local is not None else None
+        if isinstance(c_payload.get("dob"), str):
+            c_payload["dob"] = date.fromisoformat(c_payload["dob"])
+        db.add(Child(**c_payload, plan_id=plan.id, primary_carer_id=carer_id))
 
     a_payload = payload.get("assumptions")
     if a_payload:

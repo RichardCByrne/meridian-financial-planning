@@ -47,7 +47,40 @@ def _seed_plan(client: TestClient) -> int:
         f"/api/plans/{pid}/scenarios",
         json={"name": "Boost", "overrides": {"assumptions": {"inflation_rate": 0.04}}},
     )
+    client.post(
+        f"/api/plans/{pid}/children",
+        json={"name": "Saoirse", "dob": "2020-01-01", "primary_carer_id": person["id"]},
+    )
     return pid
+
+
+def test_children_survive_export_import_with_carer_remap():
+    with TestClient(app) as client:
+        src_id = _seed_plan(client)
+        export = client.get(f"/api/plans/{src_id}/export").json()
+        assert len(export["children"]) == 1
+        assert "_carer_local_id" in export["children"][0]
+        # FK columns are stripped from the dumped row.
+        assert "primary_carer_id" not in export["children"][0]
+
+        imported = client.post("/api/plans/import", json=export).json()
+        new_id = imported["id"]
+        kids = client.get(f"/api/plans/{new_id}/children").json()
+        assert len(kids) == 1
+        assert kids[0]["name"] == "Saoirse"
+        # Carer FK is remapped onto the imported plan's own person.
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        assert kids[0]["primary_carer_id"] == new_people[0]["id"]
+
+
+def test_children_survive_clone():
+    with TestClient(app) as client:
+        src_id = _seed_plan(client)
+        new_id = client.post(f"/api/plans/{src_id}/clone").json()["id"]
+        kids = client.get(f"/api/plans/{new_id}/children").json()
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        assert len(kids) == 1
+        assert kids[0]["primary_carer_id"] == new_people[0]["id"]
 
 
 def test_clone_creates_independent_plan_with_same_projection():

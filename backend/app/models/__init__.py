@@ -44,7 +44,7 @@ class PlanMember(Base):
         ForeignKey("plans.id", ondelete="CASCADE"), primary_key=True
     )
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # viewer | editor | owner
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
@@ -67,7 +67,7 @@ class PlanInvite(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     plan_id: Mapped[int] = mapped_column(
-        ForeignKey("plans.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("plans.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_by_user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -157,7 +157,7 @@ class Benefit(Base):
     __tablename__ = "benefits"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     person_id: Mapped[int] = mapped_column(
         ForeignKey("people.id", ondelete="CASCADE"), nullable=False
     )
@@ -185,7 +185,7 @@ class Child(Base):
     __tablename__ = "children"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     dob: Mapped[date] = mapped_column(Date, nullable=False)
     # Person who receives Child Benefit. NULL = pay to plan's primary person.
@@ -219,7 +219,7 @@ class Person(Base):
     __tablename__ = "people"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     dob: Mapped[date] = mapped_column(Date, nullable=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -259,7 +259,9 @@ class IncomeSource(Base):
     __tablename__ = "income_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    person_id: Mapped[int] = mapped_column(ForeignKey("people.id", ondelete="CASCADE"))
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
     kind: Mapped[str] = mapped_column(String(40), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     gross_amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -283,7 +285,7 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     category: Mapped[str] = mapped_column(String(40), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -301,7 +303,7 @@ class Asset(Base):
     __tablename__ = "assets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     kind: Mapped[str] = mapped_column(String(40), nullable=False)
     value: Mapped[float] = mapped_column(Float, nullable=False)
@@ -344,7 +346,7 @@ class Liability(Base):
     __tablename__ = "liabilities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     kind: Mapped[str] = mapped_column(String(40), nullable=False)
     principal: Mapped[float] = mapped_column(Float, nullable=False)
@@ -379,7 +381,7 @@ class LiabilityAdjustment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     liability_id: Mapped[int] = mapped_column(
-        ForeignKey("liabilities.id", ondelete="CASCADE")
+        ForeignKey("liabilities.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
     effective_year: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -392,7 +394,7 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(40), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -409,7 +411,7 @@ class Scenario(Base):
     __tablename__ = "scenarios"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"))
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     parent_scenario_id: Mapped[int | None] = mapped_column(
         ForeignKey("scenarios.id", ondelete="SET NULL"), nullable=True
@@ -455,7 +457,7 @@ class Bequest(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     plan_id: Mapped[int] = mapped_column(
-        ForeignKey("plans.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("plans.id", ondelete="CASCADE"), nullable=False, index=True
     )
     from_person_id: Mapped[int] = mapped_column(
         ForeignKey("people.id", ondelete="CASCADE"), nullable=False

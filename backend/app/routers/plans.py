@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user, grant_plan_membership, require_plan_access
 from app.db import get_db
-from app.models import Assumptions, Person, Plan, PlanMember, User
+from app.models import Assumptions, Liability, Person, Plan, PlanMember, User
 from app.routers._helpers import get_or_404
 from app.schemas.plan import PlanCreate, PlanRead, PlanUpdate
 from app.services.serialisation import hydrate_plan, serialise_plan
@@ -22,9 +22,12 @@ def _load_plan_with_children(plan_id: int, db: Session) -> Plan:
             selectinload(Plan.people).selectinload(Person.income_sources),
             selectinload(Plan.expenses),
             selectinload(Plan.assets),
-            selectinload(Plan.liabilities),
+            selectinload(Plan.liabilities).selectinload(Liability.adjustments),
             selectinload(Plan.goals),
             selectinload(Plan.scenarios),
+            selectinload(Plan.bequests),
+            selectinload(Plan.benefits),
+            selectinload(Plan.children),
             selectinload(Plan.assumptions),
         )
     ).scalar_one_or_none()

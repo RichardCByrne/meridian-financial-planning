@@ -242,6 +242,31 @@ def _apply_lightweight_migrations() -> None:
                     )
                 )
 
+    # Indexes on frequently-filtered FK columns (Alembic 0023). create_all won't
+    # add indexes to pre-existing tables, so bridge them idempotently for dev
+    # SQLite files. IF NOT EXISTS keeps this safe to re-run.
+    _fk_indexes = (
+        ("ix_people_plan_id", "people", "plan_id"),
+        ("ix_income_sources_person_id", "income_sources", "person_id"),
+        ("ix_expenses_plan_id", "expenses", "plan_id"),
+        ("ix_assets_plan_id", "assets", "plan_id"),
+        ("ix_liabilities_plan_id", "liabilities", "plan_id"),
+        ("ix_liability_adjustments_liability_id", "liability_adjustments", "liability_id"),
+        ("ix_goals_plan_id", "goals", "plan_id"),
+        ("ix_scenarios_plan_id", "scenarios", "plan_id"),
+        ("ix_bequests_plan_id", "bequests", "plan_id"),
+        ("ix_benefits_plan_id", "benefits", "plan_id"),
+        ("ix_children_plan_id", "children", "plan_id"),
+        ("ix_plan_invites_plan_id", "plan_invites", "plan_id"),
+        ("ix_plan_members_user_id", "plan_members", "user_id"),
+    )
+    with engine.begin() as conn:
+        for name, table, column in _fk_indexes:
+            if table in tables:
+                conn.execute(
+                    text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
+                )
+
     # Re-stamp Alembic to head so a dev DB that's been kept up via these
     # lightweight patches doesn't try to re-create tables on the next
     # `alembic upgrade head`. Production never enters this path — it runs

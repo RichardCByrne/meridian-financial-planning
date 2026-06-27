@@ -16,10 +16,13 @@ import {
   useUpdateScenario,
 } from "../../api/hooks";
 import type {
+  AddedAsset,
   AddedBenefit,
   AddedChild,
   AddedExpense,
   AddedIncome,
+  AddedLiability,
+  AssetKind,
   BenefitKind,
   Expense,
   ExpenseCategory,
@@ -436,6 +439,57 @@ function ScenarioCard({
     });
   };
 
+  // Add a hypothetical asset purchase, optionally financed by a new mortgage.
+  // The asset and liability are linked by a generated ref so the engine resolves
+  // the mortgage and clears it on a planned disposal.
+  const addPropertyAdded = (asset: AddedAsset, liability: AddedLiability | null) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      let assetPayload: AddedAsset = asset;
+      if (liability) {
+        const ref = `mortgage-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+        const lbucket = { ...((next.liabilities ?? {}) as Record<string, unknown>) };
+        const llist = Array.isArray(lbucket._added) ? [...(lbucket._added as unknown[])] : [];
+        llist.push({ ...liability, _ref: ref });
+        lbucket._added = llist;
+        next.liabilities = lbucket as ScenarioOverrides["liabilities"];
+        assetPayload = { ...asset, _linked_liability_ref: ref };
+      }
+      const abucket = { ...((next.assets ?? {}) as Record<string, unknown>) };
+      const alist = Array.isArray(abucket._added) ? [...(abucket._added as unknown[])] : [];
+      alist.push(assetPayload);
+      abucket._added = alist;
+      next.assets = abucket as ScenarioOverrides["assets"];
+      return next;
+    });
+  };
+
+  // Remove an added asset and, if it financed the purchase with an added
+  // mortgage, drop that mortgage too (matched by ref).
+  const removeAddedAsset = (idx: number) => {
+    setDirty(true);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      const abucket = { ...((next.assets ?? {}) as Record<string, unknown>) };
+      const alist = Array.isArray(abucket._added) ? [...(abucket._added as AddedAsset[])] : [];
+      const [removed] = alist.splice(idx, 1);
+      if (alist.length === 0) delete abucket._added;
+      else abucket._added = alist;
+      next.assets = abucket as ScenarioOverrides["assets"];
+      const ref = removed?._linked_liability_ref;
+      if (ref) {
+        const lbucket = { ...((next.liabilities ?? {}) as Record<string, unknown>) };
+        const llist = Array.isArray(lbucket._added) ? [...(lbucket._added as AddedLiability[])] : [];
+        const filtered = llist.filter((l) => l._ref !== ref);
+        if (filtered.length === 0) delete lbucket._added;
+        else lbucket._added = filtered;
+        next.liabilities = lbucket as ScenarioOverrides["liabilities"];
+      }
+      return next;
+    });
+  };
+
   const setMarriageYear = (year: number | null) => {
     setDirty(true);
     setOverrides((prev) => {
@@ -450,7 +504,8 @@ function ScenarioCard({
     ((overrides.incomes?._added as unknown[] | undefined)?.length ?? 0) +
     ((overrides.expenses?._added as unknown[] | undefined)?.length ?? 0) +
     ((overrides.benefits?._added as unknown[] | undefined)?.length ?? 0) +
-    ((overrides.children?._added as unknown[] | undefined)?.length ?? 0);
+    ((overrides.children?._added as unknown[] | undefined)?.length ?? 0) +
+    ((overrides.assets?._added as unknown[] | undefined)?.length ?? 0);
   const summaryParts: string[] = [];
   if (overrideRows.length) summaryParts.push(`${overrideRows.length} override${overrideRows.length === 1 ? "" : "s"}`);
   if (addedCount) summaryParts.push(`${addedCount} added`);
@@ -630,6 +685,9 @@ function ScenarioCard({
       <AddedItemsSection
         overrides={overrides}
         people={people ?? []}
+        baseYear={baseYear}
+        onAddProperty={addPropertyAdded}
+        onRemoveAddedAsset={removeAddedAsset}
         onAddChild={addChildAdded}
         onRemoveAddedChild={removeAddedChild}
         onAddIncome={addIncomeAdded}
@@ -784,7 +842,7 @@ function ModeTabs({
   const tabs: { id: "override" | "step" | "added"; label: string; sub: string; count?: number }[] = [
     { id: "override", label: "Override a field", sub: "Change a value on something in your base plan", count: overrideCount },
     { id: "step", label: "Schedule a step change", sub: "End one income/expense, start another at year Y" },
-    { id: "added", label: "Add income / expense / benefit / child", sub: "Promotion, wedding, inheritance, employer perk, another child — not in base plan", count: addedCount },
+    { id: "added", label: "Add income / expense / asset / child", sub: "Promotion, wedding, property purchase (e.g. buy-to-let), employer perk, another child — not in base plan", count: addedCount },
   ];
   return (
     <div className="row" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -1115,6 +1173,9 @@ function StepChangeWizard({
 function AddedItemsSection({
   overrides,
   people,
+  baseYear,
+  onAddProperty,
+  onRemoveAddedAsset,
   onAddChild,
   onRemoveAddedChild,
   onAddIncome,
@@ -1126,6 +1187,9 @@ function AddedItemsSection({
 }: {
   overrides: ScenarioOverrides;
   people: Person[];
+  baseYear: number;
+  onAddProperty: (asset: AddedAsset, liability: AddedLiability | null) => void;
+  onRemoveAddedAsset: (idx: number) => void;
   onAddChild: (payload: AddedChild) => void;
   onRemoveAddedChild: (idx: number) => void;
   onAddIncome: (payload: AddedIncome) => void;
@@ -1139,10 +1203,13 @@ function AddedItemsSection({
   const addedExpenses = (overrides.expenses?._added ?? []) as AddedExpense[];
   const addedBenefits = (overrides.benefits?._added ?? []) as AddedBenefit[];
   const addedChildren = (overrides.children?._added ?? []) as AddedChild[];
+  const addedAssets = (overrides.assets?._added ?? []) as AddedAsset[];
+  const addedLiabilities = (overrides.liabilities?._added ?? []) as AddedLiability[];
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddBenefit, setShowAddBenefit] = useState(false);
   const [showAddChild, setShowAddChild] = useState(false);
+  const [showAddProperty, setShowAddProperty] = useState(false);
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -1152,8 +1219,9 @@ function AddedItemsSection({
           Use this to model events that don't exist in the base plan: a promotion (extra
           income source from year X), a one-off cost like a wedding, an inheritance, an
           additional ongoing expense, a new employer perk like medical insurance taxed as
-          benefit-in-kind, or another child. The base plan stays untouched. To model fewer
-          children instead, use the "Override a field" tab and set a child to Excluded.
+          benefit-in-kind, another child, or a hypothetical property purchase (e.g. a
+          buy-to-let, with its own mortgage rate/deposit). The base plan stays untouched. To
+          model fewer children instead, use the "Override a field" tab and set a child to Excluded.
         </HelpTip>
       </h4>
 
@@ -1169,6 +1237,9 @@ function AddedItemsSection({
         </button>
         <button className="btn btn-secondary" onClick={() => setShowAddChild((s) => !s)}>
           {showAddChild ? "Cancel" : "+ Add child (e.g. another baby)"}
+        </button>
+        <button className="btn btn-secondary" onClick={() => setShowAddProperty((s) => !s)}>
+          {showAddProperty ? "Cancel" : "+ Add property purchase (e.g. buy-to-let)"}
         </button>
       </div>
 
@@ -1206,6 +1277,64 @@ function AddedItemsSection({
             setShowAddChild(false);
           }}
         />
+      )}
+      {showAddProperty && (
+        <AddPropertyForm
+          people={people}
+          baseYear={baseYear}
+          onSubmit={(asset, liability) => {
+            onAddProperty(asset, liability);
+            setShowAddProperty(false);
+          }}
+        />
+      )}
+
+      {addedAssets.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <ResponsiveTable<{ idx: number; row: AddedAsset }>
+            rows={addedAssets.map((row, idx) => ({ idx, row }))}
+            getKey={(r) => `asset-${r.idx}`}
+            cardTitle={(r) => r.row.name}
+            columns={[
+              { header: "Type", cell: () => <span className="muted">Asset</span> },
+              { header: "Name", cell: (r) => r.row.name, hideOnMobile: true },
+              {
+                header: "Price",
+                cell: (r) => `€${Number(r.row.value).toLocaleString()}`,
+              },
+              {
+                header: "Buy / sell",
+                cell: (r) =>
+                  `${r.row.purchase_year ?? "now"}${
+                    r.row.disposal_year ? ` → sell ${r.row.disposal_year}` : ""
+                  }`,
+              },
+              {
+                header: "Financing",
+                cell: (r) => {
+                  const ref = r.row._linked_liability_ref;
+                  const mortgage = ref
+                    ? addedLiabilities.find((l) => l._ref === ref)
+                    : undefined;
+                  return (
+                    <span className="muted">
+                      {mortgage
+                        ? `€${Number(mortgage.principal).toLocaleString()} @ ${(
+                            mortgage.interest_rate * 100
+                          ).toFixed(2)}% · deposit €${Number(r.row.deposit ?? 0).toLocaleString()}`
+                        : "cash"}
+                    </span>
+                  );
+                },
+              },
+            ]}
+            renderActions={(r) => (
+              <button className="btn btn-secondary" onClick={() => onRemoveAddedAsset(r.idx)}>
+                Remove
+              </button>
+            )}
+          />
+        </div>
       )}
 
       {addedChildren.length > 0 && (
@@ -1801,6 +1930,207 @@ function AddChildForm({
           })
         }
       >
+        Add to scenario
+      </button>
+    </div>
+  );
+}
+
+const PROPERTY_KINDS: { value: AssetKind; label: string }[] = [
+  { value: "property_btl", label: "Buy-to-let (rental)" },
+  { value: "property_primary", label: "Primary residence" },
+];
+
+function AddPropertyForm({
+  people,
+  baseYear,
+  onSubmit,
+}: {
+  people: Person[];
+  baseYear: number;
+  onSubmit: (asset: AddedAsset, liability: AddedLiability | null) => void;
+}) {
+  const [name, setName] = useState("Buy-to-let property");
+  const [kind, setKind] = useState<AssetKind>("property_btl");
+  const [ownerId, setOwnerId] = useState<number | "">(people[0]?.id ?? "");
+  const [price, setPrice] = useState(350_000);
+  const [purchaseYear, setPurchaseYear] = useState(baseYear + 1);
+  const [deposit, setDeposit] = useState(105_000);
+  const [stampDutyPct, setStampDutyPct] = useState(0.01);
+  const [growth, setGrowth] = useState(0.03);
+  const [financed, setFinanced] = useState(true);
+  const [principal, setPrincipal] = useState(245_000);
+  const [rate, setRate] = useState(0.055);
+  const [termMonths, setTermMonths] = useState(300);
+  const [principalEdited, setPrincipalEdited] = useState(false);
+
+  // Keep the mortgage principal synced to price − deposit until the user edits it.
+  useEffect(() => {
+    if (!principalEdited) setPrincipal(Math.max(0, price - deposit));
+  }, [price, deposit, principalEdited]);
+
+  const submit = () => {
+    const assetName = name.trim() || "Property";
+    const asset: AddedAsset = {
+      name: assetName,
+      kind,
+      value: price,
+      growth_rate: growth,
+      owner_person_id: ownerId === "" ? null : ownerId,
+      purchase_year: purchaseYear,
+      deposit,
+      stamp_duty_pct: stampDutyPct,
+    };
+    const liability: AddedLiability | null = financed
+      ? {
+          name: `${assetName} mortgage`,
+          kind: "mortgage",
+          principal,
+          interest_rate: rate,
+          term_months: termMonths,
+          start_year: purchaseYear,
+        }
+      : null;
+    onSubmit(asset, liability);
+  };
+
+  return (
+    <div className="card" style={{ background: "#f8fafc" }}>
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: 1, minWidth: 180 }}>
+          <label>Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>
+            Type
+            <HelpTip>
+              Buy-to-let disposals attract CGT on the gain; a primary residence is CGT-exempt.
+              For a buy-to-let, also add a Rental income (in the Add income form) for the rent.
+            </HelpTip>
+          </label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as AssetKind)}>
+            {PROPERTY_KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Owner</label>
+          <select
+            value={ownerId}
+            onChange={(e) => setOwnerId(e.target.value === "" ? "" : Number(e.target.value))}
+          >
+            <option value="">— Unassigned —</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <div className="field">
+          <label>Purchase price (€)</label>
+          <NumericInput value={price} onChange={(v) => Number.isFinite(v) && setPrice(v)} />
+        </div>
+        <div className="field">
+          <label>Purchase year</label>
+          <NumericInput
+            integer
+            value={purchaseYear}
+            onChange={(v) => Number.isFinite(v) && setPurchaseYear(v)}
+          />
+        </div>
+        <div className="field">
+          <label>
+            Deposit (€)
+            <HelpTip>
+              Paid from cash on purchase. Buy-to-let lenders typically require a larger deposit
+              (often ~30%) than a home loan.
+            </HelpTip>
+          </label>
+          <NumericInput value={deposit} onChange={(v) => Number.isFinite(v) && setDeposit(v)} />
+        </div>
+        <div className="field">
+          <label>
+            Stamp duty %
+            <HelpTip>Paid from cash on purchase. Irish residential rate is ~1% (2% above €1m).</HelpTip>
+          </label>
+          <input
+            type="number"
+            step="0.1"
+            value={stampDutyPct * 100}
+            onChange={(e) => setStampDutyPct(Number(e.target.value) / 100)}
+          />
+        </div>
+        <div className="field">
+          <label>Growth %/yr</label>
+          <input
+            type="number"
+            step="0.1"
+            value={growth * 100}
+            onChange={(e) => setGrowth(Number(e.target.value) / 100)}
+          />
+        </div>
+      </div>
+
+      <div className="field" style={{ marginTop: 4 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={financed}
+            onChange={(e) => setFinanced(e.target.checked)}
+            style={{ width: "auto" }}
+          />
+          Finance with a mortgage
+        </label>
+      </div>
+
+      {financed && (
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          <div className="field">
+            <label>
+              Mortgage amount (€)
+              <HelpTip>Defaults to price − deposit. The monthly payment is computed from rate and term.</HelpTip>
+            </label>
+            <NumericInput
+              value={principal}
+              onChange={(v) => {
+                if (!Number.isFinite(v)) return;
+                setPrincipalEdited(true);
+                setPrincipal(v);
+              }}
+            />
+          </div>
+          <div className="field">
+            <label>
+              Interest rate %
+              <HelpTip>Buy-to-let mortgage rates are usually higher than owner-occupier rates.</HelpTip>
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              value={rate * 100}
+              onChange={(e) => setRate(Number(e.target.value) / 100)}
+            />
+          </div>
+          <div className="field">
+            <label>Term (months)</label>
+            <NumericInput
+              integer
+              value={termMonths}
+              onChange={(v) => Number.isFinite(v) && setTermMonths(v)}
+            />
+          </div>
+        </div>
+      )}
+
+      <button className="btn" disabled={!name.trim() || price <= 0} onClick={submit}>
         Add to scenario
       </button>
     </div>

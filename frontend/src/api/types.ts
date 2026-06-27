@@ -500,6 +500,13 @@ export type AddedIncome = IncomeSourceCreate & { person_id: number };
 export type AddedExpense = ExpenseCreate;
 export type AddedBenefit = BenefitCreate;
 export type AddedChild = ChildCreate;
+// A scenario-added asset (e.g. a hypothetical buy-to-let property). May link to
+// an added liability (its mortgage) by ref instead of a numeric id.
+export type AddedAsset = AssetCreate & { _linked_liability_ref?: string };
+// A scenario-added liability (e.g. a BTL mortgage). `monthly_payment` is
+// optional — the engine derives it from principal/rate/term when omitted. `_ref`
+// lets an added asset point at it as its mortgage.
+export type AddedLiability = LiabilityCreate & { _ref?: string };
 
 // A child override patch carries the editable child fields plus a scenario-only
 // `active` flag (false drops the child from this scenario to model fewer kids).
@@ -511,8 +518,8 @@ export type ScenarioOverrides = {
   people?: Record<string, Partial<PersonCreate>>;
   incomes?: BucketPatch<Partial<IncomeSourceCreate>, AddedIncome>;
   expenses?: BucketPatch<Partial<ExpenseCreate>, AddedExpense>;
-  assets?: Record<string, Partial<AssetCreate>>;
-  liabilities?: Record<string, Partial<LiabilityCreate>>;
+  assets?: BucketPatch<Partial<AssetCreate>, AddedAsset>;
+  liabilities?: BucketPatch<Partial<LiabilityCreate>, AddedLiability>;
   goals?: Record<string, Partial<GoalCreate>>;
   benefits?: BucketPatch<Partial<BenefitCreate>, AddedBenefit>;
   children?: BucketPatch<ChildPatch, AddedChild>;

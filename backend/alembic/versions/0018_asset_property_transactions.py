@@ -21,13 +21,25 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    # The dev/prod lightweight-migration path runs create_all against the
+    # current model, so these columns can already exist while alembic_version
+    # trails this revision. Guard each add_column so a replay is a no-op
+    # instead of crashing with "column already exists".
+    insp = sa.inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
+
+
 def upgrade() -> None:
-    op.add_column("assets", sa.Column("purchase_year", sa.Integer(), nullable=True))
-    op.add_column(
-        "assets",
-        sa.Column("deposit", sa.Float(), nullable=False, server_default="0"),
-    )
-    op.add_column("assets", sa.Column("disposal_year", sa.Integer(), nullable=True))
+    if not _has_column("assets", "purchase_year"):
+        op.add_column("assets", sa.Column("purchase_year", sa.Integer(), nullable=True))
+    if not _has_column("assets", "deposit"):
+        op.add_column(
+            "assets",
+            sa.Column("deposit", sa.Float(), nullable=False, server_default="0"),
+        )
+    if not _has_column("assets", "disposal_year"):
+        op.add_column("assets", sa.Column("disposal_year", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:

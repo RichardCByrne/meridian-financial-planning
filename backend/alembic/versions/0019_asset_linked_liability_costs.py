@@ -22,28 +22,44 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
+
+
+def _has_fk(table: str, name: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return name in {fk["name"] for fk in insp.get_foreign_keys(table)}
+
+
 def upgrade() -> None:
-    op.add_column(
-        "assets",
-        sa.Column("linked_liability_id", sa.Integer(), nullable=True),
-    )
-    op.add_column(
-        "assets",
-        sa.Column("stamp_duty_pct", sa.Float(), nullable=False, server_default="0"),
-    )
-    op.add_column(
-        "assets",
-        sa.Column("selling_cost_pct", sa.Float(), nullable=False, server_default="0"),
-    )
-    # Named FK so SQLite batch / Postgres both drop cleanly on downgrade.
-    with op.batch_alter_table("assets") as batch:
-        batch.create_foreign_key(
-            "fk_assets_linked_liability_id",
-            "liabilities",
-            ["linked_liability_id"],
-            ["id"],
-            ondelete="SET NULL",
+    # Idempotent: lightweight create_all may have added these already while
+    # alembic_version trails this revision.
+    if not _has_column("assets", "linked_liability_id"):
+        op.add_column(
+            "assets",
+            sa.Column("linked_liability_id", sa.Integer(), nullable=True),
         )
+    if not _has_column("assets", "stamp_duty_pct"):
+        op.add_column(
+            "assets",
+            sa.Column("stamp_duty_pct", sa.Float(), nullable=False, server_default="0"),
+        )
+    if not _has_column("assets", "selling_cost_pct"):
+        op.add_column(
+            "assets",
+            sa.Column("selling_cost_pct", sa.Float(), nullable=False, server_default="0"),
+        )
+    # Named FK so SQLite batch / Postgres both drop cleanly on downgrade.
+    if not _has_fk("assets", "fk_assets_linked_liability_id"):
+        with op.batch_alter_table("assets") as batch:
+            batch.create_foreign_key(
+                "fk_assets_linked_liability_id",
+                "liabilities",
+                ["linked_liability_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
 
 
 def downgrade() -> None:

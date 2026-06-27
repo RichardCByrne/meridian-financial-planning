@@ -20,11 +20,19 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
+
+
 def upgrade() -> None:
-    op.add_column(
-        "income_sources",
-        sa.Column("is_bonus", sa.Boolean(), nullable=False, server_default=sa.false()),
-    )
+    # Idempotent: lightweight create_all may have added this already while
+    # alembic_version trails this revision.
+    if not _has_column("income_sources", "is_bonus"):
+        op.add_column(
+            "income_sources",
+            sa.Column("is_bonus", sa.Boolean(), nullable=False, server_default=sa.false()),
+        )
 
 
 def downgrade() -> None:

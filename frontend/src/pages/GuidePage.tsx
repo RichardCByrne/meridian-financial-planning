@@ -12,9 +12,9 @@ export function GuidePage() {
 
       <Section title="In short">
         <p>
-          Build a <strong>plan</strong> describing your household: people, income, expenses,
-          assets, liabilities, goals, bequests. The simulator runs year-by-year over your
-          projection horizon (default 30 years) applying Irish income tax, USC, PRSI, CGT,
+          Build a <strong>plan</strong> describing your household: people, children, income,
+          benefits-in-kind, expenses, assets, liabilities, goals, bequests. The simulator runs
+          year-by-year over your projection horizon applying Irish income tax, USC, PRSI, CGT,
           ETF exit tax, CAT (inheritance), and the full pension lifecycle (age-based
           contribution cap → 25% lump sum at retirement → ARF imputed drawdown). The
           <em> Let's See</em> tab visualises the output, with an optional Monte Carlo fan
@@ -34,17 +34,19 @@ export function GuidePage() {
             ["Let's See", "The main visualisation. Switch between Net worth, Cash flow, Income breakdown, and Tax breakdown. Hover any year to see the full breakdown of income, tax, expenses, and assets. The Probability bands toggle replaces the deterministic line with a Monte Carlo fan chart (p5–p95 spread over 200 runs) plus a median line, and surfaces shortfall probability and median final net worth."],
             ["Timeline", "Drag retirement events and goal pills along a year axis. Releasing the pill commits the change and re-runs the projection."],
             ["People", "The humans in your plan. Date of birth drives ages and state-pension eligibility. Retirement age drives the pension lifecycle (lump sum + ARF drawdown). Rent-credit claim is a per-person flag."],
-            ["Income", "Salaries, rentals, self-employment, etc. Each income source has its own start/end year and escalation rate. Pension % is the employee contribution; Employer % stacks on top without reducing your taxable income."],
-            ["Expenses", "Recurring or one-off spend. See the One-off events box below for how categories work."],
+            ["Children", "Separate from People. Each child drives Child Benefit (€140/mo until 18, to the primary carer) and optional age-gated rearing costs — childcare, primary, secondary (with an optional private-fee top-up) and an everyday food/clothes line — that the projection applies automatically over each life stage by the child's age."],
+            ["Income", "Salaries, rentals, self-employment, etc. Each income source has its own start/end year and escalation rate. Pension % is the employee contribution; Employer % stacks on top without reducing your taxable income. A bonus is flagged as such and stops at retirement like salary."],
+            ["Benefits", "Employer benefits-in-kind (medical insurance, company car/van, preferential loan). Taxed as notional pay — they raise IT/USC/PRSI but aren't received as cash; medical insurance also grants the capped 20% relief credit. They stop at retirement."],
+            ["Expenses", "Recurring (basic / discretionary — grouping labels treated the same in the projection) or one-off (single-year). See the One-off events box below."],
             ["Assets", "Cash, deposits, ETFs, unwrapped investments, pension wrappers (PRSA / occupational / ARF), and property. Each kind has its own tax treatment when sold or drawn down. AVCs sit on the pension wrapper directly."],
             ["Liabilities", "Mortgages and loans, amortised monthly. Outstanding debt is netted off net worth."],
-            ["Goals", "Aspirational targets. Cost-bearing goals (milestone, education, gift, pre-retirement spend) inject as expenses in the target year. Net-worth goals snapshot whether you've hit a number by year X. Retirement goals are informational pins on the timeline — your Person.retirement_age is what actually drives the retirement event."],
+            ["Goals", "Aspirational targets. One-off spend goals inject as an expense in the target year (the name says what for). Net-worth goals snapshot whether you've hit a number by year X (graded on liquid assets). Retirement goals are informational pins — your Person.retirement_age is what actually drives the retirement event."],
             ["Legacy", "Bequests: how each person's estate is split on death. Each bequest names a beneficiary (inside the plan or external) and a CAT group (A / B / C / exempt). CAT is computed against the beneficiary's lifetime running total, and the net inheritance routes to the plan's cash bucket."],
-            ["Scenarios", "Field-level overrides on top of the base plan, plus the ability to add new income sources or expenses that don't exist in the base. The base is untouched."],
+            ["Scenarios", "Field-level overrides on top of the base plan, plus three ways to diverge: a step change (change an existing income/expense to a new amount from year Y), add something new (net-new income, expense, child, or a property purchase such as a buy-to-let with its own mortgage), and a marriage event. The base is untouched."],
             ["Compare", "Pick two scenarios (or Base vs a scenario). The simulator runs twice and you get side-by-side net worth, a per-year delta strip, expenses, tax, and a summary table."],
-            ["Tax rules", "Pin a TaxConfig to this plan — the seeded Ireland 2026 official is the default. Clone it to a personal copy and tweak bands, rates, or pension caps to forecast a future budget or stress-test a rate change."],
-            ["Sharing", "Owner-only. Generate a share-link invite at viewer / editor / owner role. Optionally email-bind the invite so only the named recipient can accept. Revoke a pending invite at any time; list current members in the same pane."],
-            ["Assumptions", "Inflation, default growth rates, earnings growth, state pension age, state pension annual amount, and state pension escalation rate (decoupled from general inflation)."],
+            ["Tax rules", "(Advanced) Pin a TaxConfig to this plan — the seeded Ireland 2026 official is the default. Clone it to a personal copy and tweak bands, rates, or pension caps to forecast a future budget or stress-test a rate change."],
+            ["Sharing", "(Advanced) Owner-only. Generate a share-link invite at viewer / editor / owner role. Optionally email-bind the invite so only the named recipient can accept. Revoke a pending invite at any time; list current members in the same pane."],
+            ["Assumptions", "(Advanced) Inflation, default growth rates, earnings growth, state pension age, state pension annual amount, and state pension escalation rate (decoupled from general inflation)."],
           ]}
         />
       </Section>
@@ -56,10 +58,12 @@ export function GuidePage() {
         </p>
         <DefList
           items={[
-            ["A one-off cost (wedding, car, big trip)", "Add an Expense with category set to single_year. It fires only in the start year and does not recur."],
-            ["A goal that costs money (education fees, milestone gift)", "Add a Goal of kind milestone, education, gift, or pre_retirement_spend. The target_amount is treated as an expense in target_year and rolls into the cash-flow shortfall logic."],
-            ["A windfall (inheritance, bonus, sale proceeds)", "Add an Asset with the cash value at the time it lands — set its acquired_year if you want the simulator to treat it as appearing in that year. Or, in a Scenario, use 'Add income' with category Other and a 1-year window."],
-            ["A future income change (promotion, salary cut, side hustle)", "Inside a Scenario, click '+ Add income (e.g. promotion)'. Enter the salary delta (the increase, not the new total) with a start_year. Your base salary keeps running unchanged."],
+            ["A one-off cost (wedding, car, big trip)", "Add an Expense with category set to single-year. It fires only in the start year and does not recur."],
+            ["A goal that costs money (college fees, a gift)", "Add a Goal of kind 'one-off spend'. The target_amount is treated as an expense in target_year and rolls into the cash-flow shortfall logic; the goal's name says what it's for."],
+            ["A windfall (inheritance, sale proceeds)", "Add an Asset with the cash value at the time it lands — set its acquired_year if you want the simulator to treat it as appearing in that year. Or, in a Scenario, use 'Add something new' → income with kind Other and a 1-year window."],
+            ["A raise or pay cut to an existing salary", "Inside a Scenario, use 'Schedule a step change': pick the income, the year, and the new total. It ends the original the year before and starts a replacement at the new amount."],
+            ["A brand-new income that runs alongside (side job)", "Inside a Scenario, use 'Add something new' → income. Enter the full amount; it runs on top of your existing income."],
+            ["A property purchase (e.g. buy-to-let)", "Inside a Scenario, use 'Add something new' → property purchase. Set price, deposit, stamp duty and (optionally) a mortgage with its own rate and term; add a Rental income for the rent."],
           ]}
         />
       </Section>
@@ -102,7 +106,9 @@ export function GuidePage() {
           <li><strong>Monte Carlo probability bands</strong> on Let's See — toggle to see the p5–p95 spread of net worth across 200 runs plus the probability of running short.</li>
           <li><strong>CAT / inheritance modelling.</strong> Bequests on the Legacy tab; CAT computed per beneficiary group with lifetime aggregation.</li>
           <li><strong>Multi-tax-year configurable rules.</strong> Clone the seeded Ireland 2026 official config and tweak it to forecast a future budget.</li>
-          <li><strong>Plan clone / export / import.</strong> JSON snapshot round-trip preserves people, assets, scenarios, bequests, everything.</li>
+          <li><strong>Plan clone / export / import.</strong> JSON snapshot round-trip preserves people, children, assets, scenarios, bequests, everything.</li>
+          <li><strong>Children & benefits-in-kind.</strong> Child Benefit + age-gated rearing costs; employer BIK (medical insurance, company car/van, preferential loan) taxed as notional pay.</li>
+          <li><strong>Hypothetical purchases in scenarios.</strong> Add a property (e.g. buy-to-let) with its own mortgage rate/deposit and see the effect via Compare.</li>
         </ul>
       </Section>
 
@@ -114,7 +120,8 @@ export function GuidePage() {
           <li>Add your real recurring expenses and any active mortgage on Liabilities.</li>
           <li>Add your assets (cash + investments + pension wrappers).</li>
           <li>Open Let's See — the chart should look roughly plausible. If a year goes red (shortfall), that's where the model says you'd run out of cash.</li>
-          <li>On Goals, add a target net worth or a milestone (e.g. 30k car in 2032).</li>
+          <li>If you have children, add them on Children (Child Benefit + optional rearing costs).</li>
+          <li>On Goals, add a target net worth or a one-off spend (e.g. €30k car in 2032).</li>
           <li>Create a "Retire 5 years early" scenario and run Compare.</li>
           <li>On Let's See, toggle <em>Probability bands</em> to see how wide the net-worth spread is once growth and inflation are stochastic.</li>
           <li>If you want a partner or adviser to see it, open <em>Sharing</em> and send a viewer invite.</li>

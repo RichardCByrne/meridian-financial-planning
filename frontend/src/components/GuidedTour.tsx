@@ -11,87 +11,80 @@ type Step = {
 };
 
 // Bump version when STEPS content changes meaningfully so returning users see the new tour.
-const STORAGE_KEY = "meridian:tour:done:v1";
+const STORAGE_KEY = "meridian:tour:done:v2";
 
+// This tour deliberately does NOT re-teach data entry — the New plan wizard
+// already walks you through People / Income / Assets when you build a plan.
+// Here we orient you around what the app *does* with a plan: the projection,
+// the timeline, and scenarios — plus where everything lives.
 const STEPS: Step[] = [
   {
     title: "Welcome to Meridian",
     body: (
       <p>
-        Build a financial plan for your household, watch it project year-by-year through
-        Irish tax rules, and pressure-test it with scenarios. This tour walks you through
-        the five core panes in under two minutes. You can quit any time.
+        The <strong>New plan</strong> wizard walks you through entering your household. This
+        tour is the other half: it shows what Meridian <em>does</em> with that plan — the
+        projection, the timeline, and scenarios — in under two minutes. Quit any time.
       </p>
     ),
     navigate: () => "/plans",
   },
   {
-    title: "Start with a plan",
+    title: "Follow along on a sample plan",
     body: (
       <p>
         On the Plans list, hit <strong>Try a sample plan</strong> for a populated household
-        (Carla & David — two adults, joint mortgage, pensions, retirement goal), or create
-        an empty one and follow along. We'll click into it together.
+        (Carla & David — two adults, joint mortgage, pensions, a retirement goal). We'll
+        open it and tour the panes that turn those numbers into a forecast.
       </p>
     ),
     navigate: () => "/plans",
   },
   {
-    title: "People",
+    title: "Let's See — your projection",
     body: (
       <p>
-        Every plan starts with the humans. Each person's date of birth drives ages and
-        state-pension eligibility; their retirement age drives the pension lifecycle (lump
-        sum + ARF drawdown). Filing status is auto-inferred for the household.
-      </p>
-    ),
-    navigate: (id) => (id ? `/plans/${id}/people` : "/plans"),
-  },
-  {
-    title: "Income",
-    body: (
-      <p>
-        Add salaries, rentals, self-employment, or pensions in payment. Employment income
-        triggers PAYE/PRSI/USC. The <strong>Pension %</strong> field is your contribution
-        rate — tax relief is applied up to the age-based cap (15–40% by age, capped at
-        €115k earnings).
-      </p>
-    ),
-    navigate: (id) => (id ? `/plans/${id}/income` : "/plans"),
-  },
-  {
-    title: "Assets",
-    body: (
-      <p>
-        Cash, ETFs, pension wrappers, property — each has its own tax treatment baked in.
-        Pensions use AVCs (age-capped, pre-tax). ETFs use 41% exit tax with deemed
-        disposal. Unwrapped investments use 33% CGT. Just pick the kind; the engine
-        handles the rest.
-      </p>
-    ),
-    navigate: (id) => (id ? `/plans/${id}/assets` : "/plans"),
-  },
-  {
-    title: "Let's See",
-    body: (
-      <p>
-        Your projection lands here. Hover any year to see the full breakdown. Toggle
-        <strong> Today's € (real)</strong> to strip inflation, or <strong>Probability
-        bands</strong> for the Monte Carlo fan chart with shortfall probability. Goals show
-        as ✅/⚠/⏳ chips below the summary.
+        This is the heart of the app: your plan projected year-by-year through Irish tax
+        rules. Hover any year for the full breakdown. Toggle <strong>Today's € (real)</strong>
+        to strip out inflation, or <strong>Probability bands</strong> for the Monte Carlo fan
+        chart with shortfall probability. Goals show as ✅ / ⚠ / ⏳ chips below the summary.
       </p>
     ),
     navigate: (id) => (id ? `/plans/${id}` : "/plans"),
   },
   {
+    title: "Timeline — drag to explore",
+    body: (
+      <p>
+        Drag a person's retirement pill or a goal's target year along the axis and release —
+        the projection re-runs instantly. The fastest way to ask "what if I retired two years
+        earlier?" without editing any forms.
+      </p>
+    ),
+    navigate: (id) => (id ? `/plans/${id}/timeline` : "/plans"),
+  },
+  {
+    title: "Scenarios & Compare",
+    body: (
+      <p>
+        A scenario is a set of "what if" overrides layered on top of your base plan —
+        "Retire at 60", "Inheritance in 2034", a buy-to-let purchase — without touching the
+        original. Then <strong>Compare</strong> runs two side-by-side so you can see the
+        difference year-by-year.
+      </p>
+    ),
+    navigate: (id) => (id ? `/plans/${id}/scenarios` : "/plans"),
+  },
+  {
     title: "That's it",
     body: (
       <p>
-        Build a few scenarios next ("Retire at 60", "Inheritance in 2034") and use Compare
-        to see the impact. Open the <strong>Guide</strong> in the sidebar any time for a
-        full reference.
+        Ready to build your own? Hit <strong>New plan</strong> on the Plans list and the
+        wizard takes it from there. Open the <strong>Guide</strong> in the sidebar any time
+        for a full reference.
       </p>
     ),
+    navigate: () => "/plans",
   },
 ];
 
@@ -130,14 +123,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
       {open && <TourOverlay onClose={close} />}
     </TourContext.Provider>
   );
-}
-
-export function tourCompleted(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 function TourOverlay({ onClose }: { onClose: () => void }) {
@@ -240,7 +225,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
                 flex: 1,
                 height: 4,
                 borderRadius: 2,
-                background: i <= idx ? "#2563eb" : "#e2e8f0",
+                background: i <= idx ? "var(--accent, #0e6e62)" : "var(--line-soft, #e2e8f0)",
               }}
             />
           ))}

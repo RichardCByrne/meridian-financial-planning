@@ -158,13 +158,16 @@ export function ScenariosPane({ planId }: { planId: number }) {
           </HelpTip>
         </h3>
         <p className="muted pane-intro-prose">
-          Two ways to diverge from the base plan:
+          Three ways to diverge from the base plan:
           <br />
-          <strong>1. Override an existing field</strong> (e.g. retire 5 years earlier; change inflation
-          assumption) — pick bucket → target → field, then edit the value.
+          <strong>1. Override a field</strong> — tweak one value on something already in your plan
+          (retire 5 years earlier; inflation 4%).
           <br />
-          <strong>2. Add a new income or expense</strong> that doesn't exist in the base plan (e.g. a
-          promotion in 2030, a one-off wedding cost, an inheritance).
+          <strong>2. Schedule a step change</strong> — change an <em>existing</em> income or expense
+          to a new amount from a chosen year (a raise, a pay cut, a mortgage dropping off).
+          <br />
+          <strong>3. Add something new</strong> — a <em>net-new</em> income, one-off cost, property,
+          or child that runs on top of the plan (a side job, a wedding, a buy-to-let).
           <br />
           The base plan stays untouched. Run <em>Compare</em> to see two scenarios side-by-side.
         </p>
@@ -840,9 +843,9 @@ function ModeTabs({
   addedCount: number;
 }) {
   const tabs: { id: "override" | "step" | "added"; label: string; sub: string; count?: number }[] = [
-    { id: "override", label: "Override a field", sub: "Change a value on something in your base plan", count: overrideCount },
-    { id: "step", label: "Schedule a step change", sub: "End one income/expense, start another at year Y" },
-    { id: "added", label: "Add income / expense / asset / child", sub: "Promotion, wedding, property purchase (e.g. buy-to-let), employer perk, another child — not in base plan", count: addedCount },
+    { id: "override", label: "Override a field", sub: "Tweak one field on something already in your plan (retire at 60, inflation 4%)", count: overrideCount },
+    { id: "step", label: "Schedule a step change", sub: "Change an EXISTING income or expense to a new amount from year Y (raise, cut, drop-off)" },
+    { id: "added", label: "Add something new", sub: "A NET-NEW item on top of your plan — side income, one-off cost, property, child. Not for changing existing ones.", count: addedCount },
   ];
   return (
     <div className="row" style={{ gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -1104,9 +1107,12 @@ function StepChangeWizard({
       <h4 style={{ marginBottom: 8 }}>
         Schedule a step change
         <HelpTip>
-          Models an event in year Y that changes a recurring income or expense to a new value.
-          Behind the scenes this ends the original entry at year Y−1 and adds a replacement
-          starting at year Y. Use this for promotions, salary cuts, mortgage drop-offs, etc.
+          Use this to change an income or expense that <strong>already exists</strong> in your base
+          plan to a new amount from year Y — a raise, a pay cut, a mortgage dropping off. The value
+          you enter is the new <strong>total</strong> from year Y (not the increase). Behind the
+          scenes the original ends at year Y−1 and a replacement starts at year Y. To add a
+          brand-new income or expense that runs <em>alongside</em> the existing ones, use the
+          “Add something new” tab instead.
         </HelpTip>
       </h4>
       <div
@@ -1148,7 +1154,13 @@ function StepChangeWizard({
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0, minWidth: 110 }}>
-          <label>New value (€/yr)</label>
+          <label>
+            New total (€/yr)
+            <HelpTip>
+              The new total amount of this stream from year Y — not the change. E.g. an €80k salary
+              rising to €100k → enter 100,000.
+            </HelpTip>
+          </label>
           <NumericInput
             value={newValue}
             onChange={(v) => Number.isFinite(v) && setNewValue(v)}
@@ -1220,14 +1232,19 @@ function AddedItemsSection({
           income source from year X), a one-off cost like a wedding, an inheritance, an
           additional ongoing expense, a new employer perk like medical insurance taxed as
           benefit-in-kind, another child, or a hypothetical property purchase (e.g. a
-          buy-to-let, with its own mortgage rate/deposit). The base plan stays untouched. To
-          model fewer children instead, use the "Override a field" tab and set a child to Excluded.
+          buy-to-let, with its own mortgage rate/deposit). The base plan stays untouched.
+          {" "}
+          <strong>
+            To change something that already exists (e.g. a raise to your salary), don't add a
+            second one here — use “Schedule a step change” instead.
+          </strong>{" "}
+          To model fewer children instead, use the "Override a field" tab and set a child to Excluded.
         </HelpTip>
       </h4>
 
       <div className="row" style={{ gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <button className="btn btn-secondary" onClick={() => setShowAddIncome((s) => !s)}>
-          {showAddIncome ? "Cancel" : "+ Add income (e.g. promotion)"}
+          {showAddIncome ? "Cancel" : "+ Add income (e.g. side job)"}
         </button>
         <button className="btn btn-secondary" onClick={() => setShowAddExpense((s) => !s)}>
           {showAddExpense ? "Cancel" : "+ Add expense (one-off or recurring)"}
@@ -1461,7 +1478,7 @@ function AddedItemsSection({
 }
 
 const INCOME_KINDS: { value: IncomeKind; label: string }[] = [
-  { value: "employment", label: "Employment / promotion" },
+  { value: "employment", label: "Employment" },
   { value: "self_employment", label: "Self-employment" },
   { value: "rental", label: "Rental" },
   { value: "other", label: "Other" },
@@ -1475,7 +1492,7 @@ function AddIncomeForm({
   onSubmit: (payload: AddedIncome) => void;
 }) {
   const [personId, setPersonId] = useState<number | null>(people[0]?.id ?? null);
-  const [name, setName] = useState("Promotion bump");
+  const [name, setName] = useState("Side income");
   const [kind, setKind] = useState<IncomeKind>("employment");
   const [grossAmount, setGrossAmount] = useState(20_000);
   const [startYear, setStartYear] = useState(new Date().getFullYear() + 1);
@@ -1521,8 +1538,9 @@ function AddIncomeForm({
           <label>
             Gross / year
             <HelpTip>
-              For a promotion, enter the <em>delta</em> over your base salary (e.g. 20,000 if your
-              salary jumps from 80k to 100k). The base income source keeps running unchanged.
+              The full amount of this <em>additional</em> income; it runs alongside everything
+              already in your base plan. To change an existing salary (a raise or a cut), use the
+              “Schedule a step change” tab instead — don't add a second income here.
             </HelpTip>
           </label>
           <input

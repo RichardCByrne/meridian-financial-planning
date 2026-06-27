@@ -107,6 +107,7 @@ def _build_added_income(payload: dict[str, Any], synthetic_id: int) -> IncomeInp
             employer_pension_contribution_pct=float(
                 payload.get("employer_pension_contribution_pct", 0.0)
             ),
+            is_bonus=bool(payload.get("is_bonus", False)),
         )
     except (KeyError, TypeError, ValueError):
         return None

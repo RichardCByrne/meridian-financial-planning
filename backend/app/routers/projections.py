@@ -125,6 +125,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             pays_usc=i.pays_usc,
             pension_contribution_pct=i.pension_contribution_pct,
             employer_pension_contribution_pct=i.employer_pension_contribution_pct,
+            is_bonus=i.is_bonus,
         )
         for i in incomes_raw
     ]

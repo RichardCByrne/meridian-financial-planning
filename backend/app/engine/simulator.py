@@ -85,6 +85,10 @@ class IncomeInput:
     pays_usc: bool
     pension_contribution_pct: float = 0.0
     employer_pension_contribution_pct: float = 0.0
+    # An employment bonus. Taxed as normal income, but employment-related, so it
+    # stops at retirement like salary even when modelled with a passive `kind`
+    # (the one-click bonus uses kind="other") and left with an open end_year.
+    is_bonus: bool = False
 
 
 @dataclass
@@ -876,8 +880,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                     continue
                 # Earned income stops at retirement even if end_year is open.
                 # Passive kinds (rental, annuity, other) keep flowing; state
-                # pension and ARF drawdowns are auto-injected elsewhere.
-                if is_retired_now and inc.kind in ("employment", "self_employment"):
+                # pension and ARF drawdowns are auto-injected elsewhere. A bonus
+                # is employment-related, so it stops too even when modelled with a
+                # passive kind (the one-click bonus uses kind="other").
+                if is_retired_now and (
+                    inc.kind in ("employment", "self_employment") or inc.is_bonus
+                ):
                     continue
                 amt = _escalate(inc.gross_amount, inc.escalation_rate, year - inc.start_year)
                 earned_for_it += amt

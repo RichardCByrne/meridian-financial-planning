@@ -267,6 +267,17 @@ def _apply_lightweight_migrations() -> None:
                     text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
                 )
 
+    # Consolidate the legacy one-off-spend goal kinds into "spend" (Alembic
+    # 0024). Idempotent — a no-op once migrated.
+    if "goals" in tables:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE goals SET kind = 'spend' WHERE kind IN "
+                    "('milestone', 'education', 'gift', 'pre_retirement_spend')"
+                )
+            )
+
     # Re-stamp Alembic to head so a dev DB that's been kept up via these
     # lightweight patches doesn't try to re-create tables on the next
     # `alembic upgrade head`. Production never enters this path — it runs

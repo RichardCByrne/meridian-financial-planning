@@ -198,7 +198,29 @@ def _apply_lightweight_migrations() -> None:
                     text("ALTER TABLE people ADD COLUMN annuity_rate FLOAT NOT NULL DEFAULT 0.04")
                 )
     # children + benefits tables are picked up by Base.metadata.create_all on
-    # the dev path (whole-table additions need no ALTER bridging).
+    # the dev path (whole-table additions need no ALTER bridging). Per-child
+    # rearing-cost columns added later DO need bridging on an existing children
+    # table.
+    if "children" in tables:
+        cols = {c["name"] for c in insp.get_columns("children")}
+        if "childcare_annual" not in cols:
+            with engine.begin() as conn:
+                for col in (
+                    "childcare_annual",
+                    "primary_annual",
+                    "secondary_annual",
+                    "secondary_private_fee_annual",
+                    "everyday_annual",
+                ):
+                    conn.execute(
+                        text(f"ALTER TABLE children ADD COLUMN {col} FLOAT NOT NULL DEFAULT 0.0")
+                    )
+                conn.execute(
+                    text(
+                        "ALTER TABLE children ADD COLUMN "
+                        "secondary_is_private BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
     if "liabilities" in tables:
         cols = {c["name"] for c in insp.get_columns("liabilities")}
         if "monthly_overpayment" not in cols:

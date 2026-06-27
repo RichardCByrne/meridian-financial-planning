@@ -192,6 +192,25 @@ class Child(Base):
     primary_carer_id: Mapped[int | None] = mapped_column(
         ForeignKey("people.id", ondelete="SET NULL"), nullable=True
     )
+    # Per-child rearing costs (annual €, 0 = not modelled). The simulator
+    # age-gates each against the child's dob using TaxConfig stage boundaries:
+    #   childcare_annual         — birth → primary start (creche/pre-school)
+    #   primary_annual           — primary start → secondary start
+    #   secondary_annual         — secondary start → secondary end (public costs)
+    #   secondary_private_fee_annual — added on top of secondary_annual when
+    #                              secondary_is_private is set (school fees)
+    #   everyday_annual          — birth → secondary end (food/clothes). Opt-in:
+    #                              may overlap household expenses, so defaults 0.
+    # All escalate by the plan's inflation rate. Third-level/college is modelled
+    # via an `education` goal, not here.
+    childcare_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    primary_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    secondary_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    secondary_is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    secondary_private_fee_annual: Mapped[float] = mapped_column(
+        Float, default=0.0, nullable=False
+    )
+    everyday_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="children")
 

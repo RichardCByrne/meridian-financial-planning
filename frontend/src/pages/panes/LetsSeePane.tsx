@@ -531,7 +531,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
           deflate={deflate}
         />
 
-        {goals && goals.length > 0 && (
+        {showEvents && goals && goals.length > 0 && (
           <GoalStrip goals={goals} years={data.years} hoverYear={highlightYear} />
         )}
 

@@ -114,7 +114,7 @@ export function TimelinePane({ planId }: { planId: number }) {
 
   return (
     <div>
-      <div className="card">
+      <div className="card timeline-card">
         <h3 style={{ marginTop: 0 }}>Timeline</h3>
         <p className="muted">
           Drag pills to change <strong>retirement age</strong> or a goal's <strong>target year</strong>.

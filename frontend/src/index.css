@@ -280,6 +280,15 @@ th {
   min-width: 0;
 }
 
+/* Suppress the mobile browser's grey/blue tap-highlight rectangle on every
+   tappable layer of the timeline (track, draggable pill, Edit button) so a tap
+   doesn't flash a different box depending on where it lands. Touch-only; keyboard
+   focus outlines are unaffected (this property doesn't touch `outline`). */
+.timeline-card,
+.timeline-card * {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .timeline-lane {
   display: grid;
   grid-template-columns: 180px 1fr auto;

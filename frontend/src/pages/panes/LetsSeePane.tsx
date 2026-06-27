@@ -402,6 +402,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   ? "Showing in today's euros (inflation-adjusted)."
                   : "Showing in nominal euros (future cash, no inflation adjustment)."
               }
+              style={{ minWidth: 132, textAlign: "center" }}
             >
               {realMode ? "Today's € (real)" : "Nominal €"}
             </button>
@@ -409,6 +410,10 @@ export function LetsSeePane({ planId }: { planId: number }) {
               className={`btn ${showEvents ? "" : "btn-secondary"}`}
               onClick={() => setShowEvents((v) => !v)}
               title="Mark life events (retirement, state pension, goals, births, shortfall) on the chart"
+              // Fixed width covering both labels so the "on"/"off" flip never
+              // changes the toolbar width and reflows the chart-type select onto
+              // a new line.
+              style={{ minWidth: 104, textAlign: "center" }}
             >
               {showEvents ? "Events on" : "Events off"}
             </button>
@@ -417,6 +422,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 className={`btn ${showLiquid ? "" : "btn-secondary"}`}
                 onClick={onToggleLiquid}
                 title="Overlay a line showing liquid assets only (cash, deposits, unwrapped investments and ETFs — excludes property and pensions). This is what goal affordability is graded against."
+                style={{ minWidth: 132, textAlign: "center" }}
               >
                 {showLiquid ? "Liquid assets on" : "Liquid assets off"}
               </button>
@@ -426,6 +432,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 className={`btn ${showMonteCarlo ? "" : "btn-secondary"}`}
                 onClick={() => setShowMonteCarlo((v) => !v)}
                 title={`Run ${mcN} probabilistic simulations and show a fan chart with 5th–95th percentile bands`}
+                style={{ minWidth: 140, textAlign: "center" }}
               >
                 {mcFetching ? "Running…" : showMonteCarlo ? "Hide bands" : "Probability bands"}
               </button>

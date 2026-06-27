@@ -42,7 +42,10 @@ function AppShell() {
             aria-label="Meridian home"
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <h1>Meridian</h1>
+            <h1 className="brand">
+              <span className="brand-mark" aria-hidden />
+              <span>Meridian</span>
+            </h1>
           </Link>
           <button
             type="button"
@@ -71,11 +74,11 @@ function AppShell() {
               style={{
                 display: "block",
                 width: "100%",
-                padding: "8px 10px",
-                border: "1px solid #475569",
+                padding: "8px 12px",
+                border: "1px solid var(--ink-soft)",
                 background: "transparent",
                 color: "#cbd5e1",
-                borderRadius: 6,
+                borderRadius: "var(--radius-sm)",
                 marginTop: 8,
                 fontSize: 13,
                 textAlign: "left",
@@ -86,7 +89,7 @@ function AppShell() {
             </button>
           </nav>
           <UserChip />
-          <p className="muted" style={{ marginTop: 16, color: "#64748b", fontSize: 12 }}>
+          <p className="muted" style={{ marginTop: 16, color: "#94a3b8", fontSize: 12 }}>
             Ireland 2026 tax engine · v0.8
           </p>
         </div>
@@ -153,8 +156,8 @@ function UserChip() {
       style={{
         marginTop: 24,
         padding: "10px 12px",
-        background: "#1e293b",
-        borderRadius: 6,
+        background: "var(--ink-soft)",
+        borderRadius: "var(--radius-sm)",
         fontSize: 12,
         color: "#cbd5e1",
       }}

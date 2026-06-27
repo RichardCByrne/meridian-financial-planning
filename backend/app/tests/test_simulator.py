@@ -268,3 +268,34 @@ def test_marriage_year_no_effect_with_single_person():
     base = PlanInput(**common, filing_status="single")
     with_event = PlanInput(**common, filing_status="single", marriage_year=2027)
     assert simulate(with_event)[-1].income_tax == simulate(base)[-1].income_tax
+
+
+def test_bonus_income_stops_at_retirement_even_with_open_end_year():
+    """A bonus (kind='other', is_bonus=True, no end_year) is employment-related,
+    so it stops at retirement like salary — unlike a plain passive 'other'
+    income which keeps flowing."""
+    person = PersonInput(
+        id=1, name="Aoife", dob=date(1960, 1, 1), is_primary=True,
+        life_expectancy=90, retirement_age=66,
+    )
+    # base_year 2025: age 65 (working) in 2025, age 66 (retired) in 2026.
+    bonus = IncomeInput(
+        id=1, person_id=1, kind="other", name="Annual bonus",
+        gross_amount=10_000, start_year=2025, end_year=None,
+        escalation_rate=0.0, pays_prsi=True, pays_usc=True, is_bonus=True,
+    )
+    passive = IncomeInput(
+        id=2, person_id=1, kind="other", name="Royalties",
+        gross_amount=5_000, start_year=2025, end_year=None,
+        escalation_rate=0.0, pays_prsi=False, pays_usc=True, is_bonus=False,
+    )
+    plan = PlanInput(
+        base_year=2025, projection_years=2,
+        people=[person], incomes=[bonus, passive], expenses=[], assets=[],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    # 2025 (working, age 65): both flow → "other" income includes 15k.
+    assert abs(rows[0].income_by_kind.get("other", 0) - 15_000) < 1
+    # 2026 (retired, age 66): bonus stops, passive royalties continue → 5k.
+    assert abs(rows[1].income_by_kind.get("other", 0) - 5_000) < 1

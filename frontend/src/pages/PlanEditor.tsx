@@ -311,9 +311,9 @@ function TabNav({ planId }: { planId: number }) {
       <TabLink to={`/plans/${planId}/scenarios`}>Scenarios</TabLink>
       <TabLink to={`/plans/${planId}/compare`}>Compare</TabLink>
       <TabLink to={`/plans/${planId}/legacy`}>Legacy</TabLink>
-      <TabLink to={`/plans/${planId}/sharing`}>Sharing</TabLink>
       {advanced && (
         <>
+          <TabLink to={`/plans/${planId}/sharing`}>Sharing</TabLink>
           <TabLink to={`/plans/${planId}/assumptions`}>Assumptions</TabLink>
           <TabLink to={`/plans/${planId}/tax-rules`}>Tax rules</TabLink>
         </>
@@ -321,7 +321,7 @@ function TabNav({ planId }: { planId: number }) {
       <button
         type="button"
         onClick={toggle}
-        title="Toggle advanced tabs (assumptions, tax-rule editor)"
+        title="Toggle advanced tabs (sharing, assumptions, tax-rule editor)"
         className="tabnav-advanced-toggle"
         style={{
           marginLeft: "auto",

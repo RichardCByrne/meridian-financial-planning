@@ -22,6 +22,12 @@ class ChildCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     dob: date
     primary_carer_id: int | None = None
+    childcare_annual: float = Field(default=0.0, ge=0.0)
+    primary_annual: float = Field(default=0.0, ge=0.0)
+    secondary_annual: float = Field(default=0.0, ge=0.0)
+    secondary_is_private: bool = False
+    secondary_private_fee_annual: float = Field(default=0.0, ge=0.0)
+    everyday_annual: float = Field(default=0.0, ge=0.0)
 
     @field_validator("dob")
     @classmethod
@@ -33,6 +39,12 @@ class ChildUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     dob: date | None = None
     primary_carer_id: int | None = None
+    childcare_annual: float | None = Field(default=None, ge=0.0)
+    primary_annual: float | None = Field(default=None, ge=0.0)
+    secondary_annual: float | None = Field(default=None, ge=0.0)
+    secondary_is_private: bool | None = None
+    secondary_private_fee_annual: float | None = Field(default=None, ge=0.0)
+    everyday_annual: float | None = Field(default=None, ge=0.0)
 
     @field_validator("dob")
     @classmethod
@@ -48,3 +60,9 @@ class ChildRead(BaseModel):
     name: str
     dob: date
     primary_carer_id: int | None
+    childcare_annual: float
+    primary_annual: float
+    secondary_annual: float
+    secondary_is_private: bool
+    secondary_private_fee_annual: float
+    everyday_annual: float

@@ -375,12 +375,24 @@ export interface Child {
   name: string;
   dob: string;
   primary_carer_id: number | null;
+  childcare_annual: number;
+  primary_annual: number;
+  secondary_annual: number;
+  secondary_is_private: boolean;
+  secondary_private_fee_annual: number;
+  everyday_annual: number;
 }
 
 export interface ChildCreate {
   name: string;
   dob: string;
   primary_carer_id?: number | null;
+  childcare_annual?: number;
+  primary_annual?: number;
+  secondary_annual?: number;
+  secondary_is_private?: boolean;
+  secondary_private_fee_annual?: number;
+  everyday_annual?: number;
 }
 
 export type ChildUpdate = Partial<ChildCreate>;

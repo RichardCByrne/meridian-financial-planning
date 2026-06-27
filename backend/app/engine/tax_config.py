@@ -124,6 +124,16 @@ class TaxConfig:
     child_benefit_escalation: float = 0.0075
     child_benefit_age_limit: int = 18
 
+    # Child education-stage age boundaries (Irish norms). Used by the simulator
+    # to age-gate per-child rearing costs (see the Child cost fields). Childcare/
+    # pre-school runs from birth until primary start; primary until secondary
+    # start; secondary until secondary end. Third-level costs are NOT modelled
+    # here — users represent college via an `education` goal instead. Everyday
+    # costs (food/clothes) run from birth until secondary end.
+    child_primary_start_age: int = 5
+    child_secondary_start_age: int = 13
+    child_secondary_end_age: int = 18
+
     # Benefit-in-kind (BIK). Cash-equivalent rates for non-cash perks an
     # employer provides; the cash equivalent is charged to IT/USC/PRSI as
     # notional pay. See `engine/bik_ie.py`.

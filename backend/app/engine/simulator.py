@@ -223,9 +223,18 @@ class ChildInput:
     primary_carer_id: int | None = None
     # Whether this child is counted in the projection. Always True for base-plan
     # children; a scenario can flip it to False to model a smaller family
-    # (Child Benefit and any future child-driven costs are skipped). Not
-    # persisted on the ORM Child row — it only exists as a scenario override.
+    # (Child Benefit and all child-driven costs are skipped). Not persisted on
+    # the ORM Child row — it only exists as a scenario override.
     active: bool = True
+    # Per-child rearing costs (annual €, 0 = not modelled), age-gated against
+    # dob using TaxConfig stage boundaries and escalated by the plan inflation
+    # rate. See the engine step "Child-stage costs" and the ORM Child model.
+    childcare_annual: float = 0.0
+    primary_annual: float = 0.0
+    secondary_annual: float = 0.0
+    secondary_is_private: bool = False
+    secondary_private_fee_annual: float = 0.0
+    everyday_annual: float = 0.0
 
 
 @dataclass
@@ -559,6 +568,14 @@ def _validate_plan_input(plan: PlanInput) -> None:
             _ensure_finite(adj.value, f"liability[{liability.id}].adjustment[{adj.id}].value")
     for g in plan.goals:
         _ensure_finite(g.target_amount, f"goal[{g.id}].target_amount")
+    for c in plan.children:
+        _ensure_finite(c.childcare_annual, f"child[{c.id}].childcare_annual")
+        _ensure_finite(c.primary_annual, f"child[{c.id}].primary_annual")
+        _ensure_finite(c.secondary_annual, f"child[{c.id}].secondary_annual")
+        _ensure_finite(
+            c.secondary_private_fee_annual, f"child[{c.id}].secondary_private_fee_annual"
+        )
+        _ensure_finite(c.everyday_annual, f"child[{c.id}].everyday_annual")
     for b in plan.benefits:
         _ensure_finite(b.amount, f"benefit[{b.id}].amount")
         _ensure_finite(b.omv, f"benefit[{b.id}].omv")
@@ -1207,6 +1224,39 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 continue
             amt = _escalate(e.amount, e.escalation_rate, year - e.start_year)
             expenses_by_category[e.category] = expenses_by_category.get(e.category, 0.0) + amt
+
+        # ----- 4a-i. Per-child rearing costs, age-gated by education stage -----
+        # Each cost band applies only while the child's age sits in its window
+        # (boundaries from TaxConfig). Secondary private fees stack on the public
+        # secondary cost. Everyday (food/clothes) runs the whole dependency span
+        # and is opt-in (defaults 0) to avoid double-counting household expenses.
+        # All escalate by inflation. Inactive (scenario-disabled) children skip.
+        child_costs_total = 0.0
+        for child in plan.children:
+            if not child.active:
+                continue
+            child_age = year - child.dob.year
+            if child_age < 0:
+                continue
+            raw = 0.0
+            if child_age < tax_config.child_primary_start_age:
+                raw += child.childcare_annual
+            elif child_age < tax_config.child_secondary_start_age:
+                raw += child.primary_annual
+            elif child_age < tax_config.child_secondary_end_age:
+                raw += child.secondary_annual
+                if child.secondary_is_private:
+                    raw += child.secondary_private_fee_annual
+            if child_age < tax_config.child_secondary_end_age:
+                raw += child.everyday_annual
+            if raw > 0:
+                child_costs_total += _escalate(
+                    raw, plan.assumptions.inflation_rate, year - plan.base_year
+                )
+        if child_costs_total > 0:
+            expenses_by_category["children"] = (
+                expenses_by_category.get("children", 0.0) + child_costs_total
+            )
 
         # ----- 4a. Cost-bearing goals due this year -----
         goals_due: list[GoalInput] = [

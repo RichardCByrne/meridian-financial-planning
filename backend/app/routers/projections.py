@@ -232,6 +232,12 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             name=c.name,
             dob=c.dob,
             primary_carer_id=c.primary_carer_id,
+            childcare_annual=c.childcare_annual,
+            primary_annual=c.primary_annual,
+            secondary_annual=c.secondary_annual,
+            secondary_is_private=c.secondary_is_private,
+            secondary_private_fee_annual=c.secondary_private_fee_annual,
+            everyday_annual=c.everyday_annual,
         )
         for c in children_raw
     ]

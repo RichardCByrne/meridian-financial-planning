@@ -594,13 +594,6 @@ function ScenarioCard({
 
       {!collapsed && (
       <>
-      <MarriageEventRow
-        baseYear={baseYear}
-        value={overrides.marriage_year ?? null}
-        twoPeople={(people?.length ?? 0) >= 2}
-        onChange={setMarriageYear}
-      />
-
       <ModeTabs mode={mode} setMode={setMode} overrideCount={overrideRows.length} addedCount={addedCount} />
 
       {mode === "override" && (
@@ -689,6 +682,7 @@ function ScenarioCard({
         overrides={overrides}
         people={people ?? []}
         baseYear={baseYear}
+        onSetMarriage={setMarriageYear}
         onAddProperty={addPropertyAdded}
         onRemoveAddedAsset={removeAddedAsset}
         onAddChild={addChildAdded}
@@ -776,10 +770,48 @@ function MarriageEventRow({
   onChange: (year: number | null) => void;
 }) {
   const [draft, setDraft] = useState<number>(value ?? baseYear + 1);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (value !== null) setDraft(value);
   }, [value]);
+
+  // Marriage needs two people; offer nothing otherwise so it isn't a permanent
+  // fixture on every scenario.
+  if (!twoPeople) return null;
+
+  // Already set: show a compact chip with a Clear action.
+  if (value !== null) {
+    return (
+      <div
+        className="row"
+        style={{
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 12px",
+          background: "#fdf2f8",
+          border: "1px solid #fbcfe8",
+          borderRadius: 6,
+        }}
+      >
+        <span>
+          💍 Married from <strong>{value}</strong> onward (jointly assessed).
+        </span>
+        <button className="btn btn-secondary" onClick={() => onChange(null)}>
+          Clear
+        </button>
+      </div>
+    );
+  }
+
+  // Not set: opt-in button until the user chooses to add the event.
+  if (!adding) {
+    return (
+      <button className="btn btn-secondary" onClick={() => setAdding(true)}>
+        💍 Add marriage event
+      </button>
+    );
+  }
 
   return (
     <div
@@ -788,7 +820,6 @@ function MarriageEventRow({
         background: "#fdf2f8",
         border: "1px solid #fbcfe8",
         borderRadius: 6,
-        marginBottom: 12,
       }}
     >
       <div style={{ fontWeight: 600, marginBottom: 6 }}>
@@ -796,37 +827,32 @@ function MarriageEventRow({
         <HelpTip>
           Taxes both people as a jointly-assessed married couple (standard-rate band transfer +
           married tax credit) from the chosen year onward. Earlier years keep the base plan's
-          status (e.g. cohabiting / individually assessed). Needs two people in the base plan.
+          status (e.g. cohabiting / individually assessed).
         </HelpTip>
       </div>
-      {!twoPeople ? (
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          Add a second person to the base plan to model marriage.
-        </p>
-      ) : value === null ? (
-        <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
-          <div className="field" style={{ marginBottom: 0, minWidth: 120 }}>
-            <label>Marriage year</label>
-            <NumericInput
-              integer
-              value={draft}
-              onChange={(v) => Number.isFinite(v) && setDraft(v)}
-            />
-          </div>
-          <button className="btn" disabled={draft < baseYear} onClick={() => onChange(draft)}>
-            Set marriage event
-          </button>
+      <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+        <div className="field" style={{ marginBottom: 0, minWidth: 120 }}>
+          <label>Marriage year</label>
+          <NumericInput
+            integer
+            value={draft}
+            onChange={(v) => Number.isFinite(v) && setDraft(v)}
+          />
         </div>
-      ) : (
-        <div className="row" style={{ alignItems: "center", gap: 8 }}>
-          <span>
-            Married from <strong>{value}</strong> onward (jointly assessed).
-          </span>
-          <button className="btn btn-secondary" onClick={() => onChange(null)}>
-            Clear
-          </button>
-        </div>
-      )}
+        <button
+          className="btn"
+          disabled={draft < baseYear}
+          onClick={() => {
+            onChange(draft);
+            setAdding(false);
+          }}
+        >
+          Set marriage event
+        </button>
+        <button className="btn btn-secondary" onClick={() => setAdding(false)}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -1186,6 +1212,7 @@ function AddedItemsSection({
   overrides,
   people,
   baseYear,
+  onSetMarriage,
   onAddProperty,
   onRemoveAddedAsset,
   onAddChild,
@@ -1200,6 +1227,7 @@ function AddedItemsSection({
   overrides: ScenarioOverrides;
   people: Person[];
   baseYear: number;
+  onSetMarriage: (year: number | null) => void;
   onAddProperty: (asset: AddedAsset, liability: AddedLiability | null) => void;
   onRemoveAddedAsset: (idx: number) => void;
   onAddChild: (payload: AddedChild) => void;
@@ -1258,6 +1286,15 @@ function AddedItemsSection({
         <button className="btn btn-secondary" onClick={() => setShowAddProperty((s) => !s)}>
           {showAddProperty ? "Cancel" : "+ Add property purchase (e.g. buy-to-let)"}
         </button>
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <MarriageEventRow
+          baseYear={baseYear}
+          value={overrides.marriage_year ?? null}
+          twoPeople={people.length >= 2}
+          onChange={onSetMarriage}
+        />
       </div>
 
       {showAddIncome && (

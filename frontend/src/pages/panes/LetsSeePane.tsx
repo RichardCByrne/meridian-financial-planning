@@ -344,7 +344,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
       <ReferenceLine
         key="locked-year"
         x={lockedYear}
-        stroke="#1d4ed8"
+        stroke="#b0894a"
         strokeWidth={2.5}
         ifOverflow="extendDomain"
       />
@@ -589,7 +589,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     fill="#93c5fd" fillOpacity={0.7} stroke="none" legendType="none" />
                   <Area type="monotone" dataKey="band_outer_hi" stackId="mc"
                     fill="#bfdbfe" fillOpacity={0.7} stroke="none" legendType="none" />
-                  <Line type="monotone" dataKey="mc_p50" stroke="#1d4ed8"
+                  <Line type="monotone" dataKey="mc_p50" stroke="#0e6e62"
                     strokeWidth={2} dot={false} name="Median (p50)" />
                   <Line type="monotone" dataKey="net_worth" stroke="#64748b"
                     strokeWidth={1.5} strokeDasharray="4 2" dot={false} name="Deterministic" />
@@ -613,9 +613,9 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <Area
                     type="monotone"
                     dataKey="net_worth"
-                    stroke="#2563eb"
-                    fill="#2563eb"
-                    fillOpacity={0.18}
+                    stroke="#0e6e62"
+                    fill="#0e6e62"
+                    fillOpacity={0.16}
                     name="Net worth"
                   />
                   {showLiquid && (
@@ -1007,7 +1007,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.04 }}>
         {label}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 600 }}>{value}</div>
+      <div className="tnum" style={{ fontSize: 22, fontWeight: 600 }}>{value}</div>
       {sub && (
         <div className="muted" style={{ fontSize: 12 }}>
           {sub}

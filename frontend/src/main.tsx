@@ -7,6 +7,12 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/useAuth";
 import { ConfirmDialogHost } from "./components/ConfirmDialog";
 import { ToastProvider, emitToast } from "./components/Toast";
+// Self-hosted brand fonts (bundled by Vite — no external CDN request).
+// Bricolage Grotesque = display, Hanken Grotesk = body, IBM Plex Mono = figures.
+import "@fontsource-variable/bricolage-grotesque/index.css";
+import "@fontsource-variable/hanken-grotesk/index.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./index.css";
 
 function describeError(err: unknown): string {

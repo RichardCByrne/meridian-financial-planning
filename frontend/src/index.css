@@ -1,8 +1,42 @@
+/* ============================================================================
+   Meridian design tokens
+   Brand thesis: cartography / navigation. A meridian is a line of longitude —
+   the app charts a course across decades of money. Palette, type and the
+   "meridian line" signature all derive from that.
+   ========================================================================== */
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
-  color: #1a1a1a;
-  background: #f7f7f8;
+  /* Colour */
+  --ink: #0b1f2a; /* deep marine — dark surfaces, headings */
+  --ink-soft: #14303d; /* raised ink (hover, user chip) */
+  --bg: #ecede7; /* cool oat paper (not cream) */
+  --surface: #fbfbf8; /* cards — a hair warmer than pure white */
+  --accent: #0e6e62; /* meridian teal — primary action */
+  --accent-hover: #0b5a50;
+  --accent-tint: #e2efec; /* teal wash for active/selected */
+  --brass: #b0894a; /* compass brass — signature ticks ONLY */
+  --line: #d6d8ce; /* warm hairline rules / borders */
+  --line-soft: #e7e8e0;
+  --text: #15242b; /* body text */
+  --muted: #5c6b6e; /* secondary text */
+  --gain: #15803d;
+  --loss: #b91c1c;
+
+  /* Type */
+  --font-display: "Bricolage Grotesque Variable", "Hanken Grotesk Variable",
+    system-ui, sans-serif;
+  --font-body: "Hanken Grotesk Variable", system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Shape */
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--bg);
+  /* Align digits everywhere — this is a money app, columns should line up. */
+  font-variant-numeric: tabular-nums;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -22,8 +56,18 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
 a {
-  color: #2563eb;
+  color: var(--accent);
   text-decoration: none;
 }
 a:hover {
@@ -41,16 +85,79 @@ textarea {
   font: inherit;
 }
 
+/* Tabular figures for money: opt-in, used on flagship stats and data cells. */
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ---- Signature: meridian line ------------------------------------------- */
+
+/* Brand mark — a tiny graticule: vertical meridian + latitude ticks. */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-mark {
+  position: relative;
+  width: 12px;
+  height: 26px;
+  flex: 0 0 auto;
+  /* latitude ticks */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--brass) 0 1.5px,
+    transparent 1.5px 8px
+  );
+}
+.brand-mark::before {
+  /* the meridian itself */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--brass);
+}
+
+/* Horizon rule — a hairline with degree ticks, for section dividers. */
+.horizon-rule {
+  height: 6px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--line) 0 1px,
+    transparent 1px 14px
+  );
+  background-repeat: repeat-x;
+  background-position: left top;
+  background-size: 14px 4px;
+  margin: 18px 0;
+}
+
+/* ---- Shell -------------------------------------------------------------- */
+
 .app-shell {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 232px 1fr;
   min-height: 100vh;
 }
 
 .sidebar {
-  background: #0f172a;
+  background: var(--ink);
   color: #e2e8f0;
   padding: 24px 16px;
+  /* faint contour texture — barely-there navigational backdrop */
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(176, 137, 74, 0.05) 0 1px,
+    transparent 1px 22px
+  );
 }
 
 .sidebar-brand {
@@ -61,17 +168,18 @@ textarea {
 }
 
 .sidebar h1 {
-  font-size: 18px;
+  font-size: 19px;
   margin: 0 0 24px 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
 }
 
 .sidebar-toggle {
   display: none;
   background: transparent;
-  border: 1px solid #334155;
+  border: 1px solid var(--ink-soft);
   color: #cbd5e1;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   width: 40px;
   height: 40px;
   font-size: 18px;
@@ -85,20 +193,33 @@ textarea {
 
 .sidebar nav a {
   display: block;
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
   color: #cbd5e1;
   margin-bottom: 4px;
+  font-weight: 500;
+  position: relative;
 }
 
 .sidebar nav a:hover {
-  background: #1e293b;
+  background: var(--ink-soft);
   text-decoration: none;
 }
 
 .sidebar nav a.active {
-  background: #2563eb;
-  color: white;
+  background: var(--ink-soft);
+  color: #fff;
+}
+/* active = brass meridian tick on the leading edge */
+.sidebar nav a.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--brass);
 }
 
 .main {
@@ -110,11 +231,14 @@ textarea {
   margin-top: 0;
 }
 
+/* ---- Surfaces ----------------------------------------------------------- */
+
 .card {
-  background: white;
-  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   padding: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px rgba(11, 31, 42, 0.04);
   margin-bottom: 16px;
 }
 
@@ -124,26 +248,43 @@ textarea {
   align-items: center;
 }
 
+/* ---- Controls ----------------------------------------------------------- */
+
 .btn {
-  background: #2563eb;
+  background: var(--accent);
   color: white;
-  border: 0;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   padding: 8px 14px;
   font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body);
 }
 
 .btn:hover {
-  background: #1d4ed8;
+  background: var(--accent-hover);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn-secondary {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn-secondary:hover {
+  background: var(--bg);
 }
 
 .btn-danger {
-  background: #dc2626;
+  background: var(--loss);
+  color: white;
+}
+.btn-danger:hover {
+  background: #991b1b;
 }
 
 .field {
@@ -156,7 +297,7 @@ textarea {
 .field label {
   font-size: 12px;
   font-weight: 600;
-  color: #475569;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -164,15 +305,25 @@ textarea {
 .field input,
 .field select {
   padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+}
+.field input:focus,
+.field select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 
 .muted {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
+
+/* ---- Tables ------------------------------------------------------------- */
 
 table {
   width: 100%;
@@ -184,16 +335,18 @@ th,
 td {
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 th {
-  color: #64748b;
+  color: var(--muted);
   font-weight: 600;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ---- Help / jargon affordances ------------------------------------------ */
 
 .helptip {
   display: inline-flex;
@@ -203,8 +356,8 @@ th {
   height: 14px;
   margin-left: 6px;
   border-radius: 50%;
-  background: #cbd5e1;
-  color: #334155;
+  background: var(--line);
+  color: var(--ink);
   font-size: 10px;
   font-weight: 700;
   text-transform: none;
@@ -215,7 +368,7 @@ th {
 }
 
 .helptip:focus {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -227,10 +380,10 @@ th {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #0f172a;
+  background: var(--ink);
   color: #f8fafc;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -253,13 +406,13 @@ th {
 .jargon-term {
   position: relative;
   display: inline-block;
-  border-bottom: 1px dotted #94a3b8;
+  border-bottom: 1px dotted var(--muted);
   cursor: help;
   color: inherit;
 }
 
 .jargon-term:focus {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -270,12 +423,14 @@ th {
   opacity: 1;
 }
 
+/* ---- Timeline ----------------------------------------------------------- */
+
 .timeline-track {
   position: relative;
   height: 56px;
-  background: #f8fafc;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
   touch-action: none;
   min-width: 0;
 }
@@ -342,9 +497,11 @@ th {
   vertical-align: -0.125em;
 }
 
+/* ---- Tab navigation ----------------------------------------------------- */
+
 .tabnav {
   display: flex;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 16px;
   align-items: center;
   flex-wrap: wrap;
@@ -354,14 +511,38 @@ th {
   padding: 10px 16px;
   margin-bottom: -1px;
   border-bottom: 2px solid transparent;
-  color: #475569;
+  color: var(--muted);
   text-decoration: none;
   font-weight: 500;
+  position: relative;
+}
+
+.tabnav a:hover {
+  color: var(--ink);
 }
 
 .tabnav a.active {
-  border-bottom-color: #2563eb;
-  color: #2563eb;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+/* active tab carries a small brass meridian tick centred on the teal rule */
+.tabnav a.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 18px;
+  height: 2px;
+  transform: translateX(-50%);
+  background: var(--brass);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 @media (max-width: 720px) {
@@ -394,7 +575,7 @@ th {
   }
   .sidebar h1 {
     margin: 0;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.2;
   }
   .sidebar-toggle {
@@ -511,4 +692,3 @@ th {
     padding: 12px;
   }
 }
-

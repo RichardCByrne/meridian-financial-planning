@@ -43,10 +43,15 @@ _INDEXES: tuple[tuple[str, str, str], ...] = (
 
 
 def upgrade() -> None:
+    # IF NOT EXISTS: the dev lightweight-migration path and prior partial runs
+    # can create these indexes out-of-band while alembic_version still trails
+    # this revision. A plain CREATE INDEX then aborts the whole migration with
+    # "relation already exists" and crashes startup. Idempotent creation makes
+    # the upgrade safe regardless of which path got there first.
     for name, table, column in _INDEXES:
-        op.create_index(name, table, [column])
+        op.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
 
 
 def downgrade() -> None:
-    for name, table, _column in reversed(_INDEXES):
-        op.drop_index(name, table_name=table)
+    for name, _table, _column in reversed(_INDEXES):
+        op.execute(f"DROP INDEX IF EXISTS {name}")

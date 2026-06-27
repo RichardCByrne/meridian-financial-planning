@@ -179,7 +179,7 @@ export function TimelinePane({ planId }: { planId: number }) {
                   <Pill
                     pct={yearToPct(showYear)}
                     color={GOAL_COLORS[g.kind]}
-                    label={`${g.kind.replace("_", " ")} · ${showYear}`}
+                    label={`${showYear}`}
                     onPointerDown={(e) => onPointerDown(e, "goal", g.id, g.target_year)}
                     dragging={isDragging}
                   />
@@ -343,7 +343,12 @@ function Pill({
         position: "absolute",
         left: `${pct}%`,
         top: "50%",
-        transform: `translate(-50%, -50%) ${dragging ? "scale(1.06)" : "scale(1)"}`,
+        // Anchor the pill within the track instead of always centring on the
+        // year: at 0% it left-aligns, at 100% it right-aligns, centred in
+        // between. Stops the right-most marker overflowing the track and
+        // covering the Edit button. Drag accuracy is unaffected (the year is
+        // derived from the pointer's x, not the pill's centre).
+        transform: `translate(-${pct}%, -50%) ${dragging ? "scale(1.06)" : "scale(1)"}`,
         background: color,
         color: "white",
         padding: "4px 10px",

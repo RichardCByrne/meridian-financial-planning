@@ -3,9 +3,13 @@ import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
+
+// Where a brand-new account lands: straight into the plan-creation wizard.
+const NEW_USER_PATH = "/plans/new";
 
 import { DEV_AUTH, firebaseAuth, googleProvider } from "../auth/firebaseConfig";
 import { useAuth } from "../auth/useAuth";
@@ -55,8 +59,12 @@ export function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Destination once auth flips to signed-in. A new registration sends the user
+  // into the wizard; an existing sign-in honours fromPath. Held in state so the
+  // redirect below uses it even after the auth listener re-renders us.
+  const [postAuthPath, setPostAuthPath] = useState<string | null>(null);
 
-  if (auth.status === "signed-in") return <Navigate to={fromPath} replace />;
+  if (auth.status === "signed-in") return <Navigate to={postAuthPath ?? fromPath} replace />;
 
   if (DEV_AUTH) {
     return (
@@ -76,8 +84,11 @@ export function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await signInWithPopup(firebaseAuth(), googleProvider);
-      navigate(fromPath, { replace: true });
+      const result = await signInWithPopup(firebaseAuth(), googleProvider);
+      // First-ever Google sign-in for this account → treat as registration.
+      const dest = getAdditionalUserInfo(result)?.isNewUser ? NEW_USER_PATH : fromPath;
+      setPostAuthPath(dest);
+      navigate(dest, { replace: true });
     } catch (e) {
       setError(friendlyAuthError(e, "signin"));
     } finally {
@@ -92,10 +103,14 @@ export function LoginPage() {
     try {
       if (mode === "signin") {
         await signInWithEmailAndPassword(firebaseAuth(), email, password);
+        setPostAuthPath(fromPath);
+        navigate(fromPath, { replace: true });
       } else {
         await createUserWithEmailAndPassword(firebaseAuth(), email, password);
+        // New account → open the wizard so onboarding starts immediately.
+        setPostAuthPath(NEW_USER_PATH);
+        navigate(NEW_USER_PATH, { replace: true });
       }
-      navigate(fromPath, { replace: true });
     } catch (err) {
       setError(friendlyAuthError(err, mode));
     } finally {

@@ -22,23 +22,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "liability_adjustments",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "liability_id",
-            sa.Integer(),
-            sa.ForeignKey("liabilities.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column("kind", sa.String(length=20), nullable=False),
-        sa.Column("effective_year", sa.Integer(), nullable=False),
-        sa.Column("value", sa.Float(), nullable=False),
-    )
-    op.create_index(
-        "ix_liability_adjustments_liability_id",
-        "liability_adjustments",
-        ["liability_id"],
+    # IF NOT EXISTS / checkfirst: the dev lightweight-migration path runs
+    # create_all (which builds this table and its index=True column index) while
+    # alembic_version still trails this revision. A plain replay then aborts with
+    # "relation already exists". Idempotent creation makes the upgrade safe
+    # regardless of which path got there first (mirrors 0023_fk_indexes).
+    bind = op.get_bind()
+    if not sa.inspect(bind).has_table("liability_adjustments"):
+        op.create_table(
+            "liability_adjustments",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column(
+                "liability_id",
+                sa.Integer(),
+                sa.ForeignKey("liabilities.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column("kind", sa.String(length=20), nullable=False),
+            sa.Column("effective_year", sa.Integer(), nullable=False),
+            sa.Column("value", sa.Float(), nullable=False),
+        )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_liability_adjustments_liability_id "
+        "ON liability_adjustments (liability_id)"
     )
 
 

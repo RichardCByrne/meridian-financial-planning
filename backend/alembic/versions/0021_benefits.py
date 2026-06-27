@@ -24,6 +24,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Idempotent: lightweight create_all may have built this table already while
+    # alembic_version trails this revision.
+    if sa.inspect(op.get_bind()).has_table("benefits"):
+        return
     op.create_table(
         "benefits",
         sa.Column("id", sa.Integer(), primary_key=True),

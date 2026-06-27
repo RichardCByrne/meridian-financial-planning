@@ -204,3 +204,20 @@ def test_child_rejects_dob_too_far_in_past() -> None:
 def test_income_rejects_bad_money(field: str, value: float) -> None:
     with pytest.raises(ValidationError):
         IncomeSourceCreate(**_income_kwargs(**{field: value}))
+
+
+def test_expense_category_normalises_legacy_to_discretionary():
+    # "legacy" is accepted (old clients / imported plans) but folded into
+    # "discretionary" — the engine treats them identically anyway.
+    assert ExpenseCreate(
+        name="Gift", category="legacy", amount=1_000, start_year=2030
+    ).category == "discretionary"
+    assert ExpenseUpdate(category="legacy").category == "discretionary"
+    # Canonical categories pass through unchanged.
+    for cat in ("basic", "discretionary", "single_year"):
+        assert ExpenseCreate(name="X", category=cat, amount=0, start_year=2030).category == cat
+
+
+def test_expense_rejects_unknown_category():
+    with pytest.raises(ValidationError):
+        ExpenseCreate(name="X", category="luxury", amount=0, start_year=2030)

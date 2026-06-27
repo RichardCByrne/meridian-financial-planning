@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
+import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,6 +9,35 @@ import {
 
 import { DEV_AUTH, firebaseAuth, googleProvider } from "../auth/firebaseConfig";
 import { useAuth } from "../auth/useAuth";
+
+const GENERIC_SIGNIN_ERROR =
+  "Sign in failed. Please check your email and password and try again.";
+const GENERIC_SIGNUP_ERROR = "We couldn't create your account. Please try again.";
+
+// Map a Firebase auth error to a user-facing message. Deliberately generic for
+// anything that could reveal whether an account exists or which credential was
+// wrong (user-not-found / wrong-password / invalid-credential / user-disabled /
+// email-already-in-use) — exposing those enables account enumeration. Only
+// input/transport problems that leak nothing get a specific, helpful message.
+// Returns null when there's nothing worth showing (user dismissed the popup).
+function friendlyAuthError(err: unknown, mode: "signin" | "signup"): string | null {
+  const code = err instanceof FirebaseError ? err.code : "";
+  switch (code) {
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+      return null;
+    case "auth/invalid-email":
+      return "Please enter a valid email address.";
+    case "auth/weak-password":
+      return "Choose a password of at least 6 characters.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a moment and try again.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    default:
+      return mode === "signup" ? GENERIC_SIGNUP_ERROR : GENERIC_SIGNIN_ERROR;
+  }
+}
 
 export function LoginPage() {
   const auth = useAuth();
@@ -49,7 +79,7 @@ export function LoginPage() {
       await signInWithPopup(firebaseAuth(), googleProvider);
       navigate(fromPath, { replace: true });
     } catch (e) {
-      setError(String(e));
+      setError(friendlyAuthError(e, "signin"));
     } finally {
       setBusy(false);
     }
@@ -67,7 +97,7 @@ export function LoginPage() {
       }
       navigate(fromPath, { replace: true });
     } catch (err) {
-      setError(String(err));
+      setError(friendlyAuthError(err, mode));
     } finally {
       setBusy(false);
     }

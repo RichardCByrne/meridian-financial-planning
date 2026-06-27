@@ -25,8 +25,10 @@ export function AcceptInvitePage() {
     try {
       const inv = await accept.mutateAsync(token);
       navigate(`/plans/${inv.plan_id}`, { replace: true });
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError(
+        "We couldn't accept this invite. It may have expired, been revoked, or already been used.",
+      );
     }
   };
 

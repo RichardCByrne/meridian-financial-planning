@@ -27,6 +27,7 @@ from app.engine.simulator import (
     simulate,
 )
 from app.engine import montecarlo as _mc
+from app.engine import loss_capacity as _loss_capacity
 from app.engine.tax_config import TaxConfig
 from app.models import (
     Assumptions,
@@ -43,6 +44,7 @@ from app.models import (
     User,
 )
 from app.schemas.projection import (
+    LossCapacityResponse,
     MonteCarloResponse,
     MonteCarloYearRow,
     ProjectionResponse,
@@ -534,3 +536,30 @@ def get_montecarlo(
     )
     _mc_cache_set(cache_key, response)
     return response
+
+
+@router.get("/plans/{plan_id}/projection/loss-capacity", response_model=LossCapacityResponse)
+def get_loss_capacity(
+    plan_id: int,
+    scenario_id: int | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LossCapacityResponse:
+    """Capacity for loss: the largest one-off market shock (as a euro amount and
+    a % of market-exposed assets) the plan can absorb at the base year and still
+    avoid any shortfall over the horizon."""
+    require_plan_access(plan_id, user, db, min_role="viewer")
+    plan = _load_plan(plan_id, db)
+    scenario = _load_scenario(plan_id, scenario_id, db)
+    plan_input = _load_plan_input(plan, db)
+    if scenario is not None:
+        plan_input = apply_overrides(plan_input, scenario.overrides_json)
+
+    r = _loss_capacity.loss_capacity(plan_input)
+    return LossCapacityResponse(
+        investable_base=round(r.investable_base, 2),
+        max_absorbable_loss=round(r.max_absorbable_loss, 2),
+        max_absorbable_pct=round(r.max_absorbable_pct, 4),
+        already_short=r.already_short,
+        limiting_year=r.limiting_year,
+    )

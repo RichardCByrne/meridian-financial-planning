@@ -557,6 +557,14 @@ export interface ProjectionResponse {
   years: YearRow[];
 }
 
+export interface LossCapacityResponse {
+  investable_base: number;
+  max_absorbable_loss: number;
+  max_absorbable_pct: number;
+  already_short: boolean;
+  limiting_year: number | null;
+}
+
 // Scenario overrides: keyed by entity bucket. Per-entity buckets map id→partial fields,
 // and may also carry an `_added` list of new entities to inject (used to model promotions,
 // one-off events, windfalls etc that don't exist in the base plan).

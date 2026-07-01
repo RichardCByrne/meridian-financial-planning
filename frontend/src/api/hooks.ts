@@ -46,6 +46,7 @@ import type {
   PlanMember,
   PlanRole,
   PlanUpdate,
+  LossCapacityResponse,
   ProjectionResponse,
   Scenario,
   ScenarioCreate,
@@ -448,6 +449,16 @@ export function useProjection(planId: number, scenarioId?: number | null) {
     queryKey: keys.projection(planId, scenarioId ?? null),
     queryFn: () => api.get<ProjectionResponse>(`/plans/${planId}/projection${qs}`),
     enabled: Number.isFinite(planId),
+  });
+}
+
+export function useLossCapacity(planId: number, opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...keys.projection(planId, null), "loss-capacity"],
+    queryFn: () =>
+      api.get<LossCapacityResponse>(`/plans/${planId}/projection/loss-capacity`),
+    enabled: (opts?.enabled ?? true) && Number.isFinite(planId),
+    staleTime: 60_000,
   });
 }
 

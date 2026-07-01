@@ -75,6 +75,14 @@ class MonteCarloResponse(BaseModel):
     mode: str = "gaussian"
 
 
+class LossCapacityResponse(BaseModel):
+    investable_base: float
+    max_absorbable_loss: float
+    max_absorbable_pct: float
+    already_short: bool
+    limiting_year: int | None = None
+
+
 class ProjectionSummary(BaseModel):
     plan_id: int
     base_year: int

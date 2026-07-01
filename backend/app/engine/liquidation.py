@@ -30,7 +30,13 @@ LIQUIDATION_ORDER: tuple[str, ...] = (
     "deposit",
     "investment_unwrapped",
     "etf_fund",
+    "investment_bond",
 )
+
+# Gross roll-up wrappers taxed on the realised gain at the ETF exit-tax rate
+# (41% by default) with an 8-year deemed disposal, and with no CGT annual
+# exemption. Irish ETFs and life-assurance investment bonds share this regime.
+EXIT_TAX_KINDS: frozenset[str] = frozenset({"etf_fund", "investment_bond"})
 
 # Asset kinds considered liquid: readily convertible to cash without a forced
 # sale of an illiquid holding (property) or breaking into a restricted wrapper
@@ -47,14 +53,15 @@ def disposal_tax_rate(kind: str, tax_config: TaxConfig | None = None) -> float:
     - investment_unwrapped: CGT (33% by default) on the realised gain. The
       annual €1,270 exemption is applied later in the simulator after summing
       all unwrapped disposals for the year.
-    - etf_fund: ETF exit tax (41% by default) on the realised gain.
+    - etf_fund / investment_bond: exit tax (41% by default) on the realised gain
+      (gross roll-up wrappers; no CGT annual exemption).
     - property: kept tax-free in this iteration. Primary residence is CGT-exempt
       in Ireland; BTL would normally attract CGT but is deferred to a later phase.
     """
     tax_config = _resolve_config(tax_config)
     if kind == "investment_unwrapped":
         return tax_config.cgt_rate
-    if kind == "etf_fund":
+    if kind in EXIT_TAX_KINDS:
         return tax_config.etf_exit_tax_rate
     return 0.0
 

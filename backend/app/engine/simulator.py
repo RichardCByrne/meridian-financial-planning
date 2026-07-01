@@ -21,6 +21,7 @@ from datetime import date
 
 from app.engine import bik_ie, cat_ie, pension_ie, tax_ie
 from app.engine.liquidation import (
+    EXIT_TAX_KINDS,
     LIQUID_ASSET_KINDS,
     LIQUIDATION_ORDER,
     disposal_tax_rate as _disposal_tax_rate,
@@ -877,10 +878,10 @@ def simulate(
                     bits.append(f"cleared mortgage EUR {payoff:,.0f}")
                 notes.append(", ".join(bits) + ".")
 
-        # ----- 2b. ETF deemed disposal -----
+        # ----- 2b. ETF / investment-bond deemed disposal (8-year) -----
         deemed_tax = 0.0
         for aid, st in states.items():
-            if st.kind != "etf_fund":
+            if st.kind not in EXIT_TAX_KINDS:
                 continue
             elapsed = year - st.acquired
             if elapsed > 0 and elapsed % tax_config.etf_deemed_disposal_years == 0:
@@ -890,7 +891,7 @@ def simulate(
                     deemed_tax += tax
                     st.basis = st.balance
                     notes.append(
-                        f"ETF deemed disposal on asset {aid}: gain EUR {gain:,.0f}, tax EUR {tax:,.0f}."
+                        f"Deemed disposal on asset {aid}: gain EUR {gain:,.0f}, tax EUR {tax:,.0f}."
                     )
 
         # ----- 2c. Death events — transfer estate, compute CAT -----

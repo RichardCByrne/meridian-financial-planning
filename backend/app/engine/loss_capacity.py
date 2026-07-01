@@ -23,6 +23,7 @@ MARKET_KINDS: frozenset[str] = frozenset(
     {
         "investment_unwrapped",
         "etf_fund",
+        "investment_bond",
         "prsa",
         "occupational_pension",
         "arf",

@@ -338,6 +338,10 @@ class Asset(Base):
     )
     stamp_duty_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     selling_cost_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Total annual product charge (AMC + platform + adviser fee) as a fraction of
+    # balance, e.g. 0.015 = 1.5%/yr. Deducted from growth each year — real funds
+    # compound net of charges. Default 0.0 leaves existing plans unchanged.
+    annual_charge_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="assets")
 

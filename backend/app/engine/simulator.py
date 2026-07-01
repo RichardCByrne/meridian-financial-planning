@@ -168,6 +168,10 @@ class AssetInput:
     linked_liability_id: int | None = None
     stamp_duty_pct: float = 0.0
     selling_cost_pct: float = 0.0
+    # Total annual product charge (AMC + platform + adviser fee) as a fraction of
+    # balance. Deducted from growth each year so the pot compounds net of charges.
+    # 0.0 = no charge (previous behaviour).
+    annual_charge_pct: float = 0.0
 
 
 @dataclass
@@ -524,6 +528,8 @@ class AssetState:
     linked_liability_id: int | None = None
     stamp_duty_pct: float = 0.0
     selling_cost_pct: float = 0.0
+    # Annual product charge (fraction of balance) deducted from growth each year.
+    charge_pct: float = 0.0
 
 
 def _retirement_age_for(person: PersonInput, default: int) -> int:
@@ -616,6 +622,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             linked_liability_id=a.linked_liability_id,
             stamp_duty_pct=max(0.0, a.stamp_duty_pct),
             selling_cost_pct=max(0.0, a.selling_cost_pct),
+            charge_pct=max(0.0, a.annual_charge_pct),
         )
         for a in plan.assets
     }
@@ -714,7 +721,10 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             # Dormant future purchases hold no value and don't grow yet.
             if not st.active:
                 continue
-            st.balance *= 1.0 + st.growth
+            # Growth is applied net of the annual product charge (AMC/platform/
+            # adviser fee). Floor the net factor at 0 so a charge can't drive the
+            # balance negative even if it exceeds growth.
+            st.balance *= max(0.0, 1.0 + st.growth - st.charge_pct)
 
         # ----- 2a. Planned asset transactions (Phase 1: property purchase/sale).
         # Purchases activate at face value (no growth in the purchase year) and

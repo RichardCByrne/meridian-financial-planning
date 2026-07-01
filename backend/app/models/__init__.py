@@ -348,6 +348,13 @@ class IncomeSource(Base):
     # UI marker: a one-off / annual bonus (still a normal taxable income row).
     # Lets the editor badge it and offer a bonus shortcut; the engine ignores it.
     is_bonus: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Rental income only (kind == "rental"): allowable-expenses % of gross rent
+    # (mortgage interest, management, repairs, insurance — lumped) and the
+    # furnishings value on which wear-and-tear capital allowance is claimed.
+    # Taxable rental profit = gross − gross×expenses_pct − wear_and_tear.
+    # Ignored for non-rental kinds. 0 = taxed on gross (previous behaviour).
+    rental_expenses_pct: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    furnishings_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     person: Mapped[Person] = relationship(back_populates="income_sources")
 

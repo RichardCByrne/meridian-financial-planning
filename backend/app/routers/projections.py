@@ -147,6 +147,8 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             pension_contribution_pct=i.pension_contribution_pct,
             employer_pension_contribution_pct=i.employer_pension_contribution_pct,
             is_bonus=i.is_bonus,
+            rental_expenses_pct=i.rental_expenses_pct,
+            furnishings_value=i.furnishings_value,
         )
         for i in incomes_raw
     ]

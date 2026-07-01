@@ -95,6 +95,11 @@ class IncomeInput:
     # stops at retirement like salary even when modelled with a passive `kind`
     # (the one-click bonus uses kind="other") and left with an open end_year.
     is_bonus: bool = False
+    # Rental income only: allowable-expenses fraction of gross rent and the
+    # furnishings value for the wear-and-tear capital allowance. Taxable rental
+    # profit = gross − gross×rental_expenses_pct − wear_and_tear. 0 = gross.
+    rental_expenses_pct: float = 0.0
+    furnishings_value: float = 0.0
 
 
 @dataclass
@@ -1023,6 +1028,19 @@ def simulate(
                 ):
                     continue
                 amt = _escalate(inc.gross_amount, inc.escalation_rate, year - inc.start_year)
+                # Rental income is taxed on profit, not gross: deduct allowable
+                # expenses (a % of gross) and the wear-and-tear capital allowance
+                # on furnishings (straight-line over the config's window). The
+                # profit figure flows to IT/USC/PRSI and to income_by_kind.
+                if inc.kind == "rental":
+                    expenses = amt * min(1.0, max(0.0, inc.rental_expenses_pct))
+                    years_let = year - inc.start_year
+                    wear_and_tear = (
+                        max(0.0, inc.furnishings_value) * tax_config.rental_wear_tear_rate
+                        if 0 <= years_let < tax_config.rental_wear_tear_years
+                        else 0.0
+                    )
+                    amt = max(0.0, amt - expenses - wear_and_tear)
                 earned_for_it += amt
                 if inc.pays_usc:
                     earned_for_usc += amt

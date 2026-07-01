@@ -24,6 +24,8 @@ class IncomeSourceCreate(BaseModel):
     pension_contribution_pct: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
     employer_pension_contribution_pct: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
     is_bonus: bool = False
+    rental_expenses_pct: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
+    furnishings_value: float = Field(default=0.0, ge=0, allow_inf_nan=False)
 
 
 class IncomeSourceUpdate(BaseModel):
@@ -38,6 +40,8 @@ class IncomeSourceUpdate(BaseModel):
     pension_contribution_pct: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     employer_pension_contribution_pct: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     is_bonus: bool | None = None
+    rental_expenses_pct: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    furnishings_value: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class IncomeSourceRead(BaseModel):
@@ -56,3 +60,5 @@ class IncomeSourceRead(BaseModel):
     pension_contribution_pct: float
     employer_pension_contribution_pct: float
     is_bonus: bool
+    rental_expenses_pct: float
+    furnishings_value: float

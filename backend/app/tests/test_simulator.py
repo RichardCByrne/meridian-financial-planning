@@ -299,3 +299,53 @@ def test_bonus_income_stops_at_retirement_even_with_open_end_year():
     assert abs(rows[0].income_by_kind.get("other", 0) - 15_000) < 1
     # 2026 (retired, age 66): bonus stops, passive royalties continue → 5k.
     assert abs(rows[1].income_by_kind.get("other", 0) - 5_000) < 1
+
+
+def test_annual_charge_reduces_asset_growth():
+    """A product charge is deducted from growth, so the pot compounds at the net
+    rate. 6% growth − 1.5% charge = 4.5% net over 3 years."""
+    def _plan(charge: float) -> PlanInput:
+        return PlanInput(
+            base_year=2026,
+            projection_years=3,
+            people=[_person()],
+            incomes=[],
+            expenses=[],
+            assets=[
+                AssetInput(
+                    id=1, name="Fund", kind="investment_unwrapped", value=100_000,
+                    growth_rate=0.06, cost_basis=100_000.0, annual_charge_pct=charge,
+                )
+            ],
+            assumptions=AssumptionsInput(inflation_rate=0.0, default_growth_rate=0.0),
+        )
+
+    gross = simulate(_plan(0.0))
+    net = simulate(_plan(0.015))
+    # Charge-free grows at 6%; charged grows at 4.5%.
+    assert abs(gross[2].asset_balances[1] - 100_000 * 1.06 ** 3) < 1.0
+    assert abs(net[2].asset_balances[1] - 100_000 * 1.045 ** 3) < 1.0
+    # And the charge visibly lowers the terminal balance.
+    assert net[2].asset_balances[1] < gross[2].asset_balances[1]
+
+
+def test_annual_charge_exceeding_growth_does_not_go_negative():
+    """A charge larger than growth shrinks the pot but never drives it below zero."""
+    plan = PlanInput(
+        base_year=2026,
+        projection_years=2,
+        people=[_person()],
+        incomes=[],
+        expenses=[],
+        assets=[
+            AssetInput(
+                id=1, name="Fund", kind="investment_unwrapped", value=10_000,
+                growth_rate=0.02, cost_basis=10_000.0, annual_charge_pct=0.10,
+            )
+        ],
+        assumptions=AssumptionsInput(inflation_rate=0.0, default_growth_rate=0.0),
+    )
+    rows = simulate(plan)
+    # 2% growth − 10% charge = −8% net: balance shrinks but stays positive.
+    assert 0.0 < rows[0].asset_balances[1] < 10_000
+    assert abs(rows[0].asset_balances[1] - 10_000 * 0.92) < 1.0

@@ -28,6 +28,7 @@ import {
 } from "../../api/hooks";
 import type { Goal, MonteCarloResponse, YearRow } from "../../api/types";
 import { fmtMoney } from "../../lib/format";
+import { CHART, CHART_SERIES } from "../../lib/chartColors";
 import { HelpTip } from "../../components/HelpTip";
 import { JargonTerm } from "../../components/JargonTerm";
 import { ChartSkeleton } from "../../components/Skeleton";
@@ -63,8 +64,8 @@ const CHART_OPTIONS: { value: ChartKind; label: string }[] = [
   { value: "tax", label: "Tax breakdown" },
 ];
 
-const TAX_COLORS = { income_tax: "#2563eb", usc: "#7c3aed", prsi: "#0ea5e9" };
-const KIND_COLORS = ["#2563eb", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#7c3aed", "#ec4899"];
+const TAX_COLORS = { income_tax: CHART_SERIES[0], usc: CHART_SERIES[1], prsi: CHART_SERIES[2] };
+const KIND_COLORS = CHART_SERIES;
 
 const REAL_TOGGLE_KEY = (id: number) => `meridian:letsSee:real:${id}`;
 const MC_N_KEY = (id: number) => `meridian:letsSee:mcN:${id}`;
@@ -114,11 +115,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const [mcSeedText, setMcSeedText] = useState<string>("");
   const mcSeed = mcSeedText.trim() === "" ? null : Number(mcSeedText.trim());
   const seedValid = mcSeed === null || Number.isFinite(mcSeed);
+  const [mcMode, setMcMode] = useState<"gaussian" | "historic">("gaussian");
 
   const { data: mcData, isFetching: mcFetching } = useMonteCarlo(planId, {
     enabled: showMonteCarlo && chart === "net_worth",
     n: mcN,
     seed: seedValid ? mcSeed : null,
+    mode: mcMode,
   });
 
   const inflation = assumptions?.inflation_rate ?? 0;
@@ -220,20 +223,20 @@ export function LetsSeePane({ planId }: { planId: number }) {
     const dobYear = (iso: string) => new Date(iso).getFullYear();
     for (const p of people ?? []) {
       if (p.retirement_age != null) {
-        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: "#0f172a", icon: "🏖", source: "event" });
+        evs.push({ year: dobYear(p.dob) + p.retirement_age, label: `${p.name} retires`, color: CHART.ink, icon: "🏖", source: "event" });
       }
       if (assumptions?.state_pension_age) {
-        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: "#0891b2", icon: "💰", source: "event" });
+        evs.push({ year: dobYear(p.dob) + assumptions.state_pension_age, label: `${p.name} state pension`, color: CHART_SERIES[1], icon: "💰", source: "event" });
       }
     }
     for (const g of goals ?? []) {
-      evs.push({ year: g.target_year, label: g.name, color: "#7c3aed", icon: "🎯", source: "goal" });
+      evs.push({ year: g.target_year, label: g.name, color: CHART_SERIES[4], icon: "🎯", source: "goal" });
     }
     for (const c of children ?? []) {
-      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: "#db2777", icon: "👶", source: "event" });
+      evs.push({ year: dobYear(c.dob), label: `${c.name} born`, color: CHART_SERIES[3], icon: "👶", source: "event" });
     }
     if (data.summary.first_shortfall_year) {
-      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: "#dc2626", icon: "⚠", source: "event" });
+      evs.push({ year: data.summary.first_shortfall_year, label: "Shortfall", color: CHART.loss, icon: "⚠", source: "event" });
     }
     return evs
       .filter((e) => e.year >= baseYear && e.year <= lastYear)
@@ -252,7 +255,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
     }
     return [...byYear.entries()].map(([year, evs]) => {
       const colors = new Set(evs.map((e) => e.color));
-      return { year, color: colors.size === 1 ? evs[0].color : "#475569" };
+      return { year, color: colors.size === 1 ? evs[0].color : CHART.neutral };
     });
   }, [events]);
 
@@ -449,6 +452,15 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <option value={200}>200 runs</option>
                   <option value={1000}>1000 runs (slow)</option>
                 </select>
+                <select
+                  value={mcMode}
+                  onChange={(e) => setMcMode(e.target.value as "gaussian" | "historic")}
+                  style={{ padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  title="Normal: one random regime shock per run. Historic: replays block-bootstrapped historical return sequences, capturing crashes and sequence-of-returns risk."
+                >
+                  <option value="gaussian">Normal model</option>
+                  <option value="historic">Historic model</option>
+                </select>
                 <details style={{ display: "inline-block" }}>
                   <summary
                     style={{
@@ -566,7 +578,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                   onClick={handleChartClick}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                   {renderShortfall()}
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
@@ -582,19 +594,19 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <Area type="monotone" dataKey="band_base" stackId="mc"
                     fill="transparent" stroke="none" legendType="none" />
                   <Area type="monotone" dataKey="band_outer_lo" stackId="mc"
-                    fill="#bfdbfe" fillOpacity={0.7} stroke="none" name="5–25 / 75–95 %ile" />
+                    fill={CHART.fanOuter} fillOpacity={0.7} stroke="none" name="5–25 / 75–95 %ile" />
                   <Area type="monotone" dataKey="band_inner_lo" stackId="mc"
-                    fill="#93c5fd" fillOpacity={0.7} stroke="none" name="25–75 %ile" />
+                    fill={CHART.fanInner} fillOpacity={0.7} stroke="none" name="25–75 %ile" />
                   <Area type="monotone" dataKey="band_inner_hi" stackId="mc"
-                    fill="#93c5fd" fillOpacity={0.7} stroke="none" legendType="none" />
+                    fill={CHART.fanInner} fillOpacity={0.7} stroke="none" legendType="none" />
                   <Area type="monotone" dataKey="band_outer_hi" stackId="mc"
-                    fill="#bfdbfe" fillOpacity={0.7} stroke="none" legendType="none" />
-                  <Line type="monotone" dataKey="mc_p50" stroke="#0e6e62"
+                    fill={CHART.fanOuter} fillOpacity={0.7} stroke="none" legendType="none" />
+                  <Line type="monotone" dataKey="mc_p50" stroke={CHART.teal}
                     strokeWidth={2} dot={false} name="Median (p50)" />
-                  <Line type="monotone" dataKey="net_worth" stroke="#64748b"
+                  <Line type="monotone" dataKey="net_worth" stroke={CHART.ink}
                     strokeWidth={1.5} strokeDasharray="4 2" dot={false} name="Deterministic" />
                   {showLiquid && (
-                    <Line type="monotone" dataKey="liquid_assets" stroke="#10b981"
+                    <Line type="monotone" dataKey="liquid_assets" stroke={CHART.gain}
                       strokeWidth={2} dot={false} name="Liquid assets" />
                   )}
                 </ComposedChart>
@@ -604,7 +616,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                   onClick={handleChartClick}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                   {renderShortfall()}
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(v) => compact(v)} />
@@ -613,8 +625,8 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <Area
                     type="monotone"
                     dataKey="net_worth"
-                    stroke="#0e6e62"
-                    fill="#0e6e62"
+                    stroke={CHART.teal}
+                    fill={CHART.teal}
                     fillOpacity={0.16}
                     name="Net worth"
                   />
@@ -622,7 +634,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                     <Line
                       type="monotone"
                       dataKey="liquid_assets"
-                      stroke="#10b981"
+                      stroke={CHART.gain}
                       strokeWidth={2}
                       dot={false}
                       name="Liquid assets"
@@ -638,18 +650,18 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onClick={handleChartClick}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                 <Legend />
-                <Bar dataKey="net_income" fill="#10b981" name="Net income" />
-                <Bar dataKey="expenses" fill="#ef4444" name="Expenses" />
+                <Bar dataKey="net_income" fill={CHART.gain} name="Net income" />
+                <Bar dataKey="expenses" fill={CHART.loss} name="Expenses" />
                 <Line
                   type="monotone"
                   dataKey="surplus"
-                  stroke="#0f172a"
+                  stroke={CHART.ink}
                   strokeWidth={2}
                   name="Surplus / shortfall"
                   dot={false}
@@ -663,7 +675,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onClick={handleChartClick}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
@@ -682,7 +694,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <Bar
                   dataKey="asset_withdrawals"
                   stackId="income"
-                  fill="#94a3b8"
+                  fill={CHART.neutral}
                   name="Assets drawn"
                 />
                 {/* Need line: total the year must fund (expenses + tax + savings).
@@ -690,7 +702,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <Line
                   type="monotone"
                   dataKey="need"
-                  stroke="#0f172a"
+                  stroke={CHART.ink}
                   strokeWidth={2}
                   dot={false}
                   name="Need (expenses + tax + savings)"
@@ -704,7 +716,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 onMouseMove={(s: ChartMouseState) => setHoverYear(toYear(s?.activeLabel))}
                 onClick={handleChartClick}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
                 <XAxis dataKey="year" />
                 <YAxis tickFormatter={(v) => compact(v)} />
@@ -713,7 +725,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 <Bar dataKey="income_tax" stackId="t" fill={TAX_COLORS.income_tax} name="Income tax" />
                 <Bar dataKey="usc" stackId="t" fill={TAX_COLORS.usc} name="USC" />
                 <Bar dataKey="prsi" stackId="t" fill={TAX_COLORS.prsi} name="PRSI" />
-                <Bar dataKey="investment_tax" stackId="t" fill="#f59e0b" name="Investment tax (CGT/ETF)" />
+                <Bar dataKey="investment_tax" stackId="t" fill={CHART_SERIES[3]} name="Investment tax (CGT/ETF)" />
                 {renderEvents()}
                 {renderLockedLine()}
               </BarChart>
@@ -1429,14 +1441,14 @@ function McTooltip({ active, payload, label, mcData, deflate }: {
   const d = (v: number) => fmtMoney(deflate(v, label));
   return (
     <div style={{
-      background: "white", border: "1px solid #e2e8f0", borderRadius: 6,
+      background: "white", border: `1px solid ${CHART.grid}`, borderRadius: 6,
       padding: "8px 12px", fontSize: 13, minWidth: 200,
     }}>
       <div style={{ fontWeight: 600, marginBottom: 4 }}>Year {label}</div>
-      <div style={{ color: "#64748b" }}>Deterministic: {fmtMoney(det ?? 0)}</div>
-      <div style={{ color: "#1d4ed8" }}>Median (p50): {d(mc.p50)}</div>
-      <div style={{ color: "#93c5fd" }}>Range p25–p75: {d(mc.p25)} – {d(mc.p75)}</div>
-      <div style={{ color: "#bfdbfe" }}>Range p5–p95: {d(mc.p5)} – {d(mc.p95)}</div>
+      <div style={{ color: CHART.ink }}>Deterministic: {fmtMoney(det ?? 0)}</div>
+      <div style={{ color: CHART.teal }}>Median (p50): {d(mc.p50)}</div>
+      <div style={{ color: CHART_SERIES[5] }}>Range p25–p75: {d(mc.p25)} – {d(mc.p75)}</div>
+      <div style={{ color: CHART.neutral }}>Range p5–p95: {d(mc.p5)} – {d(mc.p95)}</div>
     </div>
   );
 }

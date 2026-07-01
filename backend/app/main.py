@@ -16,11 +16,13 @@ from app.routers import (
     benefits,
     bequests,
     children,
+    db_pensions,
     expenses,
     goals,
     income,
     invites,
     liabilities,
+    life_policies,
     members,
     people,
     plans,
@@ -94,6 +96,11 @@ def _apply_lightweight_migrations() -> None:
                 ))
                 conn.execute(text(
                     "ALTER TABLE assets ADD COLUMN selling_cost_pct FLOAT NOT NULL DEFAULT 0.0"
+                ))
+        if "annual_charge_pct" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE assets ADD COLUMN annual_charge_pct FLOAT NOT NULL DEFAULT 0.0"
                 ))
     if "people" in tables:
         cols = {c["name"] for c in insp.get_columns("people")}
@@ -198,8 +205,12 @@ def _apply_lightweight_migrations() -> None:
                 conn.execute(
                     text("ALTER TABLE people ADD COLUMN annuity_rate FLOAT NOT NULL DEFAULT 0.04")
                 )
-    # children + benefits tables are picked up by Base.metadata.create_all on
-    # the dev path (whole-table additions need no ALTER bridging). Per-child
+        if "death_year" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE people ADD COLUMN death_year INTEGER"))
+    # children + benefits + life_policies tables are picked up by
+    # Base.metadata.create_all on the dev path (whole-table additions need no
+    # ALTER bridging). Per-child
     # rearing-cost columns added later DO need bridging on an existing children
     # table.
     if "children" in tables:
@@ -267,6 +278,16 @@ def _apply_lightweight_migrations() -> None:
                 conn.execute(
                     text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
                 )
+
+    # Unique index on users.email (Alembic 0027) — one account per email so a
+    # second provider links instead of duplicating. IF NOT EXISTS keeps it
+    # re-runnable; a dev SQLite file with only the seeded dev user has no
+    # duplicate emails to trip it.
+    if "users" in tables:
+        with engine.begin() as conn:
+            conn.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)")
+            )
 
     # Consolidate the legacy one-off-spend goal kinds into "spend" (Alembic
     # 0024). Idempotent — a no-op once migrated.
@@ -435,6 +456,8 @@ app.include_router(income.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(liabilities.router, prefix="/api")
+app.include_router(life_policies.router, prefix="/api")
+app.include_router(db_pensions.router, prefix="/api")
 app.include_router(goals.router, prefix="/api")
 app.include_router(scenarios.router, prefix="/api")
 app.include_router(members.router, prefix="/api")

@@ -54,6 +54,7 @@ export interface Person {
   dob: string; // ISO date
   is_primary: boolean;
   life_expectancy: number;
+  death_year: number | null;
   gender_for_state_pension: string | null;
   retirement_age: number | null;
   claims_rent_credit: boolean;
@@ -72,6 +73,7 @@ export interface PersonCreate {
   dob: string;
   is_primary?: boolean;
   life_expectancy?: number;
+  death_year?: number | null;
   gender_for_state_pension?: string | null;
   retirement_age?: number | null;
   claims_rent_credit?: boolean;
@@ -215,6 +217,9 @@ export interface Asset {
   linked_liability_id: number | null;
   stamp_duty_pct: number;
   selling_cost_pct: number;
+  // Total annual product charge (AMC + platform + adviser fee) as a fraction of
+  // balance (0.015 = 1.5%/yr). Deducted from growth each year. 0 = no charge.
+  annual_charge_pct: number;
 }
 
 export interface AssetCreate {
@@ -238,6 +243,7 @@ export interface AssetCreate {
   linked_liability_id?: number | null;
   stamp_duty_pct?: number;
   selling_cost_pct?: number;
+  annual_charge_pct?: number;
 }
 
 export type LiabilityKind = "mortgage" | "loan";
@@ -339,6 +345,7 @@ export interface MonteCarloResponse {
   years: MonteCarloYearRow[];
   shortfall_probability: number;
   median_final_net_worth: number;
+  mode?: "gaussian" | "historic";
 }
 
 export type CatGroup = "A" | "B" | "C" | "exempt";
@@ -432,6 +439,58 @@ export interface BenefitCreate {
 
 export type BenefitUpdate = Partial<BenefitCreate>;
 
+export type LifePolicyKind = "term_life" | "section_72";
+
+export interface LifePolicy {
+  id: number;
+  plan_id: number;
+  person_id: number;
+  name: string;
+  kind: LifePolicyKind;
+  sum_assured: number;
+  premium_annual: number;
+  start_year: number;
+  end_year: number | null;
+}
+
+export interface LifePolicyCreate {
+  person_id: number;
+  name: string;
+  kind?: LifePolicyKind;
+  sum_assured?: number;
+  premium_annual?: number;
+  start_year: number;
+  end_year?: number | null;
+}
+
+export type LifePolicyUpdate = Partial<LifePolicyCreate>;
+
+export interface DBPension {
+  id: number;
+  plan_id: number;
+  person_id: number;
+  name: string;
+  accrual_rate: number;
+  service_years: number;
+  final_salary: number;
+  revaluation_rate: number;
+  normal_retirement_age: number;
+  tax_free_lump_sum: number;
+}
+
+export interface DBPensionCreate {
+  person_id: number;
+  name: string;
+  accrual_rate?: number;
+  service_years?: number;
+  final_salary?: number;
+  revaluation_rate?: number;
+  normal_retirement_age?: number;
+  tax_free_lump_sum?: number;
+}
+
+export type DBPensionUpdate = Partial<DBPensionCreate>;
+
 export interface YearRow {
   year: number;
   ages: Record<number, number>;
@@ -462,12 +521,17 @@ export interface YearRow {
   pension_lump_sum_tax: number;
   arf_drawdowns: number;
   state_pension_total: number;
+  db_pension_total: number;
   goal_status: Record<number, string>;
   notes: string[];
   cat_paid: number;
   estate_transfers: Record<number, number>;
   asset_contributions: number;
   benefits_in_kind_total: number;
+  protection_premiums_total: number;
+  life_cover_payout: number;
+  cover_gap: number;
+  section72_cat_relief: number;
 }
 
 export interface ProjectionSummary {

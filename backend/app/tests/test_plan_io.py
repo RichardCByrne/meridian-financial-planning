@@ -165,3 +165,64 @@ def test_import_rejects_unknown_format_version():
         bad = {"format_version": 999, "plan": {"name": "X", "base_year": 2026, "projection_years": 10}}
         resp = client.post("/api/plans/import", json=bad)
         assert resp.status_code == 400
+
+
+def test_life_policy_and_death_year_survive_clone():
+    """Protection data (person.death_year + a term policy) round-trips through a
+    clone, with the policy's person_id remapped to the cloned person."""
+    with TestClient(app) as client:
+        pid = client.post(
+            "/api/plans",
+            json={"name": "Protected", "base_year": 2026, "projection_years": 10},
+        ).json()["id"]
+        person = client.post(
+            f"/api/plans/{pid}/people",
+            json={"name": "Aoife", "dob": "1985-01-01", "is_primary": True, "death_year": 2040},
+        ).json()
+        assert person["death_year"] == 2040
+        client.post(
+            f"/api/plans/{pid}/life-policies",
+            json={
+                "person_id": person["id"], "name": "Term cover",
+                "sum_assured": 300_000, "premium_annual": 700,
+                "start_year": 2026, "end_year": 2045,
+            },
+        )
+        new_id = client.post(f"/api/plans/{pid}/clone").json()["id"]
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        assert new_people[0]["death_year"] == 2040
+        policies = client.get(f"/api/plans/{new_id}/life-policies").json()
+        assert len(policies) == 1
+        assert policies[0]["sum_assured"] == 300_000
+        # person_id remapped to the cloned plan's own person, not the source's.
+        assert policies[0]["person_id"] == new_people[0]["id"]
+
+
+def test_db_pension_survives_clone():
+    """A defined-benefit pension round-trips through a clone with its person_id
+    remapped to the cloned person."""
+    with TestClient(app) as client:
+        pid = client.post(
+            "/api/plans",
+            json={"name": "DB household", "base_year": 2026, "projection_years": 10},
+        ).json()["id"]
+        person = client.post(
+            f"/api/plans/{pid}/people",
+            json={"name": "Sean", "dob": "1965-01-01", "is_primary": True},
+        ).json()
+        client.post(
+            f"/api/plans/{pid}/db-pensions",
+            json={
+                "person_id": person["id"], "name": "Public service",
+                "accrual_rate": 0.0125, "service_years": 35, "final_salary": 55_000,
+                "revaluation_rate": 0.02, "normal_retirement_age": 65,
+                "tax_free_lump_sum": 80_000,
+            },
+        )
+        new_id = client.post(f"/api/plans/{pid}/clone").json()["id"]
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        pensions = client.get(f"/api/plans/{new_id}/db-pensions").json()
+        assert len(pensions) == 1
+        assert pensions[0]["final_salary"] == 55_000
+        assert pensions[0]["tax_free_lump_sum"] == 80_000
+        assert pensions[0]["person_id"] == new_people[0]["id"]

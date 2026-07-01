@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -7,6 +8,13 @@ import react from "@vitejs/plugin-react";
 // vendor wins.
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    globals: false,
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+  },
   server: {
     port: 5173,
     proxy: {

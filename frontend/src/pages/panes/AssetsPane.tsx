@@ -96,6 +96,7 @@ type FormState = {
   linked_liability_id: number | null;
   stamp_duty_pct: number;
   selling_cost_pct: number;
+  annual_charge_pct: number;
 };
 
 const blankForm: FormState = {
@@ -119,6 +120,7 @@ const blankForm: FormState = {
   linked_liability_id: null,
   stamp_duty_pct: 0,
   selling_cost_pct: 0,
+  annual_charge_pct: 0,
 };
 
 function inferContribMode(a: Asset): ContribMode {
@@ -161,6 +163,7 @@ function fromAsset(a: Asset): FormState {
     linked_liability_id: a.linked_liability_id ?? null,
     stamp_duty_pct: a.stamp_duty_pct ?? 0,
     selling_cost_pct: a.selling_cost_pct ?? 0,
+    annual_charge_pct: a.annual_charge_pct ?? 0,
   };
 }
 
@@ -207,6 +210,7 @@ export function AssetsPane({ planId }: { planId: number }) {
             linked_liability_id: a.linked_liability_id,
             stamp_duty_pct: a.stamp_duty_pct,
             selling_cost_pct: a.selling_cost_pct,
+            annual_charge_pct: a.annual_charge_pct,
           });
         },
       },
@@ -251,6 +255,7 @@ export function AssetsPane({ planId }: { planId: number }) {
     linked_liability_id: f.disposal_year === "" ? null : f.linked_liability_id,
     stamp_duty_pct: f.purchase_year === "" ? 0 : Math.max(0, f.stamp_duty_pct),
     selling_cost_pct: f.disposal_year === "" ? 0 : Math.max(0, f.selling_cost_pct),
+    annual_charge_pct: Math.max(0, f.annual_charge_pct),
   });
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -463,6 +468,22 @@ function FormFields({
         <NumericInput
           value={form.growth_rate * 100}
           onChange={(v) => Number.isFinite(v) && setForm({ ...form, growth_rate: v / 100 })}
+        />
+      </div>
+      <div className="field" style={{ flex: 1, minWidth: 100 }}>
+        <label>
+          Charge %
+          <HelpTip>
+            Total annual product charge — fund AMC/OCF plus any platform and adviser fees —
+            as a percent of the balance. Deducted from growth every year, so the pot
+            compounds net of costs. Leave at 0 for a charge-free asset like cash.
+          </HelpTip>
+        </label>
+        <NumericInput
+          value={form.annual_charge_pct * 100}
+          onChange={(v) =>
+            Number.isFinite(v) && setForm({ ...form, annual_charge_pct: Math.max(0, v) / 100 })
+          }
         />
       </div>
       <div className="field" style={{ flex: 1, minWidth: 110 }}>

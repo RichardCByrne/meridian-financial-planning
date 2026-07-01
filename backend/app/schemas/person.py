@@ -26,6 +26,7 @@ class PersonCreate(BaseModel):
     dob: date
     is_primary: bool = False
     life_expectancy: int = Field(default=90, ge=50, le=120)
+    death_year: int | None = Field(default=None, ge=1900, le=2200)
     gender_for_state_pension: str | None = None
     retirement_age: int | None = Field(default=None, ge=40, le=85)
     claims_rent_credit: bool = False
@@ -47,6 +48,7 @@ class PersonUpdate(BaseModel):
     dob: date | None = None
     is_primary: bool | None = None
     life_expectancy: int | None = Field(default=None, ge=50, le=120)
+    death_year: int | None = Field(default=None, ge=1900, le=2200)
     gender_for_state_pension: str | None = None
     retirement_age: int | None = Field(default=None, ge=40, le=85)
     claims_rent_credit: bool | None = None
@@ -72,6 +74,7 @@ class PersonRead(BaseModel):
     dob: date
     is_primary: bool
     life_expectancy: int
+    death_year: int | None = None
     gender_for_state_pension: str | None
     retirement_age: int | None
     claims_rent_credit: bool = False

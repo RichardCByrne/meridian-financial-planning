@@ -161,6 +161,39 @@ def test_unauthenticated_request_is_rejected_in_production_mode(monkeypatch):
         assert "bearer" in r.json()["detail"].lower()
 
 
+def _count_commits(db):
+    """Wrap db.commit with a counter; returns the dict holding the count."""
+    counter = {"n": 0}
+    real = db.commit
+
+    def spy():
+        counter["n"] += 1
+        return real()
+
+    db.commit = spy  # type: ignore[method-assign]
+    return counter
+
+
+def test_find_or_create_user_skips_write_when_unchanged():
+    import app.auth as auth_mod
+
+    uid = "nowrite-uid"
+    with SessionLocal() as db:
+        auth_mod._find_or_create_user(db, uid, "e@x.com", "Name")
+
+    # Same values → no write.
+    with SessionLocal() as db:
+        commits = _count_commits(db)
+        auth_mod._find_or_create_user(db, uid, "e@x.com", "Name")
+        assert commits["n"] == 0
+
+    # Changed email → exactly one write.
+    with SessionLocal() as db:
+        commits = _count_commits(db)
+        auth_mod._find_or_create_user(db, uid, "new@x.com", "Name")
+        assert commits["n"] == 1
+
+
 def test_token_verification_checks_revocation(monkeypatch):
     """Tokens are verified with check_revoked=True so revoked sessions are rejected."""
     import firebase_admin.auth as fb_auth
@@ -182,6 +215,40 @@ def test_token_verification_checks_revocation(monkeypatch):
         assert r.status_code == 200
         assert captured["token"] == "sometoken"
         assert captured["kwargs"].get("check_revoked") is True
+
+
+def test_second_provider_links_to_existing_account_by_email():
+    """Same email under a new UID links to the existing row, keeping users.id."""
+    import app.auth as auth_mod
+
+    with SessionLocal() as db:
+        first = auth_mod._find_or_create_user(db, "google-uid", "same@example.com", "Sam")
+        first_id = first.id
+
+    # Same person signs in later with email/password (different UID, same email).
+    with SessionLocal() as db:
+        second = auth_mod._find_or_create_user(db, "password-uid", "same@example.com", "Sam")
+        # Linked: same row (stable id), UID moved onto the new provider.
+        assert second.id == first_id
+        assert second.firebase_uid == "password-uid"
+
+    # Exactly one account for that email.
+    with SessionLocal() as db:
+        rows = db.query(User).filter(User.email == "same@example.com").all()
+        assert len(rows) == 1
+
+
+def test_duplicate_email_is_rejected_at_db_level():
+    """The unique index makes two rows with the same email impossible."""
+    from sqlalchemy.exc import IntegrityError
+
+    with SessionLocal() as db:
+        db.add(User(firebase_uid="uid-a", email="dupe@example.com"))
+        db.commit()
+    with SessionLocal() as db:
+        db.add(User(firebase_uid="uid-b", email="dupe@example.com"))
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_startup_fails_fast_on_firebase_misconfig(monkeypatch):

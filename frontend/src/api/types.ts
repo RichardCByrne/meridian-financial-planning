@@ -215,6 +215,9 @@ export interface Asset {
   linked_liability_id: number | null;
   stamp_duty_pct: number;
   selling_cost_pct: number;
+  // Total annual product charge (AMC + platform + adviser fee) as a fraction of
+  // balance (0.015 = 1.5%/yr). Deducted from growth each year. 0 = no charge.
+  annual_charge_pct: number;
 }
 
 export interface AssetCreate {
@@ -238,6 +241,7 @@ export interface AssetCreate {
   linked_liability_id?: number | null;
   stamp_duty_pct?: number;
   selling_cost_pct?: number;
+  annual_charge_pct?: number;
 }
 
 export type LiabilityKind = "mortgage" | "loan";

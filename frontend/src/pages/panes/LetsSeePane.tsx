@@ -22,12 +22,13 @@ import {
   useAssumptions,
   useChildren,
   useGoals,
+  useLossCapacity,
   useMonteCarlo,
   usePeople,
   usePlan,
   useProjection,
 } from "../../api/hooks";
-import type { Goal, MonteCarloResponse, YearRow } from "../../api/types";
+import type { Goal, LossCapacityResponse, MonteCarloResponse, YearRow } from "../../api/types";
 import { fmtMoney } from "../../lib/format";
 import { CHART, CHART_SERIES, CHART_AXIS_BRASS } from "../../lib/chartColors";
 import { HelpTip } from "../../components/HelpTip";
@@ -80,6 +81,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const { data: goals } = useGoals(planId);
   const { data: assets } = useAssets(planId);
   const { data: children } = useChildren(planId);
+  const { data: lossCap } = useLossCapacity(planId);
   const isMobile = useIsMobile();
   const tooltipTrigger = isMobile ? "click" : "hover";
   const [chart, setChart] = useState<ChartKind>("net_worth");
@@ -555,6 +557,7 @@ export function LetsSeePane({ planId }: { planId: number }) {
           summary={data.summary}
           finalYear={data.years.at(-1)?.year ?? 0}
           mcData={showMonteCarlo ? mcData : undefined}
+          lossCapacity={lossCap}
           realMode={realMode}
           deflate={deflate}
         />
@@ -976,6 +979,7 @@ function SummaryStrip({
   summary,
   finalYear,
   mcData,
+  lossCapacity,
   realMode,
   deflate,
 }: {
@@ -988,6 +992,7 @@ function SummaryStrip({
   };
   finalYear: number;
   mcData?: MonteCarloResponse;
+  lossCapacity?: LossCapacityResponse;
   realMode: boolean;
   deflate: (v: number, year: number) => number;
 }) {
@@ -1028,6 +1033,23 @@ function SummaryStrip({
           label="Shortfall probability"
           value={`${(mcData.shortfall_probability * 100).toFixed(1)}% ${shortfallMoE(mcData.shortfall_probability, mcData.runs)}`}
           sub={`chance of running short · ${mcData.runs} runs · 95% CI`}
+        />
+      )}
+      {lossCapacity && lossCapacity.investable_base > 0 && (
+        <Stat
+          label="Capacity for loss"
+          value={
+            lossCapacity.already_short
+              ? "—"
+              : `${fmtMoney(lossCapacity.max_absorbable_loss)} (${(
+                  lossCapacity.max_absorbable_pct * 100
+                ).toFixed(0)}%)`
+          }
+          sub={
+            lossCapacity.already_short
+              ? "plan already runs short"
+              : "one-off market hit the plan survives"
+          }
         />
       )}
     </div>

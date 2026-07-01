@@ -8,7 +8,7 @@ Repo: https://github.com/RichardCByrne/meridian-financial-planning
 
 Meridian is a single-repo financial planning app for Ireland with an in-house tax/pension engine (Budget 2026). FastAPI + SQLAlchemy backend, Vite + React 19 + TypeScript frontend. Local dev uses SQLite; production runs on Cloud Run with **Neon** serverless Postgres (free tier, autosuspends on idle) and Firebase Hosting for the static frontend. Cloud SQL is documented as a one-secret swap in `DEPLOY.md` Appendix A but not the default.
 
-Work is done on a per-issue/feature basis (one feature branch per change). **Tests are grouped by scope/functionality, not by feature.** Backend tests live under `backend/app/tests/test_<area>.py` — e.g. `test_pension.py`, `test_state_pension.py`, `test_child_benefit.py`, `test_child_costs.py`, `test_bik.py`, `test_liabilities.py`, `test_disposal_tax.py`, `test_property_transactions.py`, `test_goals.py`, `test_scenarios.py`, `test_scenario_add_asset.py`, `test_plan_io.py`, `test_auth.py`, `test_invites_members.py`, `test_tax_config.py`, `test_cat_estate.py`, `test_montecarlo.py`, `test_plan_settings.py` — plus pure engine-level unit tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`, `test_engine_edge_cases.py`, `test_schema_validation.py`, `test_db_indexes.py`). Test count target: keep `pytest` green (currently 279/279).
+Work is done on a per-issue/feature basis (one feature branch per change). **Tests are grouped by scope/functionality, not by feature.** Backend tests live under `backend/app/tests/test_<area>.py` — e.g. `test_pension.py`, `test_db_pension.py`, `test_state_pension.py`, `test_child_benefit.py`, `test_child_costs.py`, `test_bik.py`, `test_liabilities.py`, `test_disposal_tax.py`, `test_property_transactions.py`, `test_goals.py`, `test_protection.py`, `test_scenarios.py`, `test_scenario_add_asset.py`, `test_scenario_benefits.py`, `test_scenario_children.py`, `test_plan_io.py`, `test_auth.py`, `test_invites_members.py`, `test_tax_config.py`, `test_cat_estate.py`, `test_montecarlo.py`, `test_plan_settings.py` — plus per-resource CRUD/authz tests (`test_people.py`, `test_income.py`, `test_expenses.py`, `test_assets.py`, `test_assumptions.py`) and pure engine-level unit tests (`test_tax_ie.py`, `test_pension_ie.py`, `test_simulator.py`, `test_engine_edge_cases.py`, `test_schema_validation.py`, `test_db_indexes.py`). Test count target: keep `pytest` green (currently 336/336). Frontend has a Vitest + React Testing Library suite (`src/**/*.test.ts[x]`, run via `npm run test`) — kept green in CI too.
 
 ## Commands
 
@@ -35,10 +35,11 @@ Frontend (from `frontend/`):
 ```powershell
 npm run dev       # vite dev server, proxies /api → :8000
 npm run lint      # tsc --noEmit (this is the lint step CI runs)
+npm run test      # vitest run (Vitest + RTL suites; needs jsdom from devDeps)
 npm run build     # tsc -b && vite build
 ```
 
-CI (`.github/workflows/test.yml`) runs pytest + `pip-audit` on the backend and `tsc --noEmit` + `vite build` + `npm audit` on the frontend. Match these before claiming green.
+CI (`.github/workflows/test.yml`) runs pytest + `pip-audit` on the backend and `tsc --noEmit` + `vitest run` + `vite build` + `npm audit` on the frontend. Match these before claiming green.
 
 ## Architecture
 
@@ -53,11 +54,11 @@ CI (`.github/workflows/test.yml`) runs pytest + `pip-audit` on the backend and `
   - `simulator.py` — year-by-year orchestration: age people → grow assets → income → tax → expenses → liquidate to cover shortfalls → amortise liabilities → goals → emit `YearRow`. Per-asset simulator state lives in a single `dict[int, AssetState]` (`AssetState` is a mutable dataclass with `kind`/`balance`/`growth`/`basis`/`acquired`/`owner`); synthetic ids `-1` (cash), `-1000-pid` (PRSA), `-2000-pid` (ARF) are reserved for implicit wrappers the simulator auto-creates. `YearRow` exposes `net_worth` (raw total), `accessible_net_worth` (net worth minus PRSA/occupational/AVC balances of pre-retirement owners — ARFs stay accessible), and `liquid_assets` (gross value of liquid kinds only — cash/deposit/investment_unwrapped/etf_fund, per `liquidation.LIQUID_ASSET_KINDS`; excludes property and all pensions/ARFs, not netted against debt). Goal affordability/achievability is graded against `liquid_assets`: `net_worth`-kind goals are "met" only when `liquid_assets >= target`, and cost-bearing goals can only be funded from liquid assets (shortfall liquidation never force-sells property or raids a pension — `LIQUIDATION_ORDER` is exactly the liquid kinds).
   - `liquidation.py` — `LIQUIDATION_ORDER` plus `withdraw_with_tax` which applies CGT / ETF exit tax at disposal.
   - `cat_ie.py` — Capital Acquisitions Tax / inheritance modelling.
-  - `montecarlo.py` — wraps `simulate()` with N runs and per-asset Gaussian shocks (σ: equities/ETF 12%, pension 10%, property 6%, cash 0%) plus inflation/earnings-growth shocks. Returns p5/p10/p25/p50/p75/p90/p95 net-worth bands and shortfall probability. Uses `YearRow.had_shortfall: bool` (typed flag, not a `notes` string-grep).
+  - `montecarlo.py` — wraps `simulate()` with N runs, two `mode`s: **`gaussian`** (default) perturbs each run's growth once with per-asset Gaussian shocks (σ: equities/ETF 12%, pension 10%, property 6%, cash 0%) plus inflation/earnings-growth shocks; **`historic`** block-bootstraps a *year-by-year* return path (block len 5, deltas centred on each class' mean, one draw shared across asset classes per historical year to keep cross-asset correlation) from an illustrative historical annual-return series via `simulate(plan, annual_shocks=...)`. Both modes return the same p5/p10/p25/p50/p75/p90/p95 net-worth bands and shortfall probability. Uses `YearRow.had_shortfall: bool` (typed flag, not a `notes` string-grep).
   - `scenario.py` — applies JSON-Patch overrides to `PlanInput` before `simulate()`. Uses `dataclasses.replace(plan, ...)` so unspecified `PlanInput` fields (bequests, tax_config, filing_status) survive — do NOT switch back to explicit `PlanInput(...)` reconstruction.
   - `tax_config.py` — the `TaxConfig` dataclass that parameterises everything in `tax_ie.py`. `app/config/tax_ie_2026.py` defines the seeded `IRELAND_2026_OFFICIAL` instance. Exports `resolve(tax_config: TaxConfig | None) -> TaxConfig` — the single defaulting helper used by every engine module (do not re-implement per-module `_config` shims).
 
-- **`models/__init__.py`** — every SQLAlchemy ORM table in one file (`Plan`, `Person`, `IncomeSource`, `Expense`, `Asset`, `Liability`, `Goal`, `Scenario`, `Bequest`, `Child`, `Benefit`, `Assumptions`, `User`, `PlanMember`, `PlanInvite`, `TaxConfigRow`). Pension wrappers/ARFs are `Asset` rows with specific `kind` values; the simulator auto-creates implicit ones. `Benefit` rows are employer benefits-in-kind attached to a person.
+- **`models/__init__.py`** — every SQLAlchemy ORM table in one file (`Plan`, `Person`, `IncomeSource`, `Expense`, `Asset`, `Liability`, `Goal`, `Scenario`, `Bequest`, `Child`, `Benefit`, `LifePolicy`, `DBPension`, `Assumptions`, `User`, `PlanMember`, `PlanInvite`, `TaxConfigRow`). Pension wrappers/ARFs are `Asset` rows with specific `kind` values; the simulator auto-creates implicit ones. `Benefit` rows are employer benefits-in-kind attached to a person. `LifePolicy` rows are protection cover (`term_life` pays survivors on death within the term; `section_72` proceeds pay inheritance CAT tax-free) — premiums leave cash while in force. `DBPension` rows are defined-benefit / final-salary promises (accrual_rate × service_years × final_salary, revalued in deferment and in payment) that pay guaranteed PAYE income (PRSI-exempt) from normal retirement age with an optional tax-free lump sum.
 
 - **`routers/`** — FastAPI routers, one per resource. Every endpoint depends on `get_current_user` and gates writes via `require_role("editor"|"owner")` from `auth.py`. Shared `routers/_helpers.py::get_or_404(Model, pk, db, name=)` replaces the per-router `_X_or_404` pattern.
 
@@ -88,10 +89,11 @@ When adding a new column on an existing table: add it to the model, write an Ale
 ### Frontend
 
 - `src/api/` — single typed client (`client.ts`), shared `types.ts`, react-query hooks (`hooks.ts`).
-- `src/pages/PlanEditor.tsx` — the tabbed editor; each tab is a "pane" under `pages/panes/` (`PeoplePane`, `IncomePane`, `AssetsPane`, `BenefitsPane`, `LetsSeePane`, etc.). To add a new editable concept, mirror an existing pane.
+- `src/pages/PlanEditor.tsx` — the tabbed editor. Navigation is **two-tier**: five groups on top (Outlook / Household / Finances / Planning / Settings) with the active group's tabs as a sub-row beneath. Each tab is a "pane" under `pages/panes/` (`LetsSeePane`, `TimelinePane`, `ScenariosPane`, `ComparePane`, `PeoplePane`, `ChildrenPane`, `BenefitsPane`, `IncomePane`, `ExpensesPane`, `AssetsPane`, `LiabilitiesPane`, `DBPensionsPane`, `GoalsPane`, `ProtectionPane`, `LegacyPane`, `SharingPane`, `AssumptionsPane`, `TaxRulesPane`). To add a new editable concept, mirror an existing pane and slot it into the right group's `tabs` array.
 - `src/auth/` — Firebase web SDK wrapper with the same dev-mode bypass (`VITE_DEV_AUTH=true`).
 - State: react-query for server state, zustand for any client-only state. No Redux.
-- Charts: recharts. The probability fan-chart in `LetsSeePane` is stacked Area layers p5→p25→p75→p95 with a median line overlaid.
+- Charts: recharts. The probability fan-chart in `LetsSeePane` is stacked Area layers p5→p25→p75→p95 with a median line overlaid, on the Meridian palette with a brass graticule on the axis. The MC mode toggle (gaussian / historic) drives which band series it renders.
+- Tests: Vitest + React Testing Library under `src/**/*.test.ts[x]` (`jsdom` env). Run `npm run test`; CI runs `vitest run`.
 
 ### Projections cache
 

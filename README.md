@@ -2,7 +2,7 @@
 
 **Financial planning for Ireland — with a tax/pension engine that actually knows the rules.**
 
-Meridian is a personal-finance forecasting app built around an in-house Ireland 2026 tax & pension engine. Model your household 30+ years out, see how income tax, USC, PRSI, PRSA contributions, ARF drawdowns, CGT, ETF exit tax and CAT interact, and compare scenarios side-by-side with Monte Carlo probability bands.
+Meridian is a personal-finance forecasting app built around an in-house Ireland 2026 tax & pension engine. Model your household 30+ years out, see how income tax, USC, PRSI, PRSA contributions, defined-benefit pensions, ARF drawdowns, CGT, ETF exit tax, CAT and life-cover protection interact, and compare scenarios side-by-side with Monte Carlo probability bands.
 
 Inspired by Voyant AdviserGo. Not affiliated with Voyant Inc.
 
@@ -16,10 +16,12 @@ Most retail financial planners either ignore Irish tax entirely or apply a flat 
 
 - **Income tax bands & credits, USC, PRSI** per Budget 2026 — single-source-of-truth `TaxConfig` dataclass.
 - **Age-based pension contribution caps** (15%–40%, €115k earnings cap) with PRSA/occupational wrapper auto-creation.
+- **Defined-benefit / final-salary pensions**: guaranteed income (accrual rate × service × final salary, revalued in deferment and in payment), taxed as PAYE, PRSI-exempt, with an optional tax-free lump sum.
 - **Retirement crystallisation**: up to 25% tax-free lump sum (with band logic — €200k free / next €300k @ 20% / above @ marginal); the remaining pot defaults to an ARF with imputed minimum drawdown (4%/5%/6%), or can be taken as an annuity or a taxable cash lump sum.
 - **State pension** auto-injected at the configured age.
 - **CGT, ETF exit tax, CAT/inheritance** on disposals and bequests.
-- **Monte Carlo**: 200 (configurable 10–1,000) independent simulations with per-asset-class Gaussian shocks. Outputs p5/p10/p25/p50/p75/p90/p95 net-worth bands and a shortfall probability.
+- **Protection cover**: term-life and Section 72 policies — premiums leave cash while in force; on death within the term the sum assured pays survivors tax-free (Section 72 proceeds settle inheritance CAT).
+- **Monte Carlo**: 200 (configurable 10–1,000) independent simulations in two modes — **gaussian** (per-asset-class Gaussian shocks) or **historic** (year-by-year block-bootstrap of an illustrative historical return series). Both output p5/p10/p25/p50/p75/p90/p95 net-worth bands and a shortfall probability.
 
 Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run the year and every projection picks it up.
 
@@ -29,11 +31,12 @@ Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run 
 
 1. Create a **plan** for your household (base year, horizon, inflation/earnings-growth assumptions).
 2. Add **people** with DOBs, retirement ages, pension contribution %, state-pension entitlement.
-3. Add **income sources, expenses, assets** (cash / ETF / equities / property / pension wrappers / ARF), and **liabilities** (mortgages amortise year-by-year).
+3. Add **income sources, expenses, assets** (cash / ETF / equities / property / pension wrappers / ARF), **defined-benefit pensions**, and **liabilities** (mortgages amortise year-by-year).
 4. Add **goals** (net-worth-by-year, retirement-income, lump-sum events) and grade them against accessible net worth.
-5. Define **scenarios** as JSON-Patch overlays on the base plan, and compare projections on one chart.
-6. Toggle **Probability bands** on the Let's See chart for the Monte Carlo fan view.
-7. Share plans with other users in `owner` / `editor` / `viewer` roles (Firebase Auth in prod, dev-auth bypass for local).
+5. Add **protection** (term-life / Section 72 policies) and see how cover holds up on death.
+6. Define **scenarios** as JSON-Patch overlays on the base plan, and compare projections on one chart.
+7. Toggle **Probability bands** on the Let's See chart for the Monte Carlo fan view, in gaussian or historic mode.
+8. Share plans with other users in `owner` / `editor` / `viewer` roles (Firebase Auth in prod, dev-auth bypass for local).
 
 ---
 
@@ -47,7 +50,7 @@ Tax knobs live in `backend/app/config/tax_ie_2026.py` — change a rate, re-run 
 | Frontend | Vite, React 19, TypeScript, react-query, zustand, recharts |
 | Auth | Firebase Auth (prod) / seeded dev user (local) |
 | Hosting | Cloud Run (API) + Firebase Hosting (static frontend) |
-| Tests | 211 pytest tests, `tsc --noEmit` + `vite build` + audits in CI |
+| Tests | 336 pytest tests + Vitest/RTL frontend suite; `tsc --noEmit` + `vitest run` + `vite build` + audits in CI |
 
 ---
 
@@ -85,10 +88,11 @@ OpenAPI docs: http://127.0.0.1:8000/docs
 
 ```powershell
 cd backend
-.\.venv\Scripts\python -m pytest -v        # ~7s, 211 tests
+.\.venv\Scripts\python -m pytest -v        # ~15s, 336 tests
 
 cd ..\frontend
 npm run lint                               # tsc --noEmit
+npm run test                               # vitest run (needs jsdom from devDeps)
 npm run build
 ```
 
@@ -181,7 +185,7 @@ cd frontend; npm run build; firebase deploy --only hosting
 
 ## Status & roadmap
 
-**Phase 13 complete.** 211/211 backend tests passing. Phase 14 (AI walkthrough) is next.
+**Through Phase 16 complete.** 336/336 backend tests passing plus a Vitest/RTL frontend suite. Phase 17 (AI walkthrough) is next.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -199,7 +203,10 @@ cd frontend; npm run build; firebase deploy --only hosting
 | 11 | Multi-tax-year configurable rules | ✅ |
 | 12 | CAT / inheritance / legacy | ✅ |
 | 13 | Monte Carlo (probability bands) | ✅ |
-| 14 | AI walkthrough | 🔜 |
+| 14 | Defined-benefit / final-salary pensions | ✅ |
+| 15 | Protection (term-life / Section 72) | ✅ |
+| 16 | Historic block-bootstrap MC + brand chart rebrand + frontend tests | ✅ |
+| 17 | AI walkthrough | 🔜 |
 
 Deferred: PDF export, AI chatbot.
 

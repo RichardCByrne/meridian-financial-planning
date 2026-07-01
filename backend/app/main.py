@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
+from app.auth import DEV_AUTH, _ensure_firebase_initialised
 from app.db import Base, engine, get_db
 from app.models import register_all_models  # noqa: F401  ensure models import
 from app.routers import (
@@ -373,6 +374,12 @@ def _adopt_orphan_plans() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     register_all_models()
+    # Fail fast on Firebase misconfig. Without this, a missing service-account
+    # path only surfaces as a 500 on the first authenticated request (raised
+    # from inside get_current_user) — a boot-time crash is far easier to
+    # diagnose. No-op in dev-auth mode.
+    if not DEV_AUTH:
+        _ensure_firebase_initialised()
     # SQLite dev path only. Production runs alembic upgrade head from the
     # Dockerfile entrypoint; running create_all + stamp again on Postgres can
     # stall the lifespan past Cloud Run's startup probe budget.

@@ -4,8 +4,10 @@ import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
 } from "firebase/auth";
 
 // Where a brand-new account lands: straight into the plan-creation wizard.
@@ -59,6 +61,10 @@ export function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // When set, the account exists but its email is unverified: we've signed the
+  // user back out and are showing the "check your inbox" screen instead of
+  // letting an unverified account through (the backend rejects them anyway).
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
   // Destination once auth flips to signed-in. A new registration sends the user
   // into the wizard; an existing sign-in honours fromPath. Held in state so the
   // redirect below uses it even after the auth listener re-renders us.
@@ -102,14 +108,25 @@ export function LoginPage() {
     setBusy(true);
     try {
       if (mode === "signin") {
-        await signInWithEmailAndPassword(firebaseAuth(), email, password);
+        const cred = await signInWithEmailAndPassword(firebaseAuth(), email, password);
+        if (!cred.user.emailVerified) {
+          // Unverified accounts can't proceed — resend the link, sign back out,
+          // and show the verification screen rather than a dead-end 403.
+          await sendEmailVerification(cred.user).catch(() => {});
+          await signOut(firebaseAuth());
+          setPendingVerifyEmail(email);
+          return;
+        }
         setPostAuthPath(fromPath);
         navigate(fromPath, { replace: true });
       } else {
-        await createUserWithEmailAndPassword(firebaseAuth(), email, password);
-        // New account → open the wizard so onboarding starts immediately.
-        setPostAuthPath(NEW_USER_PATH);
-        navigate(NEW_USER_PATH, { replace: true });
+        const cred = await createUserWithEmailAndPassword(firebaseAuth(), email, password);
+        // New email/password accounts start unverified. Send the verification
+        // link and hold them at the "check your inbox" screen; they can sign in
+        // once the address is confirmed.
+        await sendEmailVerification(cred.user).catch(() => {});
+        await signOut(firebaseAuth());
+        setPendingVerifyEmail(email);
       }
     } catch (err) {
       setError(friendlyAuthError(err, mode));
@@ -117,6 +134,31 @@ export function LoginPage() {
       setBusy(false);
     }
   };
+
+  if (pendingVerifyEmail) {
+    return (
+      <div style={{ maxWidth: 420 }}>
+        <h2>Verify your email</h2>
+        <div className="card">
+          <p>
+            We've sent a verification link to <strong>{pendingVerifyEmail}</strong>.
+            Open it to confirm your address, then sign in.
+          </p>
+          <button
+            className="btn"
+            onClick={() => {
+              setPendingVerifyEmail(null);
+              setMode("signin");
+              setPassword("");
+            }}
+            style={{ width: "100%", marginTop: 8 }}
+          >
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 420 }}>

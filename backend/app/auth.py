@@ -76,12 +76,19 @@ def _find_or_create_user(
 ) -> User:
     user = db.execute(select(User).where(User.firebase_uid == firebase_uid)).scalar_one_or_none()
     if user is not None:
-        # Refresh email / display name if Firebase has newer values.
+        # Refresh email / display name if Firebase has newer values. Only commit
+        # when something actually changed — otherwise every authenticated
+        # request would issue a needless write (adds latency and cost on the
+        # Neon serverless tier).
+        changed = False
         if email and user.email != email:
             user.email = email
+            changed = True
         if display_name and user.display_name != display_name:
             user.display_name = display_name
-        db.commit()
+            changed = True
+        if changed:
+            db.commit()
         return user
     user = User(firebase_uid=firebase_uid, email=email, display_name=display_name)
     db.add(user)

@@ -160,6 +160,39 @@ def test_unauthenticated_request_is_rejected_in_production_mode(monkeypatch):
         assert "bearer" in r.json()["detail"].lower()
 
 
+def _count_commits(db):
+    """Wrap db.commit with a counter; returns the dict holding the count."""
+    counter = {"n": 0}
+    real = db.commit
+
+    def spy():
+        counter["n"] += 1
+        return real()
+
+    db.commit = spy  # type: ignore[method-assign]
+    return counter
+
+
+def test_find_or_create_user_skips_write_when_unchanged():
+    import app.auth as auth_mod
+
+    uid = "nowrite-uid"
+    with SessionLocal() as db:
+        auth_mod._find_or_create_user(db, uid, "e@x.com", "Name")
+
+    # Same values → no write.
+    with SessionLocal() as db:
+        commits = _count_commits(db)
+        auth_mod._find_or_create_user(db, uid, "e@x.com", "Name")
+        assert commits["n"] == 0
+
+    # Changed email → exactly one write.
+    with SessionLocal() as db:
+        commits = _count_commits(db)
+        auth_mod._find_or_create_user(db, uid, "new@x.com", "Name")
+        assert commits["n"] == 1
+
+
 def test_email_is_verified_gate():
     """Unverified email tokens are rejected; verified / email-less pass."""
     from app.auth import _email_is_verified

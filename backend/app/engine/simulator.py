@@ -338,6 +338,12 @@ class PlanInput:
     # earlier years keep the base status. Requires ≥2 people to have any effect.
     # This is the engine hook a scenario uses to model "getting married in year N".
     marriage_year: int | None = None
+    # Needs-vs-wants funding floor. When True, a year that can't be fully funded
+    # from income + liquid assets trims `discretionary` spending (down to zero)
+    # before declaring a shortfall — so essential (basic) spending is protected
+    # and a shortfall only means essentials went unmet. False = spend the full
+    # budget and record a shortfall if assets run out (previous behaviour).
+    trim_discretionary_on_shortfall: bool = False
 
 
 @dataclass
@@ -388,6 +394,9 @@ class YearRow:
     estate_transfers: dict[int, float] = field(default_factory=dict)
     asset_contributions: float = 0.0
     had_shortfall: bool = False
+    # Discretionary spending trimmed this year to protect essentials (only when
+    # PlanInput.trim_discretionary_on_shortfall is set). 0 = nothing trimmed.
+    discretionary_trimmed: float = 0.0
     # Total taxable cash-equivalent of employer benefits-in-kind charged this
     # year (notional pay: taxed but not received as cash, not a household
     # expense). Reported separately so it doesn't double-count in cash gross.
@@ -1587,6 +1596,30 @@ def simulate(
         investment_tax = deemed_tax + pension_lump_sum_tax_total
         realised_gains = 0.0
 
+        # ----- 5b. Needs-vs-wants floor: trim discretionary before a shortfall.
+        # If income + full liquidation can't cover the year's spend, cut
+        # discretionary (down to zero) by the unfundable amount so essentials
+        # are protected. Only trims what the plan genuinely can't raise.
+        discretionary_trimmed = 0.0
+        if plan.trim_discretionary_on_shortfall and cash_flow < 0:
+            liquidation_capacity = 0.0
+            for st in states.values():
+                if st.kind in LIQUID_ASSET_KINDS and st.balance > 0:
+                    rate = _disposal_tax_rate(st.kind, tax_config)
+                    gain = max(0.0, st.balance - st.basis)
+                    liquidation_capacity += st.balance - gain * rate
+            unfundable = -cash_flow - liquidation_capacity
+            discretionary_spend = expenses_by_category.get("discretionary", 0.0)
+            trim = min(max(0.0, unfundable), discretionary_spend)
+            if trim > 0:
+                expenses_by_category["discretionary"] = discretionary_spend - trim
+                expenses_total -= trim
+                cash_flow += trim
+                discretionary_trimmed = trim
+                notes.append(
+                    f"Trimmed EUR {trim:,.0f} discretionary spending to protect essentials."
+                )
+
         # ----- 6. Apply surplus / shortfall -----
         withdrawals: dict[int, float] = {}
         had_shortfall = False
@@ -1743,6 +1776,7 @@ def simulate(
                 estate_transfers=estate_transfers_year,
                 asset_contributions=round(asset_contributions_total, 2),
                 had_shortfall=had_shortfall,
+                discretionary_trimmed=round(discretionary_trimmed, 2),
                 benefits_in_kind_total=round(benefits_in_kind_total, 2),
                 protection_premiums_total=round(protection_premiums_total, 2),
                 life_cover_payout=round(life_cover_payout_year, 2),

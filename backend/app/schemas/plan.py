@@ -12,6 +12,7 @@ class PlanCreate(BaseModel):
     projection_years: int = Field(default=50, ge=1, le=100)
     tax_config_id: int | None = None
     filing_status: FilingStatusValue | None = None
+    trim_discretionary_on_shortfall: bool = False
 
 
 class PlanUpdate(BaseModel):
@@ -21,6 +22,7 @@ class PlanUpdate(BaseModel):
     tax_config_id: int | None = None
     filing_status: FilingStatusValue | None = None
     onboarding_complete: bool | None = None
+    trim_discretionary_on_shortfall: bool | None = None
 
 
 class PlanRead(BaseModel):
@@ -34,3 +36,4 @@ class PlanRead(BaseModel):
     tax_config_id: int | None = None
     filing_status: FilingStatusValue | None = None
     onboarding_complete: bool = False
+    trim_discretionary_on_shortfall: bool = False

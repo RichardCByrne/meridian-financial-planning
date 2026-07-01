@@ -341,6 +341,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,
+        trim_discretionary_on_shortfall=plan.trim_discretionary_on_shortfall,
     )
 
 

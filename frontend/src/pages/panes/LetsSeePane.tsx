@@ -115,11 +115,13 @@ export function LetsSeePane({ planId }: { planId: number }) {
   const [mcSeedText, setMcSeedText] = useState<string>("");
   const mcSeed = mcSeedText.trim() === "" ? null : Number(mcSeedText.trim());
   const seedValid = mcSeed === null || Number.isFinite(mcSeed);
+  const [mcMode, setMcMode] = useState<"gaussian" | "historic">("gaussian");
 
   const { data: mcData, isFetching: mcFetching } = useMonteCarlo(planId, {
     enabled: showMonteCarlo && chart === "net_worth",
     n: mcN,
     seed: seedValid ? mcSeed : null,
+    mode: mcMode,
   });
 
   const inflation = assumptions?.inflation_rate ?? 0;
@@ -449,6 +451,15 @@ export function LetsSeePane({ planId }: { planId: number }) {
                   <option value={50}>50 runs (fast)</option>
                   <option value={200}>200 runs</option>
                   <option value={1000}>1000 runs (slow)</option>
+                </select>
+                <select
+                  value={mcMode}
+                  onChange={(e) => setMcMode(e.target.value as "gaussian" | "historic")}
+                  style={{ padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  title="Normal: one random regime shock per run. Historic: replays block-bootstrapped historical return sequences, capturing crashes and sequence-of-returns risk."
+                >
+                  <option value="gaussian">Normal model</option>
+                  <option value="historic">Historic model</option>
                 </select>
                 <details style={{ display: "inline-block" }}>
                   <summary

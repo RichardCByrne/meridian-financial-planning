@@ -511,15 +511,19 @@ export function useCompare(planId: number, a: number | null, b: number | null) {
 
 export function useMonteCarlo(
   planId: number,
-  opts?: { enabled?: boolean; n?: number; seed?: number | null },
+  opts?: { enabled?: boolean; n?: number; seed?: number | null; mode?: "gaussian" | "historic" },
 ) {
   const n = opts?.n ?? 200;
   const seed = opts?.seed ?? null;
+  const mode = opts?.mode ?? "gaussian";
   const seedQs = seed !== null ? `&seed=${seed}` : "";
+  const modeQs = mode === "historic" ? "&mode=historic" : "";
   return useQuery({
-    queryKey: [...keys.monteCarlo(planId, n), seed],
+    queryKey: [...keys.monteCarlo(planId, n), seed, mode],
     queryFn: () =>
-      api.get<MonteCarloResponse>(`/plans/${planId}/projection/montecarlo?n=${n}${seedQs}`),
+      api.get<MonteCarloResponse>(
+        `/plans/${planId}/projection/montecarlo?n=${n}${seedQs}${modeQs}`,
+      ),
     enabled: (opts?.enabled ?? true) && Number.isFinite(planId),
     staleTime: 60_000, // MC is expensive — keep cached for 1 minute
   });

@@ -499,12 +499,54 @@ th {
 
 /* ---- Tab navigation ----------------------------------------------------- */
 
+.tabnav-shell {
+  margin-bottom: 16px;
+}
+
+/* Primary tier — the five plan sections. Display face, heavier than the
+   member sub-row so the hierarchy reads at a glance. */
+.tabgroups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tabgroups a {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.tabgroups a:hover {
+  color: var(--ink);
+  background: var(--line-soft);
+  text-decoration: none;
+}
+
+.tabgroups a.active {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
 .tabnav {
   display: flex;
   border-bottom: 1px solid var(--line);
   margin-bottom: 16px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* Inside the shell the member row hugs the group tier; the shell owns the
+   bottom gap before content. */
+.tabnav-shell .tabnav {
+  margin-top: 6px;
+  margin-bottom: 0;
 }
 
 .tabnav a {
@@ -610,10 +652,6 @@ th {
     min-height: 44px;
     display: flex;
     align-items: center;
-  }
-  .tabnav .tabnav-advanced-toggle {
-    margin-left: 8px !important;
-    flex: 0 0 auto;
   }
   .main {
     padding: 16px;

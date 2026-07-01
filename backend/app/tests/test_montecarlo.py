@@ -281,3 +281,57 @@ def test_mc_cache_expires():
             _mc_cache[key] = (_time.monotonic() - 1, value)
             assert proj._mc_cache_get(key) is None
             assert len(_mc_cache) == 0
+
+
+# ---------- annual_shocks hook + historic mode ----------
+
+
+def test_annual_shocks_hook_moves_growth():
+    """A positive per-year shock on the ETF kind grows the pot faster than the
+    unshocked run; a negative shock slower."""
+    plan = _simple_plan(n_years=4)
+    base = simulate(plan)
+    up = simulate(plan, annual_shocks=[{"etf_fund": 0.05}] * 4)
+    down = simulate(plan, annual_shocks=[{"etf_fund": -0.05}] * 4)
+    assert up[-1].asset_balances[1] > base[-1].asset_balances[1] > down[-1].asset_balances[1]
+
+
+def test_annual_shocks_none_is_deterministic():
+    plan = _simple_plan(n_years=4)
+    assert [r.net_worth for r in simulate(plan)] == [
+        r.net_worth for r in simulate(plan, annual_shocks=None)
+    ]
+
+
+def test_historic_mode_returns_ordered_bands_and_echoes_mode():
+    plan = _simple_plan(n_years=10)
+    mc = montecarlo.run(plan, n_runs=100, seed=0, mode="historic")
+    assert mc.mode == "historic"
+    yr5 = mc.years[4]
+    assert yr5.p5 <= yr5.p25 <= yr5.p50 <= yr5.p75 <= yr5.p95
+    assert yr5.p95 > yr5.p5  # historical dispersion spreads the bands
+
+
+def test_historic_mode_is_deterministic_under_seed():
+    plan = _simple_plan(n_years=6)
+    a = montecarlo.run(plan, n_runs=40, seed=7, mode="historic")
+    b = montecarlo.run(plan, n_runs=40, seed=7, mode="historic")
+    assert [y.p50 for y in a.years] == [y.p50 for y in b.years]
+
+
+def test_historic_shocks_are_mean_centred_and_block_length():
+    """The bootstrapped path has one entry per year and every equity/property
+    kind present; deltas are centred on each class mean so a flat series would
+    give ~0 shock."""
+    import random as _random
+
+    means = montecarlo._class_means()
+    shocks = montecarlo._historic_shocks(_random.Random(1), 12, means)
+    assert len(shocks) == 12
+    assert all("etf_fund" in s and "property_primary" in s for s in shocks)
+    # Averaged over the whole series length the equity delta is ~0 (mean-centred).
+    n = len(montecarlo.HISTORICAL_RETURNS["equity"])
+    full = montecarlo._historic_shocks(_random.Random(2), n, means)
+    # Not guaranteed exactly 0 (bootstrap sampling), but bounded well inside the range.
+    avg = sum(s["etf_fund"] for s in full) / n
+    assert abs(avg) < 0.3

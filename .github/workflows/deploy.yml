@@ -1,8 +1,6 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       target:
@@ -15,7 +13,7 @@ permissions:
   contents: read
   id-token: write
 
-# Serialize deploy runs so two PRs merging back-to-back don't race on the
+# Serialize deploy runs so two manual triggers back-to-back don't race on the
 # Cloud Run revision optimistic-concurrency check. cancel-in-progress: false
 # queues the second run instead of cancelling — we never want to skip a deploy.
 concurrency:

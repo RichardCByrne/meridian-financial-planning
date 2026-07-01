@@ -666,7 +666,16 @@ def _validate_plan_input(plan: PlanInput) -> None:
     _ensure_finite(a.state_pension_escalation_rate, "assumptions.state_pension_escalation_rate")
 
 
-def simulate(plan: PlanInput) -> list[YearRow]:
+def simulate(
+    plan: PlanInput, *, annual_shocks: list[dict[str, float]] | None = None
+) -> list[YearRow]:
+    """Run the year-by-year projection.
+
+    `annual_shocks`, when given, is a per-year list (indexed by year offset from
+    base_year) of `{asset_kind: additive_growth_delta}` maps applied on top of
+    each asset's growth rate that year. This is the hook the Monte Carlo engine
+    uses for year-by-year (sequence-of-returns) sampling; None = deterministic.
+    """
     _validate_plan_input(plan)
     tax_config = _resolve_tax_config(plan.tax_config)
     years = range(plan.base_year, plan.base_year + plan.projection_years)
@@ -783,14 +792,22 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         notes: list[str] = []
 
         # ----- 2. Asset growth (start-of-year balances grow over the year) -----
+        shock_idx = year - plan.base_year
+        year_shocks = (
+            annual_shocks[shock_idx]
+            if annual_shocks is not None and 0 <= shock_idx < len(annual_shocks)
+            else None
+        )
         for st in states.values():
             # Dormant future purchases hold no value and don't grow yet.
             if not st.active:
                 continue
             # Growth is applied net of the annual product charge (AMC/platform/
-            # adviser fee). Floor the net factor at 0 so a charge can't drive the
-            # balance negative even if it exceeds growth.
-            st.balance *= max(0.0, 1.0 + st.growth - st.charge_pct)
+            # adviser fee) and any Monte Carlo return shock for this year/kind.
+            # Floor the net factor at 0 so charges/shocks can't drive the balance
+            # negative even if they exceed growth.
+            shock = year_shocks.get(st.kind, 0.0) if year_shocks else 0.0
+            st.balance *= max(0.0, 1.0 + st.growth + shock - st.charge_pct)
 
         # ----- 2a. Planned asset transactions (Phase 1: property purchase/sale).
         # Purchases activate at face value (no growth in the purchase year) and

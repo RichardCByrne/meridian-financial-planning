@@ -38,6 +38,20 @@ def progressive_tax(
     return tax
 
 
+def standard_rate_band(
+    status: FilingStatus, tax_config: TaxConfig | None = None
+) -> tuple[float, str]:
+    """Standard-rate cut-off (SRCO) and its label for this filing status — the
+    income ceiling below which income is taxed at the standard rate. Shared by
+    `income_tax` and the ARF band-fill drawdown strategy in the simulator."""
+    cfg = _config(tax_config)
+    if status.married and not status.is_two_income_couple:
+        return cfg.srco_married_one_income, "married_one_income"
+    if status.is_single_parent:
+        return cfg.srco_single_parent, "single_parent"
+    return cfg.srco_single, "single"
+
+
 def income_tax(
     gross: float, status: FilingStatus, tax_config: TaxConfig | None = None
 ) -> tuple[float, str]:
@@ -47,15 +61,7 @@ def income_tax(
 
     cfg = _config(tax_config)
 
-    if status.married and not status.is_two_income_couple:
-        srco = cfg.srco_married_one_income
-        band = "married_one_income"
-    elif status.is_single_parent:
-        srco = cfg.srco_single_parent
-        band = "single_parent"
-    else:
-        srco = cfg.srco_single
-        band = "single"
+    srco, band = standard_rate_band(status, cfg)
 
     standard_band_used = min(gross, srco)
     higher_band_used = max(0.0, gross - srco)

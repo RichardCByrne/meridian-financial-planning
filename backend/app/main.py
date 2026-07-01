@@ -222,6 +222,11 @@ def _apply_lightweight_migrations() -> None:
         if "death_year" not in cols:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE people ADD COLUMN death_year INTEGER"))
+        if "arf_band_fill" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE people ADD COLUMN arf_band_fill BOOLEAN NOT NULL DEFAULT 0")
+                )
     # children + benefits + life_policies tables are picked up by
     # Base.metadata.create_all on the dev path (whole-table additions need no
     # ALTER bridging). Per-child

@@ -313,6 +313,10 @@ class Person(Base):
     homecaring_weeks_at_base_year: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Voluntary ARF drawdown rate (post-retirement). NULL = statutory min only.
     arf_target_drawdown_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Tax-optimal decumulation: draw the ARF up to the top of the standard-rate
+    # band each year (use cheap 20% headroom) instead of just the statutory
+    # minimum. False = previous behaviour.
+    arf_band_fill: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # What happens to the pension pot after the tax-free lump sum at retirement:
     # "arf" (default), "annuity", or "taxable_lump_sum".
     pension_option: Mapped[str] = mapped_column(String, default="arf", nullable=False)

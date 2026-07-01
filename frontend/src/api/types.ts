@@ -533,6 +533,7 @@ export interface YearRow {
   cat_paid: number;
   estate_transfers: Record<number, number>;
   asset_contributions: number;
+  had_shortfall: boolean;
   benefits_in_kind_total: number;
   protection_premiums_total: number;
   life_cover_payout: number;

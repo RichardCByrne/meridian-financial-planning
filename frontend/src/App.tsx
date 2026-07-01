@@ -10,6 +10,7 @@ import { GuidePage } from "./pages/GuidePage";
 import { LoginPage } from "./pages/LoginPage";
 import { PlansListPage } from "./pages/PlansList";
 import { PlanEditorPage } from "./pages/PlanEditor";
+import { ReportPage } from "./pages/ReportPage";
 import { PlanWizardPage } from "./pages/PlanWizardPage";
 
 export function App() {
@@ -129,6 +130,14 @@ function AppShell() {
               element={
                 <ProtectedRoute>
                   <PlanWizardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plans/:planId/report"
+              element={
+                <ProtectedRoute>
+                  <ReportPage />
                 </ProtectedRoute>
               }
             />

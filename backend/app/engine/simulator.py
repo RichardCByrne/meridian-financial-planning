@@ -69,6 +69,12 @@ class PersonInput:
     # Annual annuity income as a fraction of the annuitised pot. Only used when
     # pension_option == "annuity". ~4% is a typical Irish level-annuity rate.
     annuity_rate: float = 0.04
+    # Optional planned/what-if death year. When set and earlier than the natural
+    # life_expectancy year (dob.year + life_expectancy), the person dies then:
+    # income/BIK stop, their estate transfers to survivors (CAT via the existing
+    # bequest machinery) and any in-force term-life policy pays out. None = die
+    # at life_expectancy as before. Scenario-patchable (protection what-ifs).
+    death_year: int | None = None
 
 
 @dataclass
@@ -212,6 +218,41 @@ class BequestInput:
 
 
 @dataclass
+class LifePolicyInput:
+    """Term-life protection policy on one person (the insured). While in force
+    (start_year..end_year, end None = open-ended) the plan pays `premium_annual`
+    out of cash; if the insured dies within the term, `sum_assured` pays out
+    tax-free to survivors' cash. `kind` is reserved for future protection types
+    but only "term_life" produces a payout today."""
+    id: int
+    person_id: int
+    name: str
+    sum_assured: float
+    premium_annual: float
+    start_year: int
+    end_year: int | None = None
+    kind: str = "term_life"
+
+
+@dataclass
+class DBPensionInput:
+    """Defined-benefit / final-salary pension for one person. Pays a guaranteed
+    annual income from normal_retirement_age = accrual_rate × service_years ×
+    final_salary, indexed by revaluation_rate (deferment + in payment). Taxed as
+    PAYE income, PRSI-exempt (like an ARF or annuity). An optional
+    tax_free_lump_sum is paid to cash at retirement."""
+    id: int
+    person_id: int
+    name: str
+    accrual_rate: float
+    service_years: float
+    final_salary: float
+    revaluation_rate: float = 0.0
+    normal_retirement_age: int = 65
+    tax_free_lump_sum: float = 0.0
+
+
+@dataclass
 class GoalInput:
     id: int
     kind: str
@@ -270,6 +311,8 @@ class PlanInput:
     bequests: list[BequestInput] = field(default_factory=list)
     children: list[ChildInput] = field(default_factory=list)
     benefits: list[BenefitInput] = field(default_factory=list)
+    life_policies: list[LifePolicyInput] = field(default_factory=list)
+    db_pensions: list[DBPensionInput] = field(default_factory=list)
     # Tax-rule constants. None = use IRELAND_2026_OFFICIAL.
     tax_config: TaxConfig | None = None
     # Filing status override. None → auto (1 person → single, 2+ → married).
@@ -325,6 +368,7 @@ class YearRow:
     pension_lump_sum_tax: float = 0.0
     arf_drawdowns: float = 0.0
     state_pension_total: float = 0.0
+    db_pension_total: float = 0.0
     goal_status: dict[int, str] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     cat_paid: float = 0.0
@@ -347,10 +391,32 @@ class YearRow:
     # against: you shouldn't have to sell the house or raid a pension to hit a
     # target or fund a planned spend.
     liquid_assets: float = 0.0
+    # Protection (term-life) figures. `protection_premiums_total` is the premiums
+    # paid this year (already included in expenses_total). `life_cover_payout` is
+    # any tax-free sum assured paid to survivors on a death this year.
+    protection_premiums_total: float = 0.0
+    life_cover_payout: float = 0.0
+    # Capital shortfall: debt still outstanding that liquid assets can't clear
+    # (max(0, debt_outstanding - liquid_assets)). Most useful in a death year —
+    # shows whether survivors can at least clear the debts. 0 = fully covered.
+    cover_gap: float = 0.0
+    # CAT covered this year by a Section 72 policy on a deceased person (already
+    # netted out of cat_paid). 0 when no approved policy paid out.
+    section72_cat_relief: float = 0.0
 
 
 def _age_in_year(dob: date, year: int) -> int:
     return year - dob.year
+
+
+def _death_year_for(person: PersonInput) -> int:
+    """The year the person dies: the earlier of an explicit death_year and the
+    natural life_expectancy year (dob.year + life_expectancy). Equivalent to the
+    old `age >= life_expectancy` trigger when death_year is None."""
+    natural = person.dob.year + person.life_expectancy
+    if person.death_year is not None:
+        return min(natural, person.death_year)
+    return natural
 
 
 def _income_active(inc: IncomeInput, year: int) -> bool:
@@ -800,11 +866,12 @@ def simulate(plan: PlanInput) -> list[YearRow]:
 
         # ----- 2c. Death events — transfer estate, compute CAT -----
         cat_paid_year = 0.0
+        life_cover_payout_year = 0.0
+        section72_relief_year = 0.0
         estate_transfers_year: dict[int, float] = {}
 
         for person in plan.people:
-            age = ages[person.id]
-            if age < person.life_expectancy or person.id in deceased_persons:
+            if year < _death_year_for(person) or person.id in deceased_persons:
                 continue
             deceased_persons.add(person.id)
 
@@ -843,11 +910,51 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 net = share - cat
                 states[_cash_target()].balance += net
 
+            # Section 72 relief: an in-force Revenue-approved policy on the
+            # deceased pays the inheritance CAT tax-free. Relief caps at the CAT
+            # due; any surplus still passes to survivors. The full payout reaches
+            # cash — the covered CAT is effectively refunded to beneficiaries
+            # (the policy, not they, paid Revenue) and any excess is theirs —
+            # while the reported CAT drops by the relief.
+            s72_payout = sum(
+                max(0.0, pol.sum_assured)
+                for pol in plan.life_policies
+                if pol.person_id == person.id and pol.kind == "section_72"
+                and pol.start_year <= year and (pol.end_year is None or year <= pol.end_year)
+            )
+            if s72_payout > 0:
+                cat_after, _excess = cat_ie.apply_section72(person_cat, s72_payout)
+                relief = person_cat - cat_after
+                states[_cash_target()].balance += s72_payout
+                section72_relief_year += relief
+                notes.append(
+                    f"{person.name}'s Section 72 policy pays EUR {s72_payout:,.0f}, "
+                    f"covering EUR {relief:,.0f} of CAT."
+                )
+                person_cat = cat_after
+
             cat_paid_year += person_cat
             notes.append(
                 f"{person.name} passes: estate EUR {estate_value:,.0f}"
                 + (f", CAT EUR {person_cat:,.0f}." if person_cat > 0 else ".")
             )
+
+            # Term-life payout: any in-force policy on the deceased pays its sum
+            # assured tax-free straight to survivors' cash. Life-cover proceeds
+            # to a named beneficiary bypass the estate, so this is separate from
+            # (and untaxed by) the CAT computation above.
+            for pol in plan.life_policies:
+                if pol.person_id != person.id or pol.kind != "term_life":
+                    continue
+                in_force = pol.start_year <= year and (pol.end_year is None or year <= pol.end_year)
+                payout = max(0.0, pol.sum_assured)
+                if in_force and payout > 0:
+                    states[_cash_target()].balance += payout
+                    life_cover_payout_year += payout
+                    notes.append(
+                        f"{person.name}'s life cover '{pol.name}' pays "
+                        f"EUR {payout:,.0f} to survivors."
+                    )
 
         # ----- 3. Per-person income / pension lifecycle -----
         person_rows: list[PersonYear] = []
@@ -861,12 +968,13 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         pension_lump_sum_tax_total = 0.0
         arf_drawdowns_total = 0.0
         state_pension_total = 0.0
+        db_pension_total = 0.0
         benefits_in_kind_total = 0.0
 
         for person in plan.people:
             age = ages[person.id]
             # Skip persons who have died (this year's death is handled in step 2c above).
-            if age >= person.life_expectancy:
+            if year >= _death_year_for(person):
                 continue
             retire_age = _retirement_age_for(person, plan.assumptions.state_pension_age)
             is_retired_now = age >= retire_age
@@ -1076,6 +1184,32 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                         income_by_kind.get("state_pension", 0.0) + state_pension_amt
                     )
 
+            # 3e-i. Defined-benefit / final-salary pension income. Guaranteed
+            # annual income from the scheme's normal retirement age, computed as
+            # accrual_rate × service_years × final_salary and indexed by
+            # revaluation_rate (deferment + in payment). PAYE-taxed, PRSI-exempt.
+            # An optional tax-free lump sum lands in cash in the retirement year.
+            db_pension_amt = 0.0
+            for dp in plan.db_pensions:
+                if dp.person_id != person.id:
+                    continue
+                start_year = person.dob.year + dp.normal_retirement_age
+                if year < start_year:
+                    continue
+                base = dp.accrual_rate * dp.service_years * dp.final_salary
+                db_pension_amt += base * (1.0 + dp.revaluation_rate) ** max(0, year - plan.base_year)
+                if year == start_year and dp.tax_free_lump_sum > 0:
+                    states[_cash_target()].balance += dp.tax_free_lump_sum
+                    notes.append(
+                        f"{person.name}'s DB pension '{dp.name}' starts: tax-free lump sum "
+                        f"EUR {dp.tax_free_lump_sum:,.0f}."
+                    )
+            if db_pension_amt > 0:
+                db_pension_total += db_pension_amt
+                income_by_kind["db_pension"] = (
+                    income_by_kind.get("db_pension", 0.0) + db_pension_amt
+                )
+
             # 3e-ii. Annuity income (paid every year once an annuity is bought) and
             # one-off taxable cash drawdown (taxable_lump_sum option, retirement year).
             # Both are PAYE-taxed pension income, PRSI-exempt like ARF/state pension.
@@ -1120,7 +1254,9 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             benefits_in_kind_total += person_bik_total
 
             # 3f. Tax computation.
-            pension_income = arf_drawdown + state_pension_amt + annuity_amt + taxable_cash
+            pension_income = (
+                arf_drawdown + state_pension_amt + annuity_amt + taxable_cash + db_pension_amt
+            )
             taxable_for_it = (
                 max(0.0, earned_for_it - pension_contribution) + pension_income + person_bik_total
             )
@@ -1279,6 +1415,21 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         if child_costs_total > 0:
             expenses_by_category["children"] = (
                 expenses_by_category.get("children", 0.0) + child_costs_total
+            )
+
+        # ----- 4a-ii. Protection premiums (term life) -----
+        # Paid while the policy is in force and the insured is still alive.
+        # A real cash outgoing, so it sits in expenses like any other cost.
+        protection_premiums_total = 0.0
+        for pol in plan.life_policies:
+            in_force = pol.start_year <= year and (pol.end_year is None or year <= pol.end_year)
+            insured = next((p for p in plan.people if p.id == pol.person_id), None)
+            alive = insured is not None and year < _death_year_for(insured)
+            if in_force and alive and pol.premium_annual > 0:
+                protection_premiums_total += pol.premium_annual
+        if protection_premiums_total > 0:
+            expenses_by_category["protection"] = (
+                expenses_by_category.get("protection", 0.0) + protection_premiums_total
             )
 
         # ----- 4a. Cost-bearing goals due this year -----
@@ -1516,6 +1667,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 pension_lump_sum_tax=round(pension_lump_sum_tax_total, 2),
                 arf_drawdowns=round(arf_drawdowns_total, 2),
                 state_pension_total=round(state_pension_total, 2),
+                db_pension_total=round(db_pension_total, 2),
                 goal_status=goal_status,
                 notes=notes,
                 cat_paid=round(cat_paid_year, 2),
@@ -1523,6 +1675,10 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 asset_contributions=round(asset_contributions_total, 2),
                 had_shortfall=had_shortfall,
                 benefits_in_kind_total=round(benefits_in_kind_total, 2),
+                protection_premiums_total=round(protection_premiums_total, 2),
+                life_cover_payout=round(life_cover_payout_year, 2),
+                cover_gap=round(max(0.0, debt_outstanding - liquid_assets), 2),
+                section72_cat_relief=round(section72_relief_year, 2),
             )
         )
 

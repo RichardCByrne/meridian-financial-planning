@@ -18,8 +18,10 @@ from app.engine.simulator import (
     ExpenseInput,
     GoalInput,
     IncomeInput,
+    DBPensionInput,
     LiabilityAdjustmentInput,
     LiabilityInput,
+    LifePolicyInput,
     PersonInput,
     PlanInput,
     simulate,
@@ -32,7 +34,9 @@ from app.models import (
     Bequest,
     Child,
     IncomeSource,
+    DBPension,
     Liability,
+    LifePolicy,
     Plan,
     Scenario,
     TaxConfigRow,
@@ -63,6 +67,12 @@ router = APIRouter(tags=["projection"])
 # immediately.
 
 _MC_CACHE_TTL_SECONDS = 60.0
+# Hard cap on distinct cache entries. The key includes a caller-supplied `seed`,
+# so without a cap an attacker could spray unique seeds and pin an unbounded
+# number of full responses in memory for the whole TTL window (a memory-
+# exhaustion DoS on a small Cloud Run instance). The cap keeps the working set
+# bounded; eviction is oldest-expiry-first.
+_MC_CACHE_MAX_ENTRIES = 256
 _mc_cache: dict[tuple[int, int | None, int, int | None], tuple[float, "MonteCarloResponse"]] = {}
 
 
@@ -78,6 +88,16 @@ def _mc_cache_get(key: tuple[int, int | None, int, int | None]) -> "MonteCarloRe
 
 
 def _mc_cache_set(key: tuple[int, int | None, int, int | None], value: "MonteCarloResponse") -> None:
+    if len(_mc_cache) >= _MC_CACHE_MAX_ENTRIES and key not in _mc_cache:
+        now = time.monotonic()
+        # Drop anything already expired; if that frees nothing, evict the entry
+        # closest to expiry so the cache can't grow past the cap.
+        expired = [k for k, (exp, _) in _mc_cache.items() if exp < now]
+        for k in expired:
+            _mc_cache.pop(k, None)
+        if len(_mc_cache) >= _MC_CACHE_MAX_ENTRIES:
+            oldest = min(_mc_cache, key=lambda k: _mc_cache[k][0])
+            _mc_cache.pop(oldest, None)
     _mc_cache[key] = (time.monotonic() + _MC_CACHE_TTL_SECONDS, value)
 
 
@@ -94,6 +114,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             dob=p.dob,
             is_primary=p.is_primary,
             life_expectancy=p.life_expectancy,
+            death_year=p.death_year,
             retirement_age=p.retirement_age,
             claims_rent_credit=p.claims_rent_credit,
             lump_sum_pct=p.lump_sum_pct,
@@ -264,6 +285,39 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         )
         for b in benefits_raw
     ]
+    life_policies_raw = list(
+        db.execute(select(LifePolicy).where(LifePolicy.plan_id == plan.id)).scalars()
+    )
+    life_policies = [
+        LifePolicyInput(
+            id=lp.id,
+            person_id=lp.person_id,
+            name=lp.name,
+            sum_assured=lp.sum_assured,
+            premium_annual=lp.premium_annual,
+            start_year=lp.start_year,
+            end_year=lp.end_year,
+            kind=lp.kind,
+        )
+        for lp in life_policies_raw
+    ]
+    db_pensions_raw = list(
+        db.execute(select(DBPension).where(DBPension.plan_id == plan.id)).scalars()
+    )
+    db_pensions = [
+        DBPensionInput(
+            id=dp.id,
+            person_id=dp.person_id,
+            name=dp.name,
+            accrual_rate=dp.accrual_rate,
+            service_years=dp.service_years,
+            final_salary=dp.final_salary,
+            revaluation_rate=dp.revaluation_rate,
+            normal_retirement_age=dp.normal_retirement_age,
+            tax_free_lump_sum=dp.tax_free_lump_sum,
+        )
+        for dp in db_pensions_raw
+    ]
     tax_config = _resolve_plan_tax_config(plan, db)
     return PlanInput(
         base_year=plan.base_year,
@@ -277,6 +331,8 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         bequests=bequests,
         children=children,
         benefits=benefits,
+        life_policies=life_policies,
+        db_pensions=db_pensions,
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,
@@ -421,7 +477,10 @@ def get_montecarlo(
     plan_id: int,
     n: int = Query(default=200, ge=10, le=1000, description="Number of simulation runs"),
     scenario_id: int | None = Query(default=None),
-    seed: int | None = Query(default=None, description="Optional RNG seed for reproducible runs"),
+    seed: int | None = Query(
+        default=None, ge=0, le=2**32 - 1,
+        description="Optional RNG seed for reproducible runs",
+    ),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MonteCarloResponse:

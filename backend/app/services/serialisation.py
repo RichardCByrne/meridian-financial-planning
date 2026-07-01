@@ -28,9 +28,12 @@ from app.models import (
     IncomeSource,
     Liability,
     LiabilityAdjustment,
+    DBPension,
+    LifePolicy,
     Person,
     Plan,
     Scenario,
+    TaxConfigRow,
 )
 
 # Format version. Bump when the export format changes incompatibly.
@@ -121,6 +124,20 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
             }
             for b in plan.benefits
         ],
+        "life_policies": [
+            {
+                **_strip_ids(_columns(lp), drop=["id", "plan_id", "person_id"]),
+                "_person_local_id": lp.person_id,
+            }
+            for lp in plan.life_policies
+        ],
+        "db_pensions": [
+            {
+                **_strip_ids(_columns(dp), drop=["id", "plan_id", "person_id"]),
+                "_person_local_id": dp.person_id,
+            }
+            for dp in plan.db_pensions
+        ],
         "children": [
             {
                 **_strip_ids(_columns(c), drop=["id", "plan_id", "primary_carer_id"]),
@@ -140,17 +157,52 @@ def _strip_ids(d: dict[str, Any], drop: list[str]) -> dict[str, Any]:
     return {k: v for k, v in d.items() if k not in drop}
 
 
-def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | None = None) -> Plan:
-    """Create a Plan + children from a serialised dict. Returns the persisted Plan."""
+def _plan_columns() -> set[str]:
+    return {c.name for c in Plan.__table__.columns}
+
+
+def _pin_is_usable(tax_config_id: int, owner_user_id: int | None, db: Session) -> bool:
+    """A carried-over pin is usable only if it's the official config or one the
+    new owner owns. Unknown owner (owner_user_id None) → only the official."""
+    row = db.get(TaxConfigRow, tax_config_id)
+    if row is None:
+        return False
+    return bool(row.is_official) or (
+        owner_user_id is not None and row.created_by_user_id == owner_user_id
+    )
+
+
+def hydrate_plan(
+    payload: dict[str, Any],
+    db: Session,
+    *,
+    name_override: str | None = None,
+    owner_user_id: int | None = None,
+) -> Plan:
+    """Create a Plan + children from a serialised dict. Returns the persisted Plan.
+
+    `owner_user_id` is the caller who will own the new plan. It gates the
+    `tax_config_id` pin: a clone/import may only carry a pin over when it's the
+    official config or one the new owner owns. A foreign pin (e.g. cloning a
+    plan shared to you that's pinned to the sharer's private config, or a
+    hand-crafted import payload) is dropped, closing the same cross-tenant
+    leak that `assert_tax_config_accessible` guards on create/update.
+    """
     if payload.get("format_version") != EXPORT_FORMAT_VERSION:
         raise ValueError(
             f"Unsupported export format_version: {payload.get('format_version')!r}"
         )
 
-    plan_fields = dict(payload["plan"])
+    plan_fields = {k: v for k, v in payload["plan"].items() if k in _plan_columns()}
+    # id / created_at are server-owned; never accept them from an (attacker-
+    # controllable) import payload.
+    plan_fields.pop("id", None)
     plan_fields.pop("created_at", None)
     if name_override is not None:
         plan_fields["name"] = name_override
+    pin = plan_fields.get("tax_config_id")
+    if pin is not None and not _pin_is_usable(pin, owner_user_id, db):
+        plan_fields["tax_config_id"] = None
     plan = Plan(**plan_fields)
     db.add(plan)
     db.flush()  # populate plan.id
@@ -223,6 +275,18 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
         person_id = person_id_map.get(person_local) if person_local is not None else None
         if person_id is not None:
             db.add(Benefit(**ben_payload, plan_id=plan.id, person_id=person_id))
+
+    for lp_payload in payload.get("life_policies", []):
+        person_local = lp_payload.pop("_person_local_id", None)
+        person_id = person_id_map.get(person_local) if person_local is not None else None
+        if person_id is not None:
+            db.add(LifePolicy(**lp_payload, plan_id=plan.id, person_id=person_id))
+
+    for dp_payload in payload.get("db_pensions", []):
+        person_local = dp_payload.pop("_person_local_id", None)
+        person_id = person_id_map.get(person_local) if person_local is not None else None
+        if person_id is not None:
+            db.add(DBPension(**dp_payload, plan_id=plan.id, person_id=person_id))
 
     for c_payload in payload.get("children", []):
         carer_local = c_payload.pop("_carer_local_id", None)

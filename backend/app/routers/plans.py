@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import get_current_user, grant_plan_membership, require_plan_access
 from app.db import get_db
 from app.models import Assumptions, Liability, Person, Plan, PlanMember, User
-from app.routers._helpers import get_or_404
+from app.routers._helpers import assert_tax_config_accessible, get_or_404
 from app.schemas.plan import PlanCreate, PlanRead, PlanUpdate
 from app.services.serialisation import hydrate_plan, serialise_plan
 
@@ -27,6 +28,8 @@ def _load_plan_with_children(plan_id: int, db: Session) -> Plan:
             selectinload(Plan.scenarios),
             selectinload(Plan.bequests),
             selectinload(Plan.benefits),
+            selectinload(Plan.life_policies),
+            selectinload(Plan.db_pensions),
             selectinload(Plan.children),
             selectinload(Plan.assumptions),
         )
@@ -58,6 +61,7 @@ def create_plan(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Plan:
+    assert_tax_config_accessible(payload.tax_config_id, user.id, db)
     plan = Plan(**payload.model_dump())
     db.add(plan)
     db.flush()
@@ -87,7 +91,10 @@ def update_plan(
 ) -> Plan:
     require_plan_access(plan_id, user, db, min_role="editor")
     plan = get_or_404(Plan, plan_id, db)
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "tax_config_id" in data:
+        assert_tax_config_accessible(data["tax_config_id"], user.id, db)
+    for k, v in data.items():
         setattr(plan, k, v)
     db.commit()
     db.refresh(plan)
@@ -118,7 +125,7 @@ def clone_plan(
     src = _load_plan_with_children(plan_id, db)
     new_name = (payload or {}).get("name") or f"{src.name} (copy)"
     snapshot = serialise_plan(src)
-    new_plan = hydrate_plan(snapshot, db, name_override=new_name)
+    new_plan = hydrate_plan(snapshot, db, name_override=new_name, owner_user_id=user.id)
     grant_plan_membership(db, new_plan.id, user.id, role="owner")
     db.commit()
     return new_plan
@@ -143,9 +150,10 @@ def import_plan(
 ) -> Plan:
     """Create a plan from a previously-exported JSON snapshot. Importer becomes owner."""
     try:
-        plan = hydrate_plan(payload, db)
-    except (KeyError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=f"Invalid plan payload: {e}") from e
+        plan = hydrate_plan(payload, db, owner_user_id=user.id)
+    except (KeyError, ValueError, TypeError) as e:
+        logging.getLogger(__name__).info("Rejected plan import: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid plan payload") from e
     grant_plan_membership(db, plan.id, user.id, role="owner")
     db.commit()
     return plan

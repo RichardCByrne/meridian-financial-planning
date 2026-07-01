@@ -17,6 +17,8 @@ import { IncomePane } from "./panes/IncomePane";
 import { ExpensesPane } from "./panes/ExpensesPane";
 import { AssetsPane } from "./panes/AssetsPane";
 import { LiabilitiesPane } from "./panes/LiabilitiesPane";
+import { ProtectionPane } from "./panes/ProtectionPane";
+import { DBPensionsPane } from "./panes/DBPensionsPane";
 import { GoalsPane } from "./panes/GoalsPane";
 import { TimelinePane } from "./panes/TimelinePane";
 import { LetsSeePane } from "./panes/LetsSeePane";
@@ -140,6 +142,8 @@ export function PlanEditorPage() {
         <Route path="expenses" element={<ExpensesPane planId={id} />} />
         <Route path="assets" element={<AssetsPane planId={id} />} />
         <Route path="liabilities" element={<LiabilitiesPane planId={id} />} />
+        <Route path="protection" element={<ProtectionPane planId={id} />} />
+        <Route path="db-pensions" element={<DBPensionsPane planId={id} />} />
         <Route path="goals" element={<GoalsPane planId={id} />} />
         <Route path="scenarios" element={<ScenariosPane planId={id} />} />
         <Route path="compare" element={<ComparePane planId={id} />} />
@@ -297,6 +301,8 @@ const PLAN_TAB_GROUPS: PlanTabGroup[] = [
       { label: "Expenses", seg: "expenses" },
       { label: "Assets", seg: "assets" },
       { label: "Liabilities", seg: "liabilities" },
+      { label: "Protection", seg: "protection" },
+      { label: "DB Pension", seg: "db-pensions" },
     ],
   },
   {

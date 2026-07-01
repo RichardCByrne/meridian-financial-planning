@@ -14,6 +14,11 @@ export const CHART = {
   grid: "#d6d8ce", // --line — cartesian grid rules
 };
 
+// The single signature use of brass on charts: the x-axis graticule (axis line
+// + tick marks), echoing the compass ticks in the brand mark. It marks the
+// chart's baseline as a ruled map border — never a data series or guide line.
+export const CHART_AXIS_BRASS = "#b0894a"; // --brass
+
 // Categorical ramp for multi-series charts (income kinds, tax components).
 // Cartographic map-legend hues chosen to harmonise with the meridian teal and
 // stay legible when stacked. Teal leads; the rest are marine, sage, clay,

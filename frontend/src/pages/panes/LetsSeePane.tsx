@@ -28,7 +28,7 @@ import {
 } from "../../api/hooks";
 import type { Goal, MonteCarloResponse, YearRow } from "../../api/types";
 import { fmtMoney } from "../../lib/format";
-import { CHART, CHART_SERIES } from "../../lib/chartColors";
+import { CHART, CHART_SERIES, CHART_AXIS_BRASS } from "../../lib/chartColors";
 import { HelpTip } from "../../components/HelpTip";
 import { JargonTerm } from "../../components/JargonTerm";
 import { ChartSkeleton } from "../../components/Skeleton";
@@ -569,7 +569,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                   {renderShortfall()}
-                  <XAxis dataKey="year" />
+                  <XAxis
+                  dataKey="year"
+                  axisLine={{ stroke: CHART_AXIS_BRASS }}
+                  tickLine={{ stroke: CHART_AXIS_BRASS }}
+                />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip
                     trigger={tooltipTrigger}
@@ -607,7 +611,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                   {renderShortfall()}
-                  <XAxis dataKey="year" />
+                  <XAxis
+                  dataKey="year"
+                  axisLine={{ stroke: CHART_AXIS_BRASS }}
+                  tickLine={{ stroke: CHART_AXIS_BRASS }}
+                />
                   <YAxis tickFormatter={(v) => compact(v)} />
                   <Tooltip trigger={tooltipTrigger} formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                   {showLiquid && <Legend />}
@@ -641,7 +649,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
-                <XAxis dataKey="year" />
+                <XAxis
+                  dataKey="year"
+                  axisLine={{ stroke: CHART_AXIS_BRASS }}
+                  tickLine={{ stroke: CHART_AXIS_BRASS }}
+                />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                 <Legend />
@@ -666,7 +678,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
-                <XAxis dataKey="year" />
+                <XAxis
+                  dataKey="year"
+                  axisLine={{ stroke: CHART_AXIS_BRASS }}
+                  tickLine={{ stroke: CHART_AXIS_BRASS }}
+                />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                 <Legend />
@@ -707,7 +723,11 @@ export function LetsSeePane({ planId }: { planId: number }) {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
                 {renderShortfall()}
-                <XAxis dataKey="year" />
+                <XAxis
+                  dataKey="year"
+                  axisLine={{ stroke: CHART_AXIS_BRASS }}
+                  tickLine={{ stroke: CHART_AXIS_BRASS }}
+                />
                 <YAxis tickFormatter={(v) => compact(v)} />
                 <Tooltip formatter={(v) => fmtMoney(Number(v))} labelFormatter={(l) => `Year ${l}`} />
                 <Legend />

@@ -205,6 +205,49 @@ def test_user_cannot_read_anothers_config():
             assert client.delete(f"/api/tax-configs/{cfg['id']}").status_code == 404
 
 
+def test_user_cannot_pin_anothers_config_to_a_plan():
+    """A plan may only pin the official config or one the caller owns — pinning
+    another user's private config (on create or update) is rejected 404, closing
+    the indirect info-leak via projection output."""
+    alice = _ensure_user("alice-uid", "alice@example.com")
+    bob = _ensure_user("bob-uid", "bob@example.com")
+
+    with TestClient(app) as client:
+        with _as_user(alice.firebase_uid, alice.email or ""):
+            alice_cfg = client.post("/api/tax-configs", json={"name": "Alice private"}).json()
+
+        with _as_user(bob.firebase_uid, bob.email or ""):
+            # Create a plan pinning Alice's config → rejected.
+            r = client.post(
+                "/api/plans",
+                json={"name": "Bob steal", "base_year": 2026, "projection_years": 2,
+                      "tax_config_id": alice_cfg["id"]},
+            )
+            assert r.status_code == 404
+
+            # Bob's own plan; try to update its pin to Alice's config → rejected.
+            bob_plan = client.post(
+                "/api/plans",
+                json={"name": "Bob plan", "base_year": 2026, "projection_years": 2},
+            ).json()
+            r = client.patch(
+                f"/api/plans/{bob_plan['id']}", json={"tax_config_id": alice_cfg["id"]}
+            )
+            assert r.status_code == 404
+
+            # Official + Bob's own config are allowed.
+            official = next(
+                c for c in client.get("/api/tax-configs").json() if c["is_official"]
+            )
+            assert client.patch(
+                f"/api/plans/{bob_plan['id']}", json={"tax_config_id": official["id"]}
+            ).status_code == 200
+            bob_cfg = client.post("/api/tax-configs", json={"name": "Bob private"}).json()
+            assert client.patch(
+                f"/api/plans/{bob_plan['id']}", json={"tax_config_id": bob_cfg["id"]}
+            ).status_code == 200
+
+
 def test_delete_user_config_unpins_dependent_plans():
     alice = _ensure_user("alice-uid", "alice@example.com")
     with TestClient(app) as client:

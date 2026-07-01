@@ -263,30 +263,75 @@ function FirstRunStepper({ planId }: { planId: number }) {
   );
 }
 
-const ADVANCED_KEY = "meridian:planEditor:advanced";
+// Plan editor navigation is two-tier: five groups on top, and the active
+// group's members as a sub-row beneath. `seg` is the path segment after the
+// plan id ("" is the index — the Outlook/Let's See view).
+type PlanTab = { label: string; seg: string };
+type PlanTabGroup = { id: string; label: string; tabs: PlanTab[] };
+
+const PLAN_TAB_GROUPS: PlanTabGroup[] = [
+  {
+    id: "outlook",
+    label: "Outlook",
+    tabs: [
+      { label: "Let's See", seg: "" },
+      { label: "Timeline", seg: "timeline" },
+      { label: "Scenarios", seg: "scenarios" },
+      { label: "Compare", seg: "compare" },
+    ],
+  },
+  {
+    id: "household",
+    label: "Household",
+    tabs: [
+      { label: "People", seg: "people" },
+      { label: "Children", seg: "children" },
+      { label: "Benefits", seg: "benefits" },
+    ],
+  },
+  {
+    id: "finances",
+    label: "Finances",
+    tabs: [
+      { label: "Income", seg: "income" },
+      { label: "Expenses", seg: "expenses" },
+      { label: "Assets", seg: "assets" },
+      { label: "Liabilities", seg: "liabilities" },
+    ],
+  },
+  {
+    id: "planning",
+    label: "Planning",
+    tabs: [
+      { label: "Goals", seg: "goals" },
+      { label: "Legacy", seg: "legacy" },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    tabs: [
+      { label: "Sharing", seg: "sharing" },
+      { label: "Assumptions", seg: "assumptions" },
+      { label: "Tax rules", seg: "tax-rules" },
+    ],
+  },
+];
 
 function TabNav({ planId }: { planId: number }) {
-  const [advanced, setAdvanced] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(ADVANCED_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
   const navRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
-  const toggle = () => {
-    setAdvanced((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(ADVANCED_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
+  const base = `/plans/${planId}`;
+  const toPath = (seg: string) => (seg ? `${base}/${seg}` : base);
 
+  // First path segment after the plan id decides the active group.
+  const seg = location.pathname.startsWith(base)
+    ? location.pathname.slice(base.length).replace(/^\/+/, "").split("/")[0]
+    : "";
+  const activeGroup =
+    PLAN_TAB_GROUPS.find((g) => g.tabs.some((t) => t.seg === seg)) ?? PLAN_TAB_GROUPS[0];
+
+  // Keep the active member tab in view on the (horizontally scrollable) sub-row.
   useLayoutEffect(() => {
     const el = navRef.current?.querySelector<HTMLAnchorElement>("a.active");
     if (el && typeof el.scrollIntoView === "function") {
@@ -295,49 +340,27 @@ function TabNav({ planId }: { planId: number }) {
   }, [location.pathname]);
 
   return (
-    <nav ref={navRef} className="tabnav">
-      <TabLink to={`/plans/${planId}`} end>
-        Let's See
-      </TabLink>
-      <TabLink to={`/plans/${planId}/timeline`}>Timeline</TabLink>
-      <TabLink to={`/plans/${planId}/people`}>People</TabLink>
-      <TabLink to={`/plans/${planId}/children`}>Children</TabLink>
-      <TabLink to={`/plans/${planId}/income`}>Income</TabLink>
-      <TabLink to={`/plans/${planId}/benefits`}>Benefits</TabLink>
-      <TabLink to={`/plans/${planId}/expenses`}>Expenses</TabLink>
-      <TabLink to={`/plans/${planId}/assets`}>Assets</TabLink>
-      <TabLink to={`/plans/${planId}/liabilities`}>Liabilities</TabLink>
-      <TabLink to={`/plans/${planId}/goals`}>Goals</TabLink>
-      <TabLink to={`/plans/${planId}/scenarios`}>Scenarios</TabLink>
-      <TabLink to={`/plans/${planId}/compare`}>Compare</TabLink>
-      <TabLink to={`/plans/${planId}/legacy`}>Legacy</TabLink>
-      {advanced && (
-        <>
-          <TabLink to={`/plans/${planId}/sharing`}>Sharing</TabLink>
-          <TabLink to={`/plans/${planId}/assumptions`}>Assumptions</TabLink>
-          <TabLink to={`/plans/${planId}/tax-rules`}>Tax rules</TabLink>
-        </>
-      )}
-      <button
-        type="button"
-        onClick={toggle}
-        title="Toggle advanced tabs (sharing, assumptions, tax-rule editor)"
-        className="tabnav-advanced-toggle"
-        style={{
-          marginLeft: "auto",
-          marginBottom: -1,
-          padding: "10px 16px",
-          background: "transparent",
-          border: "none",
-          color: advanced ? "#2563eb" : "#94a3b8",
-          fontSize: 12,
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
-        {advanced ? "Hide advanced" : "Show advanced"}
-      </button>
-    </nav>
+    <div className="tabnav-shell">
+      <nav className="tabgroups" aria-label="Plan sections">
+        {PLAN_TAB_GROUPS.map((g) => (
+          <Link
+            key={g.id}
+            to={toPath(g.tabs[0].seg)}
+            className={g.id === activeGroup.id ? "active" : ""}
+            aria-current={g.id === activeGroup.id ? "page" : undefined}
+          >
+            {g.label}
+          </Link>
+        ))}
+      </nav>
+      <nav ref={navRef} className="tabnav" aria-label={`${activeGroup.label} tabs`}>
+        {activeGroup.tabs.map((t) => (
+          <TabLink key={t.seg || "index"} to={toPath(t.seg)} end={t.seg === ""}>
+            {t.label}
+          </TabLink>
+        ))}
+      </nav>
+    </div>
   );
 }
 

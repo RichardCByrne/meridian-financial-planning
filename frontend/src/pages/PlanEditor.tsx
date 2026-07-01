@@ -301,7 +301,6 @@ const PLAN_TAB_GROUPS: PlanTabGroup[] = [
       { label: "Expenses", seg: "expenses" },
       { label: "Assets", seg: "assets" },
       { label: "Liabilities", seg: "liabilities" },
-      { label: "Protection", seg: "protection" },
       { label: "DB Pension", seg: "db-pensions" },
     ],
   },
@@ -310,6 +309,7 @@ const PLAN_TAB_GROUPS: PlanTabGroup[] = [
     label: "Planning",
     tabs: [
       { label: "Goals", seg: "goals" },
+      { label: "Protection", seg: "protection" },
       { label: "Legacy", seg: "legacy" },
     ],
   },

@@ -39,18 +39,34 @@ export function TimelinePane({ planId }: { planId: number }) {
   if (!plan) return <p className="muted">Loading…</p>;
 
   const baseYear = plan.base_year;
-  const lastYear = plan.base_year + plan.projection_years - 1;
-  const totalYears = plan.projection_years;
+  // Projection horizon: the last year the simulator actually runs to.
+  const horizonYear = plan.base_year + plan.projection_years - 1;
+
+  // The retirement pill must be draggable across a person's full valid
+  // retirement-age range (40..85), and goals can sit past the horizon too.
+  // A short projection_years must NOT cap those — so the axis extends to
+  // whichever is furthest out. Otherwise the pill clamps at the horizon and
+  // you can't set a retirement age whose year falls beyond it.
+  const retirementMaxYear = (people ?? []).reduce((mx, p) => {
+    if (p.retirement_age == null) return mx;
+    return Math.max(mx, new Date(p.dob).getFullYear() + 85);
+  }, horizonYear);
+  const goalMaxYear = (goals ?? []).reduce(
+    (mx, g) => Math.max(mx, g.target_year),
+    horizonYear,
+  );
+  const lastYear = Math.max(horizonYear, retirementMaxYear, goalMaxYear);
+  const axisRange = Math.max(1, lastYear - baseYear);
 
   const yearToPct = (year: number) => {
     const clamped = Math.max(baseYear, Math.min(lastYear, year));
-    return ((clamped - baseYear) / Math.max(1, totalYears - 1)) * 100;
+    return ((clamped - baseYear) / axisRange) * 100;
   };
 
   const xToYear = (clientX: number, trackEl: HTMLElement): number => {
     const rect = trackEl.getBoundingClientRect();
     const ratio = (clientX - rect.left) / rect.width;
-    const year = Math.round(baseYear + ratio * (totalYears - 1));
+    const year = Math.round(baseYear + ratio * axisRange);
     return Math.max(baseYear, Math.min(lastYear, year));
   };
 
@@ -134,7 +150,7 @@ export function TimelinePane({ planId }: { planId: number }) {
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                 >
-                  <Axis baseYear={baseYear} lastYear={lastYear} ticks={ticks} />
+                  <Axis baseYear={baseYear} lastYear={lastYear} horizonYear={horizonYear} ticks={ticks} />
                   <Pill
                     pct={yearToPct(showYear)}
                     color={RETIREMENT_COLOR}
@@ -175,7 +191,7 @@ export function TimelinePane({ planId }: { planId: number }) {
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                 >
-                  <Axis baseYear={baseYear} lastYear={lastYear} ticks={ticks} />
+                  <Axis baseYear={baseYear} lastYear={lastYear} horizonYear={horizonYear} ticks={ticks} />
                   <Pill
                     pct={yearToPct(showYear)}
                     color={GOAL_COLORS[g.kind]}
@@ -281,7 +297,21 @@ function YearTapEdit({
   );
 }
 
-function Axis({ baseYear, lastYear, ticks }: { baseYear: number; lastYear: number; ticks: number[] }) {
+function Axis({
+  baseYear,
+  lastYear,
+  horizonYear,
+  ticks,
+}: {
+  baseYear: number;
+  lastYear: number;
+  horizonYear: number;
+  ticks: number[];
+}) {
+  const range = Math.max(1, lastYear - baseYear);
+  // When the axis extends past the projection horizon (to fit a retirement age
+  // or goal beyond it), mark where the simulator actually stops running.
+  const horizonPct = horizonYear < lastYear ? ((horizonYear - baseYear) / range) * 100 : null;
   return (
     <>
       <div
@@ -294,6 +324,19 @@ function Axis({ baseYear, lastYear, ticks }: { baseYear: number; lastYear: numbe
           background: "#cbd5e1",
         }}
       />
+      {horizonPct != null && (
+        <div
+          title={`Projection horizon (${horizonYear})`}
+          style={{
+            position: "absolute",
+            left: `${horizonPct}%`,
+            top: 0,
+            bottom: 0,
+            width: 1,
+            borderLeft: "1px dashed #cbd5e1",
+          }}
+        />
+      )}
       {ticks.map((y) => {
         const pct = ((y - baseYear) / Math.max(1, lastYear - baseYear)) * 100;
         return (

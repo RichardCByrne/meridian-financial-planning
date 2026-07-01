@@ -20,6 +20,7 @@ from app.engine.simulator import (
     IncomeInput,
     LiabilityAdjustmentInput,
     LiabilityInput,
+    LifePolicyInput,
     PersonInput,
     PlanInput,
     simulate,
@@ -33,6 +34,7 @@ from app.models import (
     Child,
     IncomeSource,
     Liability,
+    LifePolicy,
     Plan,
     Scenario,
     TaxConfigRow,
@@ -94,6 +96,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             dob=p.dob,
             is_primary=p.is_primary,
             life_expectancy=p.life_expectancy,
+            death_year=p.death_year,
             retirement_age=p.retirement_age,
             claims_rent_credit=p.claims_rent_credit,
             lump_sum_pct=p.lump_sum_pct,
@@ -264,6 +267,22 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         )
         for b in benefits_raw
     ]
+    life_policies_raw = list(
+        db.execute(select(LifePolicy).where(LifePolicy.plan_id == plan.id)).scalars()
+    )
+    life_policies = [
+        LifePolicyInput(
+            id=lp.id,
+            person_id=lp.person_id,
+            name=lp.name,
+            sum_assured=lp.sum_assured,
+            premium_annual=lp.premium_annual,
+            start_year=lp.start_year,
+            end_year=lp.end_year,
+            kind=lp.kind,
+        )
+        for lp in life_policies_raw
+    ]
     tax_config = _resolve_plan_tax_config(plan, db)
     return PlanInput(
         base_year=plan.base_year,
@@ -277,6 +296,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         bequests=bequests,
         children=children,
         benefits=benefits,
+        life_policies=life_policies,
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,

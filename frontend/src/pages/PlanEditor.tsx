@@ -17,6 +17,7 @@ import { IncomePane } from "./panes/IncomePane";
 import { ExpensesPane } from "./panes/ExpensesPane";
 import { AssetsPane } from "./panes/AssetsPane";
 import { LiabilitiesPane } from "./panes/LiabilitiesPane";
+import { ProtectionPane } from "./panes/ProtectionPane";
 import { GoalsPane } from "./panes/GoalsPane";
 import { TimelinePane } from "./panes/TimelinePane";
 import { LetsSeePane } from "./panes/LetsSeePane";
@@ -140,6 +141,7 @@ export function PlanEditorPage() {
         <Route path="expenses" element={<ExpensesPane planId={id} />} />
         <Route path="assets" element={<AssetsPane planId={id} />} />
         <Route path="liabilities" element={<LiabilitiesPane planId={id} />} />
+        <Route path="protection" element={<ProtectionPane planId={id} />} />
         <Route path="goals" element={<GoalsPane planId={id} />} />
         <Route path="scenarios" element={<ScenariosPane planId={id} />} />
         <Route path="compare" element={<ComparePane planId={id} />} />
@@ -307,6 +309,7 @@ function TabNav({ planId }: { planId: number }) {
       <TabLink to={`/plans/${planId}/expenses`}>Expenses</TabLink>
       <TabLink to={`/plans/${planId}/assets`}>Assets</TabLink>
       <TabLink to={`/plans/${planId}/liabilities`}>Liabilities</TabLink>
+      <TabLink to={`/plans/${planId}/protection`}>Protection</TabLink>
       <TabLink to={`/plans/${planId}/goals`}>Goals</TabLink>
       <TabLink to={`/plans/${planId}/scenarios`}>Scenarios</TabLink>
       <TabLink to={`/plans/${planId}/compare`}>Compare</TabLink>

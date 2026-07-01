@@ -54,6 +54,7 @@ export interface Person {
   dob: string; // ISO date
   is_primary: boolean;
   life_expectancy: number;
+  death_year: number | null;
   gender_for_state_pension: string | null;
   retirement_age: number | null;
   claims_rent_credit: boolean;
@@ -72,6 +73,7 @@ export interface PersonCreate {
   dob: string;
   is_primary?: boolean;
   life_expectancy?: number;
+  death_year?: number | null;
   gender_for_state_pension?: string | null;
   retirement_age?: number | null;
   claims_rent_credit?: boolean;
@@ -436,6 +438,32 @@ export interface BenefitCreate {
 
 export type BenefitUpdate = Partial<BenefitCreate>;
 
+export type LifePolicyKind = "term_life";
+
+export interface LifePolicy {
+  id: number;
+  plan_id: number;
+  person_id: number;
+  name: string;
+  kind: LifePolicyKind;
+  sum_assured: number;
+  premium_annual: number;
+  start_year: number;
+  end_year: number | null;
+}
+
+export interface LifePolicyCreate {
+  person_id: number;
+  name: string;
+  kind?: LifePolicyKind;
+  sum_assured?: number;
+  premium_annual?: number;
+  start_year: number;
+  end_year?: number | null;
+}
+
+export type LifePolicyUpdate = Partial<LifePolicyCreate>;
+
 export interface YearRow {
   year: number;
   ages: Record<number, number>;
@@ -472,6 +500,9 @@ export interface YearRow {
   estate_transfers: Record<number, number>;
   asset_contributions: number;
   benefits_in_kind_total: number;
+  protection_premiums_total: number;
+  life_cover_payout: number;
+  cover_gap: number;
 }
 
 export interface ProjectionSummary {

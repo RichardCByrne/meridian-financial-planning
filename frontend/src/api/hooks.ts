@@ -30,6 +30,9 @@ import type {
   Liability,
   LiabilityCreate,
   LiabilityUpdate,
+  LifePolicy,
+  LifePolicyCreate,
+  LifePolicyUpdate,
   Person,
   PersonCreate,
   PersonUpdate,
@@ -62,6 +65,7 @@ const keys = {
   bequests: (planId: number) => ["plan", planId, "bequests"] as const,
   children: (planId: number) => ["plan", planId, "children"] as const,
   benefits: (planId: number) => ["plan", planId, "benefits"] as const,
+  lifePolicies: (planId: number) => ["plan", planId, "life-policies"] as const,
   members: (planId: number) => ["plan", planId, "members"] as const,
   invites: (planId: number) => ["plan", planId, "invites"] as const,
   taxConfigs: () => ["tax-configs"] as const,
@@ -653,6 +657,54 @@ export function useDeleteBenefit(planId: number) {
     mutationFn: (id: number) => api.del(`/benefits/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.benefits(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+// ---------- Life policies (protection) ----------
+
+export function useLifePolicies(planId: number) {
+  return useQuery({
+    queryKey: keys.lifePolicies(planId),
+    queryFn: () => api.get<LifePolicy[]>(`/plans/${planId}/life-policies`),
+    enabled: Number.isFinite(planId),
+  });
+}
+
+export function useCreateLifePolicy(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (body: LifePolicyCreate) =>
+      api.post<LifePolicy>(`/plans/${planId}/life-policies`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.lifePolicies(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useUpdateLifePolicy(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: ({ id, body }: { id: number; body: LifePolicyUpdate }) =>
+      api.patch<LifePolicy>(`/life-policies/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.lifePolicies(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useDeleteLifePolicy(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (id: number) => api.del(`/life-policies/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.lifePolicies(planId) });
       invalidateProjection(qc, planId);
     },
   });

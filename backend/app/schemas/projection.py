@@ -49,6 +49,9 @@ class YearRowOut(BaseModel):
     asset_contributions: float = 0.0
     had_shortfall: bool = False
     benefits_in_kind_total: float = 0.0
+    protection_premiums_total: float = 0.0
+    life_cover_payout: float = 0.0
+    cover_gap: float = 0.0
 
 
 class MonteCarloYearRow(BaseModel):

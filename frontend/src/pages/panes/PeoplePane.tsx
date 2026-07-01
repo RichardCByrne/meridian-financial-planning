@@ -22,6 +22,7 @@ type FormState = {
   dob: string;
   is_primary: boolean;
   life_expectancy: number;
+  death_year: number | ""; // "" = die at life expectancy (no early death modelled)
   retirement_age: number | "";
   claims_rent_credit: boolean;
   lump_sum_pct: number; // whole-number percent, 0–25
@@ -37,6 +38,7 @@ const blankForm: FormState = {
   dob: "1990-01-01",
   is_primary: false,
   life_expectancy: 90,
+  death_year: "",
   retirement_age: 66,
   claims_rent_credit: false,
   lump_sum_pct: 25,
@@ -53,6 +55,7 @@ function fromPerson(p: Person): FormState {
     dob: p.dob,
     is_primary: p.is_primary,
     life_expectancy: p.life_expectancy,
+    death_year: p.death_year ?? "",
     retirement_age: p.retirement_age ?? "",
     claims_rent_credit: p.claims_rent_credit ?? false,
     lump_sum_pct: Math.round((p.lump_sum_pct ?? 0.25) * 1000) / 10,
@@ -86,6 +89,7 @@ export function PeoplePane({ planId }: { planId: number }) {
       dob: p.dob,
       is_primary: p.is_primary,
       life_expectancy: p.life_expectancy,
+      death_year: p.death_year,
       retirement_age: p.retirement_age,
       claims_rent_credit: p.claims_rent_credit,
       lump_sum_pct: p.lump_sum_pct,
@@ -111,6 +115,7 @@ export function PeoplePane({ planId }: { planId: number }) {
     dob: f.dob,
     is_primary: f.is_primary,
     life_expectancy: f.life_expectancy,
+    death_year: f.death_year === "" ? null : Number(f.death_year),
     retirement_age: f.retirement_age === "" ? null : Number(f.retirement_age),
     claims_rent_credit: f.claims_rent_credit,
     lump_sum_pct: Math.max(0, Math.min(0.25, f.lump_sum_pct / 100)),
@@ -356,6 +361,22 @@ function FormFields({
           integer
           value={form.life_expectancy}
           onChange={(v) => Number.isFinite(v) && setForm({ ...form, life_expectancy: v })}
+        />
+      </div>
+      <div className="field" style={{ flex: "1 1 110px", minWidth: 110 }}>
+        <label>
+          Dies in year
+          <HelpTip>
+            Optional protection what-if. Set a year to model this person dying early — their
+            income stops, their estate passes to survivors, and any term-life cover pays out.
+            Leave blank to die at life expectancy. Pair with the Protection tab to test cover.
+          </HelpTip>
+        </label>
+        <NumericInput
+          integer
+          placeholder="—"
+          value={form.death_year === "" ? NaN : form.death_year}
+          onChange={(v) => setForm({ ...form, death_year: Number.isFinite(v) ? v : "" })}
         />
       </div>
       <div className="field" style={{ flex: "1 1 110px", minWidth: 110 }}>

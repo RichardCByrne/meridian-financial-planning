@@ -7,6 +7,7 @@ once a real Firebase token lands in the Authorization header.
 
 from contextlib import contextmanager
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import get_current_user, grant_plan_membership
@@ -158,6 +159,17 @@ def test_unauthenticated_request_is_rejected_in_production_mode(monkeypatch):
         r = client.get("/api/plans")
         assert r.status_code == 401
         assert "bearer" in r.json()["detail"].lower()
+
+
+def test_startup_fails_fast_on_firebase_misconfig(monkeypatch):
+    """Prod mode with no service-account path must crash at boot, not per-request."""
+    monkeypatch.setattr("app.main.DEV_AUTH", False)
+    monkeypatch.setattr("app.auth.DEV_AUTH", False)
+    monkeypatch.setattr("app.auth._firebase_initialised", False)
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT_PATH", raising=False)
+    with pytest.raises(RuntimeError):
+        with TestClient(app):
+            pass
 
 
 def test_email_is_verified_gate():

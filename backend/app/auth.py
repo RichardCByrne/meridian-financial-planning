@@ -77,11 +77,15 @@ def _lookup_user(db: Session, firebase_uid: str) -> User | None:
 
 def _refresh_profile(db: Session, user: User, email: str | None, display_name: str | None) -> User:
     """Sync email / display name from Firebase if they've changed, then commit."""
+    changed = False
     if email and user.email != email:
         user.email = email
+        changed = True
     if display_name and user.display_name != display_name:
         user.display_name = display_name
-    db.commit()
+        changed = True
+    if changed:
+        db.commit()
     return user
 
 
@@ -94,7 +98,6 @@ def _find_or_create_user(
     user = _lookup_user(db, firebase_uid)
     if user is not None:
         return _refresh_profile(db, user, email, display_name)
-
     user = User(firebase_uid=firebase_uid, email=email, display_name=display_name)
     db.add(user)
     try:

@@ -273,6 +273,16 @@ def _apply_lightweight_migrations() -> None:
                     text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
                 )
 
+    # Unique index on users.email (Alembic 0027) — one account per email so a
+    # second provider links instead of duplicating. IF NOT EXISTS keeps it
+    # re-runnable; a dev SQLite file with only the seeded dev user has no
+    # duplicate emails to trip it.
+    if "users" in tables:
+        with engine.begin() as conn:
+            conn.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)")
+            )
+
     # Consolidate the legacy one-off-spend goal kinds into "spend" (Alembic
     # 0024). Idempotent — a no-op once migrated.
     if "goals" in tables:

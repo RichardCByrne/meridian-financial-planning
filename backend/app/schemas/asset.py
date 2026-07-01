@@ -18,7 +18,7 @@ _GROWTH_RATE = Field(default=0.04, ge=-0.5, le=1.0, allow_inf_nan=False)
 
 class AssetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    kind: str = Field(pattern="^(cash|deposit|investment_unwrapped|etf_fund|prsa|occupational_pension|arf|property_primary|property_btl)$")
+    kind: str = Field(pattern="^(cash|deposit|investment_unwrapped|etf_fund|investment_bond|prsa|occupational_pension|arf|property_primary|property_btl)$")
     value: float = Field(ge=0, allow_inf_nan=False)
     growth_rate: float = _GROWTH_RATE
     owner_person_id: int | None = None

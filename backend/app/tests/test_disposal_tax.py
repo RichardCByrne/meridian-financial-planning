@@ -137,3 +137,55 @@ def test_etf_deemed_disposal_at_year_8():
     # No deemed disposal in non-trigger years (e.g. year 5).
     other_row = next(r for r in rows if r.year == 2030)
     assert other_row.investment_tax == 0.0
+
+
+def test_investment_bond_exit_tax_on_disposal():
+    """Investment bond shares the ETF regime: 41% exit tax on the realised gain,
+    no CGT annual exemption. Need 5k net from 10k / 0 basis → G = 5000/0.59."""
+    plan = PlanInput(
+        base_year=2026,
+        projection_years=1,
+        people=[_person()],
+        incomes=[],
+        expenses=[
+            ExpenseInput(id=1, name="Trip", category="single_year",
+                         amount=5_000, start_year=2026, end_year=None, escalation_rate=0.0),
+        ],
+        assets=[
+            AssetInput(id=1, name="Bond", kind="investment_bond",
+                       value=10_000.0, growth_rate=0.0, cost_basis=0.0),
+        ],
+        assumptions=AssumptionsInput(),
+    )
+    r = simulate(plan)[0]
+    assert abs(r.withdrawals_by_asset[1] - 8_474.58) < 5
+    assert abs(r.investment_tax - 3_474.58) < 5
+
+
+def test_investment_bond_deemed_disposal_at_year_8():
+    plan = PlanInput(
+        base_year=2026,
+        projection_years=10,
+        people=[_person()],
+        incomes=[
+            IncomeInput(id=1, person_id=1, kind="employment", name="S",
+                        gross_amount=80_000, start_year=2026, end_year=None,
+                        escalation_rate=0.0, pays_prsi=True, pays_usc=True),
+        ],
+        expenses=[
+            ExpenseInput(id=1, name="L", category="basic", amount=20_000,
+                         start_year=2026, end_year=None, escalation_rate=0.0),
+        ],
+        assets=[
+            AssetInput(id=1, name="Cash", kind="cash", value=10_000, growth_rate=0.0, cost_basis=0.0),
+            AssetInput(id=2, name="Bond", kind="investment_bond",
+                       value=10_000.0, growth_rate=0.05, cost_basis=10_000.0,
+                       acquired_year=2026),
+        ],
+        assumptions=AssumptionsInput(),
+    )
+    rows = simulate(plan)
+    deemed_row = next(r for r in rows if r.year == 2034)
+    expected_tax = (10_000 * (1.05 ** 9) - 10_000) * 0.41
+    assert abs(deemed_row.investment_tax - expected_tax) < 50
+    assert any("deemed disposal" in n.lower() for n in deemed_row.notes)

@@ -34,6 +34,7 @@ SIGMA_BY_KIND: dict[str, float] = {
     "deposit": 0.005,
     "investment_unwrapped": 0.12,
     "etf_fund": 0.12,
+    "investment_bond": 0.12,
     "prsa": 0.10,
     "occupational_pension": 0.10,
     "arf": 0.10,
@@ -49,6 +50,7 @@ SIGMA_EARNINGS_GROWTH = 0.008
 KIND_TO_CLASS: dict[str, str] = {
     "investment_unwrapped": "equity",
     "etf_fund": "equity",
+    "investment_bond": "equity",
     "prsa": "equity",
     "occupational_pension": "equity",
     "arf": "equity",

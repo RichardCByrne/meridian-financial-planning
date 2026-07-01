@@ -25,7 +25,7 @@ const NO_CONTRIB_KINDS: AssetKind[] = ["arf"];  // post-retirement drawdown only
 
 const KIND_GROUPS: { label: string; kinds: AssetKind[] }[] = [
   { label: "Cash & deposits", kinds: ["cash", "deposit"] },
-  { label: "Investments", kinds: ["investment_unwrapped", "etf_fund"] },
+  { label: "Investments", kinds: ["investment_unwrapped", "etf_fund", "investment_bond"] },
   { label: "Pensions", kinds: ["prsa", "occupational_pension", "arf"] },
   { label: "Property", kinds: ["property_primary", "property_btl"] },
 ];
@@ -49,6 +49,12 @@ const KINDS: { value: AssetKind; label: string; defaultGrowth: number; help?: st
     label: "ETF / fund (41% exit tax)",
     defaultGrowth: 0.05,
     help: "Irish/EU UCITS ETFs and unit-linked funds. Gains taxed at 41% exit tax, with deemed disposal every 8 years even if not sold.",
+  },
+  {
+    value: "investment_bond",
+    label: "Investment bond (41% exit tax)",
+    defaultGrowth: 0.05,
+    help: "Life-assurance investment bond (gross roll-up). Same regime as ETFs: gains taxed at 41% exit tax with an 8-year deemed disposal, no CGT annual exemption.",
   },
   {
     value: "prsa",

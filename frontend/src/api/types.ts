@@ -188,6 +188,7 @@ export type AssetKind =
   | "deposit"
   | "investment_unwrapped"
   | "etf_fund"
+  | "investment_bond"
   | "prsa"
   | "occupational_pension"
   | "arf"

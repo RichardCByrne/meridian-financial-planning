@@ -128,7 +128,10 @@ def get_current_user(
     try:
         from firebase_admin import auth as fb_auth
 
-        decoded = fb_auth.verify_id_token(token)
+        # check_revoked=True adds a Firebase round-trip but ensures signed-out,
+        # disabled, or password-reset accounts stop working immediately instead
+        # of remaining valid until the token's ~1h natural expiry.
+        decoded = fb_auth.verify_id_token(token, check_revoked=True)
     except Exception as e:  # noqa: BLE001
         logger.info("Token verification failed: %s", e)
         raise HTTPException(

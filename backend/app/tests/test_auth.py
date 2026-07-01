@@ -160,6 +160,29 @@ def test_unauthenticated_request_is_rejected_in_production_mode(monkeypatch):
         assert "bearer" in r.json()["detail"].lower()
 
 
+def test_token_verification_checks_revocation(monkeypatch):
+    """Tokens are verified with check_revoked=True so revoked sessions are rejected."""
+    import firebase_admin.auth as fb_auth
+
+    monkeypatch.setattr("app.auth.DEV_AUTH", False)
+    monkeypatch.setattr("app.auth._ensure_firebase_initialised", lambda: None)
+
+    captured = {}
+
+    def fake_verify(token, **kwargs):
+        captured["token"] = token
+        captured["kwargs"] = kwargs
+        return {"uid": "revoke-uid", "email": "r@example.com", "email_verified": True}
+
+    monkeypatch.setattr(fb_auth, "verify_id_token", fake_verify)
+
+    with TestClient(app) as client:
+        r = client.get("/api/plans", headers={"Authorization": "Bearer sometoken"})
+        assert r.status_code == 200
+        assert captured["token"] == "sometoken"
+        assert captured["kwargs"].get("check_revoked") is True
+
+
 def test_email_is_verified_gate():
     """Unverified email tokens are rejected; verified / email-less pass."""
     from app.auth import _email_is_verified

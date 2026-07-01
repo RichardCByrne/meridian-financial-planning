@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import Base
+from app.models import TaxConfigRow
 
 T = TypeVar("T", bound=Base)
 
@@ -18,3 +19,23 @@ def get_or_404(model: type[T], pk: int, db: Session, *, name: str | None = None)
     if obj is None:
         raise HTTPException(status_code=404, detail=f"{name or model.__name__} not found")
     return obj
+
+
+def assert_tax_config_accessible(
+    tax_config_id: int | None, user_id: int, db: Session
+) -> None:
+    """Guard a plan's `tax_config_id` write.
+
+    A plan may only pin the seeded official config or one the caller owns.
+    Without this, a user could point their plan at another user's private
+    TaxConfigRow and infer its private band/rate values from projection output.
+
+    `None` (no pin) is always allowed. Raises 404 — not 403 — for a config the
+    caller can't use, matching the enumeration-safe convention used elsewhere:
+    don't reveal that someone else's config id exists.
+    """
+    if tax_config_id is None:
+        return
+    row = db.get(TaxConfigRow, tax_config_id)
+    if row is None or not (row.is_official or row.created_by_user_id == user_id):
+        raise HTTPException(status_code=404, detail="Tax config not found")

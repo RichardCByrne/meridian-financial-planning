@@ -16,6 +16,7 @@ from app.routers import (
     benefits,
     bequests,
     children,
+    db_pensions,
     expenses,
     goals,
     income,
@@ -456,6 +457,7 @@ app.include_router(expenses.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(liabilities.router, prefix="/api")
 app.include_router(life_policies.router, prefix="/api")
+app.include_router(db_pensions.router, prefix="/api")
 app.include_router(goals.router, prefix="/api")
 app.include_router(scenarios.router, prefix="/api")
 app.include_router(members.router, prefix="/api")

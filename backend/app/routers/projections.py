@@ -18,6 +18,7 @@ from app.engine.simulator import (
     ExpenseInput,
     GoalInput,
     IncomeInput,
+    DBPensionInput,
     LiabilityAdjustmentInput,
     LiabilityInput,
     LifePolicyInput,
@@ -33,6 +34,7 @@ from app.models import (
     Bequest,
     Child,
     IncomeSource,
+    DBPension,
     Liability,
     LifePolicy,
     Plan,
@@ -283,6 +285,23 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         )
         for lp in life_policies_raw
     ]
+    db_pensions_raw = list(
+        db.execute(select(DBPension).where(DBPension.plan_id == plan.id)).scalars()
+    )
+    db_pensions = [
+        DBPensionInput(
+            id=dp.id,
+            person_id=dp.person_id,
+            name=dp.name,
+            accrual_rate=dp.accrual_rate,
+            service_years=dp.service_years,
+            final_salary=dp.final_salary,
+            revaluation_rate=dp.revaluation_rate,
+            normal_retirement_age=dp.normal_retirement_age,
+            tax_free_lump_sum=dp.tax_free_lump_sum,
+        )
+        for dp in db_pensions_raw
+    ]
     tax_config = _resolve_plan_tax_config(plan, db)
     return PlanInput(
         base_year=plan.base_year,
@@ -297,6 +316,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
         children=children,
         benefits=benefits,
         life_policies=life_policies,
+        db_pensions=db_pensions,
         assumptions=assumptions,
         tax_config=tax_config,
         filing_status=plan.filing_status,

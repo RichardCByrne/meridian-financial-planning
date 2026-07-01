@@ -28,6 +28,7 @@ from app.models import (
     IncomeSource,
     Liability,
     LiabilityAdjustment,
+    DBPension,
     LifePolicy,
     Person,
     Plan,
@@ -128,6 +129,13 @@ def serialise_plan(plan: Plan) -> dict[str, Any]:
                 "_person_local_id": lp.person_id,
             }
             for lp in plan.life_policies
+        ],
+        "db_pensions": [
+            {
+                **_strip_ids(_columns(dp), drop=["id", "plan_id", "person_id"]),
+                "_person_local_id": dp.person_id,
+            }
+            for dp in plan.db_pensions
         ],
         "children": [
             {
@@ -237,6 +245,12 @@ def hydrate_plan(payload: dict[str, Any], db: Session, *, name_override: str | N
         person_id = person_id_map.get(person_local) if person_local is not None else None
         if person_id is not None:
             db.add(LifePolicy(**lp_payload, plan_id=plan.id, person_id=person_id))
+
+    for dp_payload in payload.get("db_pensions", []):
+        person_local = dp_payload.pop("_person_local_id", None)
+        person_id = person_id_map.get(person_local) if person_local is not None else None
+        if person_id is not None:
+            db.add(DBPension(**dp_payload, plan_id=plan.id, person_id=person_id))
 
     for c_payload in payload.get("children", []):
         carer_local = c_payload.pop("_carer_local_id", None)

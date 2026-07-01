@@ -235,6 +235,24 @@ class LifePolicyInput:
 
 
 @dataclass
+class DBPensionInput:
+    """Defined-benefit / final-salary pension for one person. Pays a guaranteed
+    annual income from normal_retirement_age = accrual_rate × service_years ×
+    final_salary, indexed by revaluation_rate (deferment + in payment). Taxed as
+    PAYE income, PRSI-exempt (like an ARF or annuity). An optional
+    tax_free_lump_sum is paid to cash at retirement."""
+    id: int
+    person_id: int
+    name: str
+    accrual_rate: float
+    service_years: float
+    final_salary: float
+    revaluation_rate: float = 0.0
+    normal_retirement_age: int = 65
+    tax_free_lump_sum: float = 0.0
+
+
+@dataclass
 class GoalInput:
     id: int
     kind: str
@@ -294,6 +312,7 @@ class PlanInput:
     children: list[ChildInput] = field(default_factory=list)
     benefits: list[BenefitInput] = field(default_factory=list)
     life_policies: list[LifePolicyInput] = field(default_factory=list)
+    db_pensions: list[DBPensionInput] = field(default_factory=list)
     # Tax-rule constants. None = use IRELAND_2026_OFFICIAL.
     tax_config: TaxConfig | None = None
     # Filing status override. None → auto (1 person → single, 2+ → married).
@@ -349,6 +368,7 @@ class YearRow:
     pension_lump_sum_tax: float = 0.0
     arf_drawdowns: float = 0.0
     state_pension_total: float = 0.0
+    db_pension_total: float = 0.0
     goal_status: dict[int, str] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     cat_paid: float = 0.0
@@ -948,6 +968,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         pension_lump_sum_tax_total = 0.0
         arf_drawdowns_total = 0.0
         state_pension_total = 0.0
+        db_pension_total = 0.0
         benefits_in_kind_total = 0.0
 
         for person in plan.people:
@@ -1163,6 +1184,32 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                         income_by_kind.get("state_pension", 0.0) + state_pension_amt
                     )
 
+            # 3e-i. Defined-benefit / final-salary pension income. Guaranteed
+            # annual income from the scheme's normal retirement age, computed as
+            # accrual_rate × service_years × final_salary and indexed by
+            # revaluation_rate (deferment + in payment). PAYE-taxed, PRSI-exempt.
+            # An optional tax-free lump sum lands in cash in the retirement year.
+            db_pension_amt = 0.0
+            for dp in plan.db_pensions:
+                if dp.person_id != person.id:
+                    continue
+                start_year = person.dob.year + dp.normal_retirement_age
+                if year < start_year:
+                    continue
+                base = dp.accrual_rate * dp.service_years * dp.final_salary
+                db_pension_amt += base * (1.0 + dp.revaluation_rate) ** max(0, year - plan.base_year)
+                if year == start_year and dp.tax_free_lump_sum > 0:
+                    states[_cash_target()].balance += dp.tax_free_lump_sum
+                    notes.append(
+                        f"{person.name}'s DB pension '{dp.name}' starts: tax-free lump sum "
+                        f"EUR {dp.tax_free_lump_sum:,.0f}."
+                    )
+            if db_pension_amt > 0:
+                db_pension_total += db_pension_amt
+                income_by_kind["db_pension"] = (
+                    income_by_kind.get("db_pension", 0.0) + db_pension_amt
+                )
+
             # 3e-ii. Annuity income (paid every year once an annuity is bought) and
             # one-off taxable cash drawdown (taxable_lump_sum option, retirement year).
             # Both are PAYE-taxed pension income, PRSI-exempt like ARF/state pension.
@@ -1207,7 +1254,9 @@ def simulate(plan: PlanInput) -> list[YearRow]:
             benefits_in_kind_total += person_bik_total
 
             # 3f. Tax computation.
-            pension_income = arf_drawdown + state_pension_amt + annuity_amt + taxable_cash
+            pension_income = (
+                arf_drawdown + state_pension_amt + annuity_amt + taxable_cash + db_pension_amt
+            )
             taxable_for_it = (
                 max(0.0, earned_for_it - pension_contribution) + pension_income + person_bik_total
             )
@@ -1618,6 +1667,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 pension_lump_sum_tax=round(pension_lump_sum_tax_total, 2),
                 arf_drawdowns=round(arf_drawdowns_total, 2),
                 state_pension_total=round(state_pension_total, 2),
+                db_pension_total=round(db_pension_total, 2),
                 goal_status=goal_status,
                 notes=notes,
                 cat_paid=round(cat_paid_year, 2),

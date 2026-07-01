@@ -149,6 +149,9 @@ class Plan(Base):
     life_policies: Mapped[list["LifePolicy"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"
     )
+    db_pensions: Mapped[list["DBPension"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan"
+    )
 
 
 class Benefit(Base):
@@ -212,6 +215,35 @@ class LifePolicy(Base):
     end_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     plan: Mapped[Plan] = relationship(back_populates="life_policies")
+
+
+class DBPension(Base):
+    """A defined-benefit / final-salary pension promise for one person. Pays a
+    guaranteed annual income from normal_retirement_age, computed as
+    accrual_rate × service_years × final_salary and indexed by revaluation_rate
+    (deferment + in payment). Taxed as PAYE income, PRSI-exempt (like an ARF or
+    annuity). An optional tax_free_lump_sum is paid to cash at retirement.
+    """
+
+    __tablename__ = "db_pensions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Accrual fraction earned per year of service (e.g. 1/60 ≈ 0.016667).
+    accrual_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    service_years: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    final_salary: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Indexation applied both in deferment (to retirement) and in payment.
+    revaluation_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    normal_retirement_age: Mapped[int] = mapped_column(Integer, default=65, nullable=False)
+    # Optional tax-free lump sum paid at normal_retirement_age (0 = none).
+    tax_free_lump_sum: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    plan: Mapped[Plan] = relationship(back_populates="db_pensions")
 
 
 class Child(Base):
@@ -561,6 +593,7 @@ __all__ = [
     "Bequest",
     "Benefit",
     "LifePolicy",
+    "DBPension",
     "Child",
     "PLAN_ROLES",
     "register_all_models",

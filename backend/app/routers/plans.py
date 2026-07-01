@@ -28,6 +28,7 @@ def _load_plan_with_children(plan_id: int, db: Session) -> Plan:
             selectinload(Plan.bequests),
             selectinload(Plan.benefits),
             selectinload(Plan.life_policies),
+            selectinload(Plan.db_pensions),
             selectinload(Plan.children),
             selectinload(Plan.assumptions),
         )

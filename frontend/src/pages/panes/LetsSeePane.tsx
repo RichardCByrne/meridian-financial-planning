@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -397,6 +398,14 @@ export function LetsSeePane({ planId }: { planId: number }) {
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <h3 style={{ margin: 0 }}>Let's see</h3>
           <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <Link
+              to={`/plans/${planId}/report`}
+              className="btn btn-secondary"
+              title="Open a printable report and save it as a PDF"
+              style={{ textAlign: "center" }}
+            >
+              Export PDF
+            </Link>
             <button
               className={`btn ${realMode ? "" : "btn-secondary"}`}
               onClick={onToggleReal}

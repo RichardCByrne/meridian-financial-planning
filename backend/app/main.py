@@ -167,6 +167,14 @@ def _apply_lightweight_migrations() -> None:
                         "onboarding_complete BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
+        if "trim_discretionary_on_shortfall" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE plans ADD COLUMN "
+                        "trim_discretionary_on_shortfall BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
     if "people" in tables:
         cols = {c["name"] for c in insp.get_columns("people")}
         if "claims_rent_credit" not in cols:

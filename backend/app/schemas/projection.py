@@ -49,6 +49,7 @@ class YearRowOut(BaseModel):
     estate_transfers: dict[int, float] = {}
     asset_contributions: float = 0.0
     had_shortfall: bool = False
+    discretionary_trimmed: float = 0.0
     benefits_in_kind_total: float = 0.0
     protection_premiums_total: float = 0.0
     life_cover_payout: float = 0.0

@@ -112,6 +112,11 @@ class Plan(Base):
     # started wizard tasks). Lets the UI skip the first-run stepper outright
     # instead of computing completion on every load (which caused a brief flash).
     onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Needs-vs-wants floor: when true, a year that can't be fully funded trims
+    # discretionary spending before declaring a shortfall (essentials protected).
+    trim_discretionary_on_shortfall: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     people: Mapped[list["Person"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"

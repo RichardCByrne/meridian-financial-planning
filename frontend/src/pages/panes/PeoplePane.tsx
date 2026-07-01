@@ -142,6 +142,7 @@ export function PeoplePane({ planId }: { planId: number }) {
 
   const autoStatus = (people?.length ?? 0) >= 2 ? "married" : "single";
   const filingValue = plan?.filing_status ?? "auto";
+  const trimDiscretionary = plan?.trim_discretionary_on_shortfall ?? false;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +178,25 @@ export function PeoplePane({ planId }: { planId: number }) {
               <option value="married">Married / civil partnership</option>
               <option value="cohabiting">Cohabiting (taxed as singles)</option>
             </select>
+          </div>
+          <div className="field" style={{ flex: 1, maxWidth: 360 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={trimDiscretionary}
+                disabled={updatePlan.isPending}
+                onChange={(e) =>
+                  updatePlan.mutate({ trim_discretionary_on_shortfall: e.target.checked })
+                }
+                style={{ width: "auto" }}
+              />
+              Protect essentials (trim wants when short)
+              <HelpTip>
+                When a year can't be fully funded from income and liquid assets, cut discretionary
+                spending before declaring a shortfall — so a shortfall only means essential (basic)
+                spending went unmet. Off = spend the full budget and flag a shortfall if assets run out.
+              </HelpTip>
+            </label>
           </div>
           <div style={{ paddingBottom: 8 }}>
             <span

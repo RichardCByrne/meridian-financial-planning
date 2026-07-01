@@ -11,6 +11,7 @@ export interface Plan {
   tax_config_id: number | null;
   filing_status: FilingStatus | null;
   onboarding_complete: boolean;
+  trim_discretionary_on_shortfall: boolean;
 }
 
 export interface PlanCreate {
@@ -28,6 +29,7 @@ export interface PlanUpdate {
   tax_config_id?: number | null;
   filing_status?: FilingStatus | null;
   onboarding_complete?: boolean;
+  trim_discretionary_on_shortfall?: boolean;
 }
 
 export interface TaxConfigSummary {
@@ -535,6 +537,7 @@ export interface YearRow {
   estate_transfers: Record<number, number>;
   asset_contributions: number;
   had_shortfall: boolean;
+  discretionary_trimmed: number;
   benefits_in_kind_total: number;
   protection_premiums_total: number;
   life_cover_payout: number;

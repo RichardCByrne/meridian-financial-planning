@@ -142,6 +142,9 @@ class Plan(Base):
     benefits: Mapped[list["Benefit"]] = relationship(
         back_populates="plan", cascade="all, delete-orphan"
     )
+    life_policies: Mapped[list["LifePolicy"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan"
+    )
 
 
 class Benefit(Base):
@@ -179,6 +182,32 @@ class Benefit(Base):
     relief_children: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     plan: Mapped[Plan] = relationship(back_populates="benefits")
+
+
+class LifePolicy(Base):
+    """A protection policy on one person (the insured). Currently term life:
+    while in force (start_year..end_year) the plan pays `premium_annual` out of
+    cash; if the insured dies within the term, `sum_assured` pays out tax-free
+    to the survivors' cash. `kind` is reserved for future protection types
+    (income protection / serious illness) but only "term_life" pays out today.
+    """
+
+    __tablename__ = "life_policies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(40), default="term_life", nullable=False)
+    sum_assured: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    premium_annual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    start_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NULL end_year = whole-of-life / open-ended cover.
+    end_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    plan: Mapped[Plan] = relationship(back_populates="life_policies")
 
 
 class Child(Base):
@@ -224,6 +253,12 @@ class Person(Base):
     dob: Mapped[date] = mapped_column(Date, nullable=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     life_expectancy: Mapped[int] = mapped_column(Integer, default=90, nullable=False)
+    # Optional planned/what-if death year (protection modelling). When set and
+    # earlier than the natural life_expectancy year, the person dies then — their
+    # income and BIK stop, pensions/estate transfer to survivors (CAT via the
+    # existing estate machinery), and any in-force term-life policy pays out.
+    # NULL = die at life_expectancy as before.
+    death_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gender_for_state_pension: Mapped[str | None] = mapped_column(String(10), nullable=True)
     retirement_age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Phase 14: rent tax credit (€1,000/yr from Budget 2024) — only applies to
@@ -521,6 +556,7 @@ __all__ = [
     "TaxConfigRow",
     "Bequest",
     "Benefit",
+    "LifePolicy",
     "Child",
     "PLAN_ROLES",
     "register_all_models",

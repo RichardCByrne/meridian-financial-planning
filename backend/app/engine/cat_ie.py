@@ -46,3 +46,17 @@ def compute_cat(
     already_above = max(0.0, prior_lifetime_receipts - threshold)
     marginal_taxable = max(0.0, taxable_total - already_above)
     return round(marginal_taxable * tax_config.cat_rate, 2)
+
+
+def apply_section72(cat_due: float, policy_payout: float) -> tuple[float, float]:
+    """Apply a Revenue-approved Section 72 life-assurance policy against a CAT
+    bill. Proceeds used to pay the inheritance CAT are exempt from CAT; the
+    relief caps at the CAT due. Any proceeds beyond the bill are excess (in
+    reality themselves CAT-able — the caller decides what to do with it).
+
+    Returns (cat_after_relief, excess).
+    """
+    cat_due = max(0.0, cat_due)
+    payout = max(0.0, policy_payout)
+    relief = min(cat_due, payout)
+    return round(cat_due - relief, 2), round(payout - relief, 2)

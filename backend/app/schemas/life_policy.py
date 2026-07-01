@@ -1,8 +1,10 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-# Only term life is modelled today; the column/enum leaves room for income
-# protection and serious illness later without a migration.
-_KIND = Field(default="term_life", pattern="^(term_life)$")
+# term_life pays survivors on death within the term; section_72 is a Revenue-
+# approved policy whose proceeds pay inheritance CAT tax-free. Income protection
+# / serious illness can join later without a migration.
+_KIND_PATTERN = "^(term_life|section_72)$"
+_KIND = Field(default="term_life", pattern=_KIND_PATTERN)
 
 
 class LifePolicyCreate(BaseModel):
@@ -18,7 +20,7 @@ class LifePolicyCreate(BaseModel):
 class LifePolicyUpdate(BaseModel):
     person_id: int | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    kind: str | None = Field(default=None, pattern="^(term_life)$")
+    kind: str | None = Field(default=None, pattern=_KIND_PATTERN)
     sum_assured: float | None = Field(default=None, ge=0.0, allow_inf_nan=False)
     premium_annual: float | None = Field(default=None, ge=0.0, allow_inf_nan=False)
     start_year: int | None = Field(default=None, ge=1900, le=2200)

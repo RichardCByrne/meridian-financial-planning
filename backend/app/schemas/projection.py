@@ -52,6 +52,7 @@ class YearRowOut(BaseModel):
     protection_premiums_total: float = 0.0
     life_cover_payout: float = 0.0
     cover_gap: float = 0.0
+    section72_cat_relief: float = 0.0
 
 
 class MonteCarloYearRow(BaseModel):

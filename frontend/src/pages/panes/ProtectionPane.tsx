@@ -7,7 +7,7 @@ import {
   usePeople,
   useUpdateLifePolicy,
 } from "../../api/hooks";
-import type { LifePolicy, LifePolicyCreate } from "../../api/types";
+import type { LifePolicy, LifePolicyCreate, LifePolicyKind } from "../../api/types";
 import { EditModal } from "../../components/EditModal";
 import { EmptyState } from "../../components/EmptyState";
 import { HelpTip } from "../../components/HelpTip";
@@ -15,9 +15,17 @@ import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { fmtMoney } from "../../lib/format";
 import { useSoftDelete } from "../../lib/useSoftDelete";
 
+const KIND_LABELS: Record<LifePolicyKind, string> = {
+  term_life: "Term life",
+  section_72: "Section 72 (CAT)",
+};
+
+const KIND_OPTIONS = Object.entries(KIND_LABELS) as [LifePolicyKind, string][];
+
 type FormState = {
   person_id: number | "";
   name: string;
+  kind: LifePolicyKind;
   sum_assured: number;
   premium_annual: number;
   start_year: number;
@@ -27,6 +35,7 @@ type FormState = {
 const blankForm: FormState = {
   person_id: "",
   name: "",
+  kind: "term_life",
   sum_assured: 200_000,
   premium_annual: 600,
   start_year: new Date().getFullYear(),
@@ -37,6 +46,7 @@ function fromPolicy(p: LifePolicy): FormState {
   return {
     person_id: p.person_id,
     name: p.name,
+    kind: p.kind,
     sum_assured: p.sum_assured,
     premium_annual: p.premium_annual,
     start_year: p.start_year,
@@ -66,6 +76,7 @@ export function ProtectionPane({ planId }: { planId: number }) {
     toPayload: (p) => ({
       person_id: p.person_id,
       name: p.name,
+      kind: p.kind,
       sum_assured: p.sum_assured,
       premium_annual: p.premium_annual,
       start_year: p.start_year,
@@ -84,6 +95,7 @@ export function ProtectionPane({ planId }: { planId: number }) {
   const buildPayload = (f: FormState): LifePolicyCreate => ({
     person_id: f.person_id === "" ? 0 : Number(f.person_id),
     name: f.name.trim(),
+    kind: f.kind,
     sum_assured: Math.max(0, f.sum_assured),
     premium_annual: Math.max(0, f.premium_annual),
     start_year: f.start_year,
@@ -109,13 +121,14 @@ export function ProtectionPane({ planId }: { planId: number }) {
     <div>
       <div className="card">
         <h3 style={{ marginTop: 0 }}>
-          Add life cover
+          Add protection policy
           <HelpTip>
-            Term-life protection on one person. While the cover runs the plan pays the annual
-            premium out of cash. If that person dies within the term, the sum assured pays out
-            tax-free to the survivors — offsetting the loss of their income and helping clear
-            any outstanding debt. Model the death itself with a “dies in year” on the People tab,
-            then see whether the cover closes the gap.
+            Cover on one person, paid for by an annual premium out of cash while in force.
+            <b> Term life</b> pays the sum assured tax-free to survivors if the insured dies
+            within the term — offsetting lost income and clearing debt. <b>Section 72</b> is a
+            Revenue-approved policy whose proceeds pay the inheritance CAT tax-free, so heirs
+            keep the estate instead of selling assets to fund the bill. Model the death itself
+            with a “dies in year” on the People tab, then see whether the cover closes the gap.
           </HelpTip>
         </h3>
         <form onSubmit={onSubmit}>
@@ -143,6 +156,7 @@ export function ProtectionPane({ planId }: { planId: number }) {
             columns={[
               { header: "Name", cell: (p) => p.name, hideOnMobile: true },
               { header: "Insured", cell: (p) => personName(p.person_id) },
+              { header: "Kind", cell: (p) => KIND_LABELS[p.kind] },
               { header: "Sum assured", cell: (p) => fmtMoney(p.sum_assured) },
               { header: "Premium/yr", cell: (p) => fmtMoney(p.premium_annual) },
               { header: "Term", cell: (p) => `${p.start_year}–${p.end_year ?? "∞"}` },
@@ -223,13 +237,36 @@ function PolicyFields({
             ))}
           </select>
         </div>
+        <div className="field" style={{ flex: "1 1 160px", minWidth: 160 }}>
+          <label>
+            Kind
+            <HelpTip>
+              Term life pays survivors on death within the term. Section 72 is a Revenue-approved
+              policy whose proceeds pay the inheritance CAT tax-free.
+            </HelpTip>
+          </label>
+          <select
+            value={form.kind}
+            onChange={(e) => setForm({ ...form, kind: e.target.value as LifePolicyKind })}
+          >
+            {KIND_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
         <div className="field" style={{ flex: "1 1 160px", minWidth: 160 }}>
           <label>
             Sum assured (€)
-            <HelpTip>The tax-free lump sum paid to survivors if the insured dies within the term.</HelpTip>
+            <HelpTip>
+              {form.kind === "section_72"
+                ? "Cover amount — the proceeds available to pay inheritance CAT tax-free."
+                : "The tax-free lump sum paid to survivors if the insured dies within the term."}
+            </HelpTip>
           </label>
           <input
             type="number"

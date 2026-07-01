@@ -42,7 +42,7 @@ export function PlanEditorPage() {
   if (isLoading) return <p className="muted">Loading…</p>;
   if (error || !plan)
     return (
-      <p style={{ color: "#dc2626" }}>
+      <p style={{ color: "var(--loss)" }}>
         Couldn't load plan. <Link to="/plans">Back to plans</Link>
       </p>
     );
@@ -201,14 +201,14 @@ function FirstRunStepper({ planId }: { planId: number }) {
   return (
     <div
       style={{
-        background: "#f1f5f9",
-        border: "1px solid #e2e8f0",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
         borderRadius: 8,
         padding: "10px 14px",
         marginBottom: 12,
       }}
     >
-      <div style={{ fontSize: 13, color: "#475569", marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
         <strong>Getting started ({doneCount}/{steps.length}).</strong> Add the basics to see your
         projection.
       </div>
@@ -233,9 +233,9 @@ function FirstRunStepper({ planId }: { planId: number }) {
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 999,
-                background: s.done ? "#dcfce7" : "white",
-                color: s.done ? "#166534" : "#1e293b",
-                border: `1px solid ${s.done ? "#86efac" : "#cbd5e1"}`,
+                background: s.done ? "var(--accent-tint)" : "var(--surface)",
+                color: s.done ? "var(--accent)" : "var(--ink)",
+                border: `1px solid ${s.done ? "var(--accent)" : "var(--line)"}`,
                 textDecoration: "none",
                 fontSize: 13,
                 fontWeight: 500,
@@ -250,7 +250,7 @@ function FirstRunStepper({ planId }: { planId: number }) {
                   width: 18,
                   height: 18,
                   borderRadius: "50%",
-                  background: s.done ? "#22c55e" : "#cbd5e1",
+                  background: s.done ? "var(--accent)" : "var(--muted)",
                   color: "white",
                   fontSize: 11,
                   fontWeight: 700,
@@ -387,8 +387,8 @@ function SaveIndicator({ planId }: { planId: number }) {
     return (
       <span
         style={{
-          background: "#fef3c7",
-          color: "#92400e",
+          background: "var(--line-soft)",
+          color: "var(--muted)",
           padding: "2px 8px",
           borderRadius: 999,
           fontSize: 11,
@@ -403,8 +403,8 @@ function SaveIndicator({ planId }: { planId: number }) {
     return (
       <span
         style={{
-          background: "#dcfce7",
-          color: "#166534",
+          background: "var(--accent-tint)",
+          color: "var(--accent)",
           padding: "2px 8px",
           borderRadius: 999,
           fontSize: 11,

@@ -226,3 +226,104 @@ def test_db_pension_survives_clone():
         assert pensions[0]["final_salary"] == 55_000
         assert pensions[0]["tax_free_lump_sum"] == 80_000
         assert pensions[0]["person_id"] == new_people[0]["id"]
+
+
+def _seed_two_person_plan_with_bequest_and_benefit(client: TestClient) -> tuple[int, int, int]:
+    """Plan with two people, a bequest from A→B, and a medical-insurance BIK on A.
+
+    Returns (plan_id, person_a_id, person_b_id).
+    """
+    pid = client.post(
+        "/api/plans",
+        json={"name": "Estate household", "base_year": 2026, "projection_years": 10},
+    ).json()["id"]
+    a = client.post(
+        f"/api/plans/{pid}/people",
+        json={"name": "Aoife", "dob": "1980-01-01", "is_primary": True, "death_year": 2050},
+    ).json()
+    b = client.post(
+        f"/api/plans/{pid}/people",
+        json={"name": "Cormac", "dob": "1982-01-01", "is_primary": False},
+    ).json()
+    client.post(
+        f"/api/plans/{pid}/bequests",
+        json={
+            "from_person_id": a["id"],
+            "to_person_id": b["id"],
+            "cat_group": "A",
+            "share_pct": 1.0,
+        },
+    )
+    client.post(
+        f"/api/plans/{pid}/benefits",
+        json={
+            "person_id": a["id"],
+            "kind": "medical_insurance",
+            "name": "VHI",
+            "start_year": 2026,
+            "amount": 1_400,
+        },
+    )
+    return pid, a["id"], b["id"]
+
+
+def test_bequest_survives_export_import_with_person_remap():
+    """Covers the bequest re-linking branch in serialisation (from/to person ids
+    resolved through person_id_map on import)."""
+    with TestClient(app) as client:
+        src_id, _, _ = _seed_two_person_plan_with_bequest_and_benefit(client)
+        export = client.get(f"/api/plans/{src_id}/export").json()
+        assert len(export["bequests"]) == 1
+        beq = export["bequests"][0]
+        # FK columns stripped, local-id links present for re-mapping.
+        assert "from_person_id" not in beq
+        assert "to_person_id" not in beq
+        assert "_from_person_local_id" in beq
+        assert "_to_person_local_id" in beq
+
+        imported = client.post("/api/plans/import", json=export).json()
+        new_id = imported["id"]
+        new_bequests = client.get(f"/api/plans/{new_id}/bequests").json()
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        names = {p["id"]: p["name"] for p in new_people}
+        assert len(new_bequests) == 1
+        # from/to remapped onto the imported plan's own people, not stale source ids.
+        assert names[new_bequests[0]["from_person_id"]] == "Aoife"
+        assert names[new_bequests[0]["to_person_id"]] == "Cormac"
+        assert new_bequests[0]["share_pct"] == 1.0
+
+
+def test_benefit_survives_export_import_with_person_remap():
+    """Covers the benefit re-linking branch in serialisation."""
+    with TestClient(app) as client:
+        src_id, _, _ = _seed_two_person_plan_with_bequest_and_benefit(client)
+        export = client.get(f"/api/plans/{src_id}/export").json()
+        assert len(export["benefits"]) == 1
+        ben = export["benefits"][0]
+        assert "person_id" not in ben
+        assert "_person_local_id" in ben
+
+        imported = client.post("/api/plans/import", json=export).json()
+        new_id = imported["id"]
+        new_benefits = client.get(f"/api/plans/{new_id}/benefits").json()
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        names = {p["id"]: p["name"] for p in new_people}
+        assert len(new_benefits) == 1
+        assert new_benefits[0]["kind"] == "medical_insurance"
+        # person_id remapped onto the imported plan's own person.
+        assert names[new_benefits[0]["person_id"]] == "Aoife"
+
+
+def test_bequest_and_benefit_survive_clone():
+    with TestClient(app) as client:
+        src_id, _, _ = _seed_two_person_plan_with_bequest_and_benefit(client)
+        new_id = client.post(f"/api/plans/{src_id}/clone").json()["id"]
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        names = {p["id"]: p["name"] for p in new_people}
+        bequests = client.get(f"/api/plans/{new_id}/bequests").json()
+        benefits = client.get(f"/api/plans/{new_id}/benefits").json()
+        assert len(bequests) == 1
+        assert len(benefits) == 1
+        assert names[bequests[0]["from_person_id"]] == "Aoife"
+        assert names[bequests[0]["to_person_id"]] == "Cormac"
+        assert names[benefits[0]["person_id"]] == "Aoife"

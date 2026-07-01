@@ -34,7 +34,7 @@ jobs:
         run: pip-audit --skip-editable
 
   frontend:
-    name: Frontend (tsc + vite + npm audit)
+    name: Frontend (tsc + vitest + vite + npm audit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -51,6 +51,9 @@ jobs:
       - name: Type check
         working-directory: frontend
         run: npx tsc --noEmit
+      - name: Unit tests
+        working-directory: frontend
+        run: npm run test
       - name: Production build
         working-directory: frontend
         env:

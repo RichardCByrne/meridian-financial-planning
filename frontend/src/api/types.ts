@@ -345,6 +345,7 @@ export interface MonteCarloResponse {
   years: MonteCarloYearRow[];
   shortfall_probability: number;
   median_final_net_worth: number;
+  mode?: "gaussian" | "historic";
 }
 
 export type CatGroup = "A" | "B" | "C" | "exempt";

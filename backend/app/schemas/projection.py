@@ -72,6 +72,7 @@ class MonteCarloResponse(BaseModel):
     years: list[MonteCarloYearRow]
     shortfall_probability: float
     median_final_net_worth: float
+    mode: str = "gaussian"
 
 
 class ProjectionSummary(BaseModel):

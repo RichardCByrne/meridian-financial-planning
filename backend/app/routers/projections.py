@@ -73,10 +73,10 @@ _MC_CACHE_TTL_SECONDS = 60.0
 # exhaustion DoS on a small Cloud Run instance). The cap keeps the working set
 # bounded; eviction is oldest-expiry-first.
 _MC_CACHE_MAX_ENTRIES = 256
-_mc_cache: dict[tuple[int, int | None, int, int | None], tuple[float, "MonteCarloResponse"]] = {}
+_mc_cache: dict[tuple[int, int | None, int, int | None, str], tuple[float, "MonteCarloResponse"]] = {}
 
 
-def _mc_cache_get(key: tuple[int, int | None, int, int | None]) -> "MonteCarloResponse | None":
+def _mc_cache_get(key: tuple[int, int | None, int, int | None, str]) -> "MonteCarloResponse | None":
     entry = _mc_cache.get(key)
     if entry is None:
         return None
@@ -87,7 +87,7 @@ def _mc_cache_get(key: tuple[int, int | None, int, int | None]) -> "MonteCarloRe
     return value
 
 
-def _mc_cache_set(key: tuple[int, int | None, int, int | None], value: "MonteCarloResponse") -> None:
+def _mc_cache_set(key: tuple[int, int | None, int, int | None, str], value: "MonteCarloResponse") -> None:
     if len(_mc_cache) >= _MC_CACHE_MAX_ENTRIES and key not in _mc_cache:
         now = time.monotonic()
         # Drop anything already expired; if that frees nothing, evict the entry
@@ -481,17 +481,24 @@ def get_montecarlo(
         default=None, ge=0, le=2**32 - 1,
         description="Optional RNG seed for reproducible runs",
     ),
+    mode: str = Query(
+        default="gaussian",
+        pattern="^(gaussian|historic)$",
+        description="Shock model: 'gaussian' (normal regime draw) or 'historic' "
+        "(year-by-year block bootstrap of historical returns).",
+    ),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MonteCarloResponse:
     """Run N perturbed simulations and return per-year net-worth percentile bands.
 
-    Each run perturbs asset growth rates and macro assumptions once (persistent
-    shock model). Returns p5 / p10 / p25 / p50 / p75 / p90 / p95 bands plus
-    the probability of at least one shortfall occurring across all runs.
+    gaussian mode perturbs asset growth once per run (persistent regime shock);
+    historic mode block-bootstraps a year-by-year historical return path,
+    capturing sequence-of-returns risk. Returns p5 / p10 / p25 / p50 / p75 /
+    p90 / p95 bands plus the probability of at least one shortfall.
     """
     require_plan_access(plan_id, user, db, min_role="viewer")
-    cache_key = (plan_id, scenario_id, n, seed)
+    cache_key = (plan_id, scenario_id, n, seed, mode)
     cached = _mc_cache_get(cache_key)
     if cached is not None:
         return cached
@@ -502,9 +509,10 @@ def get_montecarlo(
     if scenario is not None:
         plan_input = apply_overrides(plan_input, scenario.overrides_json)
 
-    result = _mc.run(plan_input, n_runs=n, seed=seed)
+    result = _mc.run(plan_input, n_runs=n, seed=seed, mode=mode)
     response = MonteCarloResponse(
         runs=result.runs,
+        mode=result.mode,
         years=[
             MonteCarloYearRow(
                 year=y.year,

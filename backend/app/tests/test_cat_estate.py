@@ -15,6 +15,7 @@ from app.engine.simulator import (
     AssumptionsInput,
     BequestInput,
     IncomeInput,
+    LifePolicyInput,
     PersonInput,
     PlanInput,
     simulate,
@@ -301,3 +302,53 @@ def test_bequest_in_projection():
             # Estate should be recorded in year 2026
             assert str(p1["id"]) in year0["estate_transfers"] or p1["id"] in year0.get("estate_transfers", {})
             assert year0["cat_paid"] > 0
+
+
+# ---------- Section 72 relief ----------
+
+
+def test_apply_section72_caps_relief_and_returns_excess():
+    # Payout below the bill: relief = payout, no excess.
+    assert cat_ie.apply_section72(80_000, 50_000) == (30_000.0, 0.0)
+    # Payout above the bill: relief caps at CAT due, remainder is excess.
+    assert cat_ie.apply_section72(80_000, 100_000) == (0.0, 20_000.0)
+    # No CAT due: nothing to relieve, whole payout is excess.
+    assert cat_ie.apply_section72(0.0, 40_000) == (0.0, 40_000.0)
+
+
+def test_section72_policy_covers_inheritance_cat():
+    """A Section 72 policy on the deceased pays the CAT tax-free: reported CAT
+    drops by the relief and the covered amount is refunded to beneficiaries."""
+    estate = 1_000_000.0
+    gross_cat = cat_ie.compute_cat(estate, "A", 0.0, IRELAND_2026_OFFICIAL)
+    assert gross_cat > 0
+
+    def _plan(sum_assured: float) -> PlanInput:
+        policies = (
+            [LifePolicyInput(id=1, person_id=1, name="S72", kind="section_72",
+                             sum_assured=sum_assured, premium_annual=0.0,
+                             start_year=2026, end_year=2040)]
+            if sum_assured > 0 else []
+        )
+        return PlanInput(
+            base_year=2026, projection_years=2,
+            people=[_simple_person(1, 1946, 80, "Alice"), _simple_person(2, 1986, 90, "Bob")],
+            incomes=[], expenses=[],
+            assets=[AssetInput(id=1, name="Alice cash", kind="cash", value=estate,
+                               growth_rate=0.0, cost_basis=0.0, owner_person_id=1)],
+            bequests=[BequestInput(id=1, from_person_id=1, to_person_id=2,
+                                   cat_group="A", share_pct=1.0)],
+            life_policies=policies,
+            assumptions=AssumptionsInput(),
+        )
+
+    base = simulate(_plan(0.0))[0]
+    covered = simulate(_plan(gross_cat))[0]
+
+    assert base.section72_cat_relief == 0.0
+    assert base.cat_paid == pytest.approx(gross_cat, abs=1)
+    # A policy sized to the bill drives reported CAT to ~0 and reports the relief.
+    assert covered.section72_cat_relief == pytest.approx(gross_cat, abs=1)
+    assert covered.cat_paid == pytest.approx(0.0, abs=1)
+    # Beneficiary is better off by the covered CAT (kept the estate).
+    assert covered.net_worth > base.net_worth + gross_cat * 0.99

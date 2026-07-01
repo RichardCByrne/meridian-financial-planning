@@ -27,7 +27,11 @@ class User(Base):
     # Firebase UID is the source of truth for identity. Unique per user; immutable.
     # In MERIDIAN_DEV_AUTH mode the bypass user has firebase_uid="dev-local".
     firebase_uid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # Unique so one email maps to one account — a second provider for the same
+    # (verified) address links to the existing row rather than duplicating it.
+    # Nullable: rows without an email (e.g. phone auth) are exempt; both SQLite
+    # and Postgres allow multiple NULLs under a unique index.
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 

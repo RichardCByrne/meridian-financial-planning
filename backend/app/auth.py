@@ -75,6 +75,22 @@ def _lookup_user(db: Session, firebase_uid: str) -> User | None:
     ).scalar_one_or_none()
 
 
+def _lookup_user_by_email(db: Session, email: str) -> User | None:
+    return db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+
+
+def _link_existing(db: Session, existing: User, firebase_uid: str, display_name: str | None) -> User:
+    """Point an existing account at a new Firebase UID (provider linking).
+
+    Same verified email arriving under a different UID means the same person
+    signed in with a second provider (e.g. Google after email/password). We
+    move the existing row onto the new UID rather than creating a duplicate, so
+    `users.id` — and therefore all plan memberships — stays stable.
+    """
+    existing.firebase_uid = firebase_uid
+    return _refresh_profile(db, existing, existing.email, display_name)
+
+
 def _refresh_profile(db: Session, user: User, email: str | None, display_name: str | None) -> User:
     """Sync email / display name from Firebase if they've changed, then commit."""
     changed = False
@@ -98,21 +114,32 @@ def _find_or_create_user(
     user = _lookup_user(db, firebase_uid)
     if user is not None:
         return _refresh_profile(db, user, email, display_name)
+
+    # Same (verified) email under a different UID → link to the existing
+    # account instead of creating a duplicate. get_current_user only admits
+    # verified emails, so the address is trustworthy as a linking key.
+    if email:
+        existing = _lookup_user_by_email(db, email)
+        if existing is not None:
+            return _link_existing(db, existing, firebase_uid, display_name)
+
     user = User(firebase_uid=firebase_uid, email=email, display_name=display_name)
     db.add(user)
     try:
         db.commit()
     except IntegrityError:
-        # A concurrent first request for the same Firebase UID inserted the row
-        # between our lookup and commit (the `firebase_uid` unique constraint
-        # fired). A fresh sign-in fans out into several parallel API calls, so
-        # this is a real race, not a theoretical one. Roll back and adopt the
-        # row the other request created.
+        # Lost a race: between our lookups and commit a concurrent request
+        # inserted the row — either under the same `firebase_uid` (parallel
+        # first requests from one sign-in) or the same `email` (provider
+        # linking). Roll back and adopt whichever row now exists.
         db.rollback()
         existing = _lookup_user(db, firebase_uid)
+        if existing is not None:
+            return _refresh_profile(db, existing, email, display_name)
+        existing = _lookup_user_by_email(db, email) if email else None
         if existing is None:
             raise
-        return _refresh_profile(db, existing, email, display_name)
+        return _link_existing(db, existing, firebase_uid, display_name)
     db.refresh(user)
     return user
 

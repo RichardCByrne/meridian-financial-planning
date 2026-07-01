@@ -217,6 +217,40 @@ def test_token_verification_checks_revocation(monkeypatch):
         assert captured["kwargs"].get("check_revoked") is True
 
 
+def test_second_provider_links_to_existing_account_by_email():
+    """Same email under a new UID links to the existing row, keeping users.id."""
+    import app.auth as auth_mod
+
+    with SessionLocal() as db:
+        first = auth_mod._find_or_create_user(db, "google-uid", "same@example.com", "Sam")
+        first_id = first.id
+
+    # Same person signs in later with email/password (different UID, same email).
+    with SessionLocal() as db:
+        second = auth_mod._find_or_create_user(db, "password-uid", "same@example.com", "Sam")
+        # Linked: same row (stable id), UID moved onto the new provider.
+        assert second.id == first_id
+        assert second.firebase_uid == "password-uid"
+
+    # Exactly one account for that email.
+    with SessionLocal() as db:
+        rows = db.query(User).filter(User.email == "same@example.com").all()
+        assert len(rows) == 1
+
+
+def test_duplicate_email_is_rejected_at_db_level():
+    """The unique index makes two rows with the same email impossible."""
+    from sqlalchemy.exc import IntegrityError
+
+    with SessionLocal() as db:
+        db.add(User(firebase_uid="uid-a", email="dupe@example.com"))
+        db.commit()
+    with SessionLocal() as db:
+        db.add(User(firebase_uid="uid-b", email="dupe@example.com"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+
 def test_startup_fails_fast_on_firebase_misconfig(monkeypatch):
     """Prod mode with no service-account path must crash at boot, not per-request."""
     monkeypatch.setattr("app.main.DEV_AUTH", False)

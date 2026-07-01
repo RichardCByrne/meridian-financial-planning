@@ -464,6 +464,32 @@ export interface LifePolicyCreate {
 
 export type LifePolicyUpdate = Partial<LifePolicyCreate>;
 
+export interface DBPension {
+  id: number;
+  plan_id: number;
+  person_id: number;
+  name: string;
+  accrual_rate: number;
+  service_years: number;
+  final_salary: number;
+  revaluation_rate: number;
+  normal_retirement_age: number;
+  tax_free_lump_sum: number;
+}
+
+export interface DBPensionCreate {
+  person_id: number;
+  name: string;
+  accrual_rate?: number;
+  service_years?: number;
+  final_salary?: number;
+  revaluation_rate?: number;
+  normal_retirement_age?: number;
+  tax_free_lump_sum?: number;
+}
+
+export type DBPensionUpdate = Partial<DBPensionCreate>;
+
 export interface YearRow {
   year: number;
   ages: Record<number, number>;
@@ -494,6 +520,7 @@ export interface YearRow {
   pension_lump_sum_tax: number;
   arf_drawdowns: number;
   state_pension_total: number;
+  db_pension_total: number;
   goal_status: Record<number, string>;
   notes: string[];
   cat_paid: number;

@@ -42,6 +42,7 @@ class YearRowOut(BaseModel):
     pension_lump_sum_tax: float = 0.0
     arf_drawdowns: float = 0.0
     state_pension_total: float = 0.0
+    db_pension_total: float = 0.0
     goal_status: dict[int, str] = {}
     notes: list[str]
     cat_paid: float = 0.0

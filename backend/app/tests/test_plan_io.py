@@ -196,3 +196,33 @@ def test_life_policy_and_death_year_survive_clone():
         assert policies[0]["sum_assured"] == 300_000
         # person_id remapped to the cloned plan's own person, not the source's.
         assert policies[0]["person_id"] == new_people[0]["id"]
+
+
+def test_db_pension_survives_clone():
+    """A defined-benefit pension round-trips through a clone with its person_id
+    remapped to the cloned person."""
+    with TestClient(app) as client:
+        pid = client.post(
+            "/api/plans",
+            json={"name": "DB household", "base_year": 2026, "projection_years": 10},
+        ).json()["id"]
+        person = client.post(
+            f"/api/plans/{pid}/people",
+            json={"name": "Sean", "dob": "1965-01-01", "is_primary": True},
+        ).json()
+        client.post(
+            f"/api/plans/{pid}/db-pensions",
+            json={
+                "person_id": person["id"], "name": "Public service",
+                "accrual_rate": 0.0125, "service_years": 35, "final_salary": 55_000,
+                "revaluation_rate": 0.02, "normal_retirement_age": 65,
+                "tax_free_lump_sum": 80_000,
+            },
+        )
+        new_id = client.post(f"/api/plans/{pid}/clone").json()["id"]
+        new_people = client.get(f"/api/plans/{new_id}/people").json()
+        pensions = client.get(f"/api/plans/{new_id}/db-pensions").json()
+        assert len(pensions) == 1
+        assert pensions[0]["final_salary"] == 55_000
+        assert pensions[0]["tax_free_lump_sum"] == 80_000
+        assert pensions[0]["person_id"] == new_people[0]["id"]

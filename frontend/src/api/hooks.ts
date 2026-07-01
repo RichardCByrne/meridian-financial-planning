@@ -33,6 +33,9 @@ import type {
   LifePolicy,
   LifePolicyCreate,
   LifePolicyUpdate,
+  DBPension,
+  DBPensionCreate,
+  DBPensionUpdate,
   Person,
   PersonCreate,
   PersonUpdate,
@@ -66,6 +69,7 @@ const keys = {
   children: (planId: number) => ["plan", planId, "children"] as const,
   benefits: (planId: number) => ["plan", planId, "benefits"] as const,
   lifePolicies: (planId: number) => ["plan", planId, "life-policies"] as const,
+  dbPensions: (planId: number) => ["plan", planId, "db-pensions"] as const,
   members: (planId: number) => ["plan", planId, "members"] as const,
   invites: (planId: number) => ["plan", planId, "invites"] as const,
   taxConfigs: () => ["tax-configs"] as const,
@@ -705,6 +709,54 @@ export function useDeleteLifePolicy(planId: number) {
     mutationFn: (id: number) => api.del(`/life-policies/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.lifePolicies(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+// ---------- Defined-benefit pensions ----------
+
+export function useDBPensions(planId: number) {
+  return useQuery({
+    queryKey: keys.dbPensions(planId),
+    queryFn: () => api.get<DBPension[]>(`/plans/${planId}/db-pensions`),
+    enabled: Number.isFinite(planId),
+  });
+}
+
+export function useCreateDBPension(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (body: DBPensionCreate) =>
+      api.post<DBPension>(`/plans/${planId}/db-pensions`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.dbPensions(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useUpdateDBPension(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: ({ id, body }: { id: number; body: DBPensionUpdate }) =>
+      api.patch<DBPension>(`/db-pensions/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.dbPensions(planId) });
+      invalidateProjection(qc, planId);
+    },
+  });
+}
+
+export function useDeleteDBPension(planId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: keys.plan(planId),
+    mutationFn: (id: number) => api.del(`/db-pensions/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.dbPensions(planId) });
       invalidateProjection(qc, planId);
     },
   });

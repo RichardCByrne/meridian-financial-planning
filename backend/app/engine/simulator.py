@@ -380,6 +380,9 @@ class YearRow:
     # (max(0, debt_outstanding - liquid_assets)). Most useful in a death year —
     # shows whether survivors can at least clear the debts. 0 = fully covered.
     cover_gap: float = 0.0
+    # CAT covered this year by a Section 72 policy on a deceased person (already
+    # netted out of cat_paid). 0 when no approved policy paid out.
+    section72_cat_relief: float = 0.0
 
 
 def _age_in_year(dob: date, year: int) -> int:
@@ -844,6 +847,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
         # ----- 2c. Death events — transfer estate, compute CAT -----
         cat_paid_year = 0.0
         life_cover_payout_year = 0.0
+        section72_relief_year = 0.0
         estate_transfers_year: dict[int, float] = {}
 
         for person in plan.people:
@@ -885,6 +889,29 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 person_cat += cat
                 net = share - cat
                 states[_cash_target()].balance += net
+
+            # Section 72 relief: an in-force Revenue-approved policy on the
+            # deceased pays the inheritance CAT tax-free. Relief caps at the CAT
+            # due; any surplus still passes to survivors. The full payout reaches
+            # cash — the covered CAT is effectively refunded to beneficiaries
+            # (the policy, not they, paid Revenue) and any excess is theirs —
+            # while the reported CAT drops by the relief.
+            s72_payout = sum(
+                max(0.0, pol.sum_assured)
+                for pol in plan.life_policies
+                if pol.person_id == person.id and pol.kind == "section_72"
+                and pol.start_year <= year and (pol.end_year is None or year <= pol.end_year)
+            )
+            if s72_payout > 0:
+                cat_after, _excess = cat_ie.apply_section72(person_cat, s72_payout)
+                relief = person_cat - cat_after
+                states[_cash_target()].balance += s72_payout
+                section72_relief_year += relief
+                notes.append(
+                    f"{person.name}'s Section 72 policy pays EUR {s72_payout:,.0f}, "
+                    f"covering EUR {relief:,.0f} of CAT."
+                )
+                person_cat = cat_after
 
             cat_paid_year += person_cat
             notes.append(
@@ -1601,6 +1628,7 @@ def simulate(plan: PlanInput) -> list[YearRow]:
                 protection_premiums_total=round(protection_premiums_total, 2),
                 life_cover_payout=round(life_cover_payout_year, 2),
                 cover_gap=round(max(0.0, debt_outstanding - liquid_assets), 2),
+                section72_cat_relief=round(section72_relief_year, 2),
             )
         )
 

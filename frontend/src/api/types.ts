@@ -438,7 +438,7 @@ export interface BenefitCreate {
 
 export type BenefitUpdate = Partial<BenefitCreate>;
 
-export type LifePolicyKind = "term_life";
+export type LifePolicyKind = "term_life" | "section_72";
 
 export interface LifePolicy {
   id: number;
@@ -503,6 +503,7 @@ export interface YearRow {
   protection_premiums_total: number;
   life_cover_payout: number;
   cover_gap: number;
+  section72_cat_relief: number;
 }
 
 export interface ProjectionSummary {

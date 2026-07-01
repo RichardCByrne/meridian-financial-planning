@@ -164,6 +164,7 @@ def _load_plan_input(plan: Plan, db: Session) -> PlanInput:
             linked_liability_id=a.linked_liability_id,
             stamp_duty_pct=a.stamp_duty_pct,
             selling_cost_pct=a.selling_cost_pct,
+            annual_charge_pct=a.annual_charge_pct,
         )
         for a in plan.assets
     ]

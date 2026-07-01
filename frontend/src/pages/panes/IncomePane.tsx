@@ -92,6 +92,8 @@ type FormState = {
   pension_contribution_pct: number;
   employer_pension_contribution_pct: number;
   is_bonus: boolean;
+  rental_expenses_pct: number;
+  furnishings_value: number;
 };
 
 const blankForm: FormState = {
@@ -104,6 +106,8 @@ const blankForm: FormState = {
   pension_contribution_pct: 0,
   employer_pension_contribution_pct: 0,
   is_bonus: false,
+  rental_expenses_pct: 0,
+  furnishings_value: 0,
 };
 
 function fromIncome(i: IncomeSource): FormState {
@@ -117,6 +121,8 @@ function fromIncome(i: IncomeSource): FormState {
     pension_contribution_pct: i.pension_contribution_pct,
     employer_pension_contribution_pct: i.employer_pension_contribution_pct ?? 0,
     is_bonus: i.is_bonus ?? false,
+    rental_expenses_pct: i.rental_expenses_pct ?? 0,
+    furnishings_value: i.furnishings_value ?? 0,
   };
 }
 
@@ -167,6 +173,8 @@ function PersonIncomeBlock({
       pension_contribution_pct: f.pension_contribution_pct,
       employer_pension_contribution_pct: f.employer_pension_contribution_pct,
       is_bonus: f.is_bonus,
+      rental_expenses_pct: f.kind === "rental" ? f.rental_expenses_pct : 0,
+      furnishings_value: f.kind === "rental" ? f.furnishings_value : 0,
     };
   };
 
@@ -525,6 +533,39 @@ function FormFields({
           onChange={(v) => Number.isFinite(v) && setForm({ ...form, employer_pension_contribution_pct: v / 100 })}
         />
       </div>
+      {form.kind === "rental" && (
+        <>
+          <div className="field" style={{ flex: "1 1 110px" }}>
+            <label>
+              Expenses %
+              <HelpTip>
+                Allowable expenses as a % of gross rent (mortgage interest, management, repairs,
+                insurance). Deducted before tax — rental is taxed on profit, not gross.
+              </HelpTip>
+            </label>
+            <NumericInput
+              value={form.rental_expenses_pct * 100}
+              onChange={(v) =>
+                Number.isFinite(v) &&
+                setForm({ ...form, rental_expenses_pct: Math.max(0, v) / 100 })
+              }
+            />
+          </div>
+          <div className="field" style={{ flex: "1 1 130px" }}>
+            <label>
+              Furnishings (€)
+              <HelpTip>
+                Value of furniture/fittings. Wear-and-tear capital allowance of 12.5%/yr for 8
+                years reduces taxable rental profit.
+              </HelpTip>
+            </label>
+            <NumericInput
+              value={form.furnishings_value}
+              onChange={(v) => Number.isFinite(v) && setForm({ ...form, furnishings_value: Math.max(0, v) })}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

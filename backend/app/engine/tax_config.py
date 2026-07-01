@@ -154,6 +154,13 @@ class TaxConfig:
     bik_preferential_loan_rate_qualifying: float = 0.04
     bik_preferential_loan_rate_other: float = 0.135
 
+    # Rental income. Taxable rental profit = gross rent − allowable expenses
+    # (a per-source %) − wear-and-tear capital allowance on furnishings. Irish
+    # wear-and-tear is 12.5% straight-line over 8 years (Revenue.ie), so a €10k
+    # furnishing spend gives €1,250/yr of relief for 8 years.
+    rental_wear_tear_rate: float = 0.125
+    rental_wear_tear_years: int = 8
+
     def to_dict(self) -> dict[str, Any]:
         """JSON-serialisable representation. Tuples become lists."""
         d = asdict(self)

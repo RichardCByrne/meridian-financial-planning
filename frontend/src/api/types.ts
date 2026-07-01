@@ -131,6 +131,8 @@ export interface IncomeSource {
   pension_contribution_pct: number;
   employer_pension_contribution_pct: number;
   is_bonus: boolean;
+  rental_expenses_pct: number;
+  furnishings_value: number;
 }
 
 export interface IncomeSourceCreate {
@@ -145,6 +147,8 @@ export interface IncomeSourceCreate {
   pension_contribution_pct?: number;
   employer_pension_contribution_pct?: number;
   is_bonus?: boolean;
+  rental_expenses_pct?: number;
+  furnishings_value?: number;
 }
 
 export type IncomeSourceUpdate = Partial<IncomeSourceCreate>;

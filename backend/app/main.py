@@ -135,6 +135,20 @@ def _apply_lightweight_migrations() -> None:
                         "is_bonus BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
+        if "rental_expenses_pct" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE income_sources ADD COLUMN "
+                        "rental_expenses_pct FLOAT NOT NULL DEFAULT 0.0"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "ALTER TABLE income_sources ADD COLUMN "
+                        "furnishings_value FLOAT NOT NULL DEFAULT 0.0"
+                    )
+                )
     if "plans" in tables:
         cols = {c["name"] for c in insp.get_columns("plans")}
         if "tax_config_id" not in cols:

@@ -21,6 +21,17 @@ def get_or_404(model: type[T], pk: int, db: Session, *, name: str | None = None)
     return obj
 
 
+def tax_config_accessible(tax_config_id: int | None, user_id: int, db: Session) -> bool:
+    """True if `user_id` may pin `tax_config_id`: no pin, the seeded official,
+    or a config the caller owns. Non-raising counterpart of
+    `assert_tax_config_accessible` — used where an inaccessible pin should be
+    dropped rather than rejected (clone / import)."""
+    if tax_config_id is None:
+        return True
+    row = db.get(TaxConfigRow, tax_config_id)
+    return row is not None and (row.is_official or row.created_by_user_id == user_id)
+
+
 def assert_tax_config_accessible(
     tax_config_id: int | None, user_id: int, db: Session
 ) -> None:
@@ -34,8 +45,5 @@ def assert_tax_config_accessible(
     caller can't use, matching the enumeration-safe convention used elsewhere:
     don't reveal that someone else's config id exists.
     """
-    if tax_config_id is None:
-        return
-    row = db.get(TaxConfigRow, tax_config_id)
-    if row is None or not (row.is_official or row.created_by_user_id == user_id):
+    if not tax_config_accessible(tax_config_id, user_id, db):
         raise HTTPException(status_code=404, detail="Tax config not found")

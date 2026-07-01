@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -123,7 +124,7 @@ def clone_plan(
     src = _load_plan_with_children(plan_id, db)
     new_name = (payload or {}).get("name") or f"{src.name} (copy)"
     snapshot = serialise_plan(src)
-    new_plan = hydrate_plan(snapshot, db, name_override=new_name)
+    new_plan = hydrate_plan(snapshot, db, name_override=new_name, owner_user_id=user.id)
     grant_plan_membership(db, new_plan.id, user.id, role="owner")
     db.commit()
     return new_plan
@@ -148,9 +149,10 @@ def import_plan(
 ) -> Plan:
     """Create a plan from a previously-exported JSON snapshot. Importer becomes owner."""
     try:
-        plan = hydrate_plan(payload, db)
-    except (KeyError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=f"Invalid plan payload: {e}") from e
+        plan = hydrate_plan(payload, db, owner_user_id=user.id)
+    except (KeyError, ValueError, TypeError) as e:
+        logging.getLogger(__name__).info("Rejected plan import: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid plan payload") from e
     grant_plan_membership(db, plan.id, user.id, role="owner")
     db.commit()
     return plan

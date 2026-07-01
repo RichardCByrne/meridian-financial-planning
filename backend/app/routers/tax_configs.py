@@ -2,6 +2,8 @@
 own configs. Editing is allowed only on user-owned configs (not the official).
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
@@ -73,7 +75,8 @@ def create_tax_config(
     try:
         validated = TaxConfig.from_dict({**base_payload, "name": payload.name})
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"Invalid tax config payload: {e}") from e
+        logging.getLogger(__name__).info("Rejected tax config create: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid tax config payload") from e
 
     row = TaxConfigRow(
         name=payload.name,
@@ -107,7 +110,8 @@ def update_tax_config(
         try:
             validated = TaxConfig.from_dict({**merged, "name": row.name})
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(status_code=400, detail=f"Invalid tax config payload: {e}") from e
+            logging.getLogger(__name__).info("Rejected tax config update: %s", e)
+            raise HTTPException(status_code=400, detail="Invalid tax config payload") from e
         row.config_json = validated.to_dict()
     db.commit()
     db.refresh(row)

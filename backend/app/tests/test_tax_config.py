@@ -248,6 +248,50 @@ def test_user_cannot_pin_anothers_config_to_a_plan():
             ).status_code == 200
 
 
+def test_clone_and_import_drop_a_foreign_tax_config_pin():
+    """Cloning a shared plan (or importing a crafted payload) must not carry over
+    a pin to someone else's private config — that would re-open the projection
+    info-leak on the hydrate path. A pin the new owner *does* own survives."""
+    from app.auth import grant_plan_membership
+
+    alice = _ensure_user("alice-uid", "alice@example.com")
+    bob = _ensure_user("bob-uid", "bob@example.com")
+
+    with TestClient(app) as client:
+        with _as_user(alice.firebase_uid, alice.email or ""):
+            alice_cfg = client.post("/api/tax-configs", json={"name": "Alice private"}).json()
+            alice_plan = client.post(
+                "/api/plans",
+                json={"name": "Alice pinned", "base_year": 2026, "projection_years": 2,
+                      "tax_config_id": alice_cfg["id"]},
+            ).json()
+
+        # Share the plan with Bob as viewer so he can clone it.
+        with SessionLocal() as db:
+            grant_plan_membership(db, alice_plan["id"], bob.id, role="viewer")
+
+        with _as_user(bob.firebase_uid, bob.email or ""):
+            # Clone → foreign pin dropped.
+            cloned = client.post(f"/api/plans/{alice_plan['id']}/clone").json()
+            assert cloned["tax_config_id"] is None
+
+            # Import a hand-crafted payload aimed at Alice's config → dropped.
+            imported = client.post(
+                "/api/plans/import",
+                json={
+                    "format_version": 1,
+                    "plan": {"name": "Bob import", "base_year": 2026,
+                             "projection_years": 2, "tax_config_id": alice_cfg["id"]},
+                },
+            ).json()
+            assert imported["tax_config_id"] is None
+
+        # Alice cloning her *own* pinned plan keeps the pin (she owns the config).
+        with _as_user(alice.firebase_uid, alice.email or ""):
+            own_clone = client.post(f"/api/plans/{alice_plan['id']}/clone").json()
+            assert own_clone["tax_config_id"] == alice_cfg["id"]
+
+
 def test_delete_user_config_unpins_dependent_plans():
     alice = _ensure_user("alice-uid", "alice@example.com")
     with TestClient(app) as client:

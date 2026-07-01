@@ -57,6 +57,13 @@ class PersonInput:
     # year. Lets users model "I want 6% drawdown" or back-solve from a target
     # monthly spend. Range [0.0, 1.0]. Only used when pension_option == "arf".
     arf_target_drawdown_pct: float | None = None
+    # Tax-optimal decumulation: when True, the ARF is drawn each post-retirement
+    # year up to the top of the standard-rate band (filling cheap 20% headroom
+    # left by other income) rather than just the statutory minimum — smoothing
+    # marginal rates across retirement. Still respects the statutory minimum as a
+    # floor and never draws more than the pot. Only used when pension_option ==
+    # "arf". Default False = previous behaviour.
+    arf_band_fill: bool = False
     # What to do with the pension pot remaining after the tax-free lump sum at
     # retirement. Irish options:
     #   "arf"               — invest in an ARF, draw it down over time (default).
@@ -1172,32 +1179,11 @@ def simulate(
             pension_lump_sum_total += crystallised_lump_sum
             pension_lump_sum_tax_total += crystallised_lump_sum_tax
 
-            # 3d. ARF imputed minimum drawdown (post-retirement).
+            # ARF drawdown is computed at step 3d below, AFTER the other
+            # retirement income (state pension / DB / annuity) is known — the
+            # band-fill strategy needs the year's non-ARF taxable income to size
+            # the drawdown against the standard-rate band.
             arf_drawdown = 0.0
-            if is_retired_now:
-                arf_total = sum(
-                    st.balance
-                    for st in states.values()
-                    if st.kind == "arf" and st.owner == person.id
-                )
-                min_pct = pension_ie.arf_minimum_drawdown_pct(age, arf_total, tax_config)
-                # Voluntary higher drawdown — take the bigger of the statutory
-                # minimum and the user's target. Clamped to 1.0 so we can't
-                # withdraw more than the pot in a single year.
-                target_pct = person.arf_target_drawdown_pct or 0.0
-                pct = min(1.0, max(min_pct, target_pct))
-                if pct > 0 and arf_total > 0:
-                    arf_drawdown = arf_total * pct
-                    # Pull pro-rata from each ARF owned by this person.
-                    for st in states.values():
-                        if st.kind != "arf" or st.owner != person.id:
-                            continue
-                        share = st.balance / arf_total
-                        st.balance -= arf_drawdown * share
-                    arf_drawdowns_total += arf_drawdown
-                    income_by_kind["arf_drawdown"] = (
-                        income_by_kind.get("arf_drawdown", 0.0) + arf_drawdown
-                    )
 
             # 3e. State pension auto-injection, scaled by TCA entitlement.
             state_pension_amt = 0.0
@@ -1256,6 +1242,53 @@ def simulate(
                 income_by_kind["pension_taxable_cash"] = (
                     income_by_kind.get("pension_taxable_cash", 0.0) + taxable_cash
                 )
+
+            # 3d. ARF drawdown (post-retirement): the statutory minimum, an
+            # optional voluntary target %, or — with band-fill — drawn up to the
+            # top of the standard-rate band given the year's other income, to use
+            # cheap 20% headroom before it's lost. Placed after the other
+            # retirement income above so band-fill can size that headroom.
+            if is_retired_now:
+                arf_total = sum(
+                    st.balance
+                    for st in states.values()
+                    if st.kind == "arf" and st.owner == person.id
+                )
+                if arf_total > 0:
+                    min_pct = pension_ie.arf_minimum_drawdown_pct(age, arf_total, tax_config)
+                    target_pct = person.arf_target_drawdown_pct or 0.0
+                    # Clamp to 1.0 so we can't withdraw more than the pot.
+                    pct = min(1.0, max(min_pct, target_pct))
+                    arf_drawdown = arf_total * pct
+                    if person.arf_band_fill:
+                        band_status = _filing_status_for_person(
+                            person, plan.people, any_two_income, plan.filing_status,
+                            age=age,
+                            is_paye_employee=(
+                                has_paye_income or not has_self_employment or is_retired_now
+                            ),
+                            year=year, marriage_year=plan.marriage_year,
+                        )
+                        srco, _lbl = tax_ie.standard_rate_band(band_status, tax_config)
+                        non_arf_taxable = (
+                            max(0.0, earned_for_it) + state_pension_amt + db_pension_amt
+                            + annuity_amt + taxable_cash
+                        )
+                        headroom = max(0.0, srco - non_arf_taxable)
+                        # Fill the band, but never below the statutory minimum and
+                        # never more than the pot.
+                        arf_drawdown = min(arf_total, max(arf_drawdown, headroom))
+                    if arf_drawdown > 0:
+                        # Pull pro-rata from each ARF owned by this person.
+                        for st in states.values():
+                            if st.kind != "arf" or st.owner != person.id:
+                                continue
+                            share = st.balance / arf_total
+                            st.balance -= arf_drawdown * share
+                        arf_drawdowns_total += arf_drawdown
+                        income_by_kind["arf_drawdown"] = (
+                            income_by_kind.get("arf_drawdown", 0.0) + arf_drawdown
+                        )
 
             # 3e-iii. Employer benefits-in-kind (notional pay). The cash
             # equivalent of each active benefit is charged to IT/USC/PRSI but

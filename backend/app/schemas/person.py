@@ -34,6 +34,7 @@ class PersonCreate(BaseModel):
     prsi_weeks_at_base_year: int = Field(default=2080, ge=0, le=2600)
     homecaring_weeks_at_base_year: int = Field(default=0, ge=0, le=1040)
     arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
+    arf_band_fill: bool = False
     pension_option: PensionOption = "arf"
     annuity_rate: float = Field(default=0.04, ge=0.0, le=0.2)
 
@@ -56,6 +57,7 @@ class PersonUpdate(BaseModel):
     prsi_weeks_at_base_year: int | None = Field(default=None, ge=0, le=2600)
     homecaring_weeks_at_base_year: int | None = Field(default=None, ge=0, le=1040)
     arf_target_drawdown_pct: float | None = Field(default=None, ge=0.0, le=1.0)
+    arf_band_fill: bool | None = None
     pension_option: PensionOption | None = None
     annuity_rate: float | None = Field(default=None, ge=0.0, le=0.2)
 
@@ -82,5 +84,6 @@ class PersonRead(BaseModel):
     prsi_weeks_at_base_year: int = 2080
     homecaring_weeks_at_base_year: int = 0
     arf_target_drawdown_pct: float | None = None
+    arf_band_fill: bool = False
     pension_option: str = "arf"
     annuity_rate: float = 0.04

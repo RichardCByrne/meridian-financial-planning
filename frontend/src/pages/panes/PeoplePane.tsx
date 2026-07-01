@@ -29,6 +29,7 @@ type FormState = {
   prsi_years_at_base_year: number; // years, converted to weeks on submit
   homecaring_years_at_base_year: number;
   arf_target_drawdown_pct: number | ""; // whole-number percent, "" = use statutory min
+  arf_band_fill: boolean;
   pension_option: PensionOption;
   annuity_rate: number; // whole-number percent, only used for annuity
 };
@@ -45,6 +46,7 @@ const blankForm: FormState = {
   prsi_years_at_base_year: 40,
   homecaring_years_at_base_year: 0,
   arf_target_drawdown_pct: "",
+  arf_band_fill: false,
   pension_option: "arf",
   annuity_rate: 4,
 };
@@ -65,6 +67,7 @@ function fromPerson(p: Person): FormState {
       p.arf_target_drawdown_pct == null
         ? ""
         : Math.round(p.arf_target_drawdown_pct * 1000) / 10,
+    arf_band_fill: p.arf_band_fill ?? false,
     pension_option: p.pension_option ?? "arf",
     annuity_rate: Math.round((p.annuity_rate ?? 0.04) * 1000) / 10,
   };
@@ -96,6 +99,7 @@ export function PeoplePane({ planId }: { planId: number }) {
       prsi_weeks_at_base_year: p.prsi_weeks_at_base_year,
       homecaring_weeks_at_base_year: p.homecaring_weeks_at_base_year,
       arf_target_drawdown_pct: p.arf_target_drawdown_pct,
+      arf_band_fill: p.arf_band_fill,
       pension_option: p.pension_option,
       annuity_rate: p.annuity_rate,
     }),
@@ -125,6 +129,7 @@ export function PeoplePane({ planId }: { planId: number }) {
       f.arf_target_drawdown_pct === ""
         ? null
         : Math.max(0, Math.min(1, Number(f.arf_target_drawdown_pct) / 100)),
+    arf_band_fill: f.arf_band_fill,
     pension_option: f.pension_option,
     annuity_rate: Math.max(0, Math.min(0.2, f.annuity_rate / 100)),
   });
@@ -533,6 +538,28 @@ function FormFields({
               })
             }
           />
+        </div>
+      )}
+      {form.pension_option === "arf" && (
+        <div className="field" style={{ flex: "0 0 auto", minWidth: 150 }}>
+          <label>
+            Band-fill drawdown
+            <HelpTip>
+              Tax-optimal decumulation: each year draw the ARF up to the top of the standard-rate
+              (20%) band, using cheap headroom left by other income (e.g. the State Pension),
+              instead of just the statutory minimum. Overrides the drawdown % above when it draws
+              more. Smooths tax across retirement.
+            </HelpTip>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={form.arf_band_fill}
+              onChange={(e) => setForm({ ...form, arf_band_fill: e.target.checked })}
+              style={{ width: "auto" }}
+            />
+            Fill the 20% band
+          </label>
         </div>
       )}
     </div>

@@ -158,3 +158,18 @@ def test_unauthenticated_request_is_rejected_in_production_mode(monkeypatch):
         r = client.get("/api/plans")
         assert r.status_code == 401
         assert "bearer" in r.json()["detail"].lower()
+
+
+def test_email_is_verified_gate():
+    """Unverified email tokens are rejected; verified / email-less pass."""
+    from app.auth import _email_is_verified
+
+    # Password provider, not yet verified → blocked.
+    assert _email_is_verified({"email": "a@b.com", "email_verified": False}) is False
+    # Missing claim defaults to unverified.
+    assert _email_is_verified({"email": "a@b.com"}) is False
+    # Verified (e.g. Google) → allowed.
+    assert _email_is_verified({"email": "a@b.com", "email_verified": True}) is True
+    # No email claim (e.g. phone auth) → not our concern, allowed.
+    assert _email_is_verified({"email_verified": False}) is True
+    assert _email_is_verified({}) is True

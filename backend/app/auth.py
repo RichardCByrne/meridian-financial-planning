@@ -90,6 +90,17 @@ def _find_or_create_user(
     return user
 
 
+def _email_is_verified(decoded: dict) -> bool:
+    """True unless the token carries an email that Firebase reports unverified.
+
+    Tokens with no `email` claim (e.g. phone auth) are treated as verified —
+    the email-based attack this guards against doesn't apply to them.
+    """
+    if not decoded.get("email"):
+        return True
+    return bool(decoded.get("email_verified", False))
+
+
 def get_current_user(
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
@@ -123,6 +134,17 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         ) from e
+
+    # Reject accounts whose email is not yet verified. Email/password sign-ups
+    # start unverified; without this an attacker could register with a victim's
+    # address and, e.g., accept an email-bound plan invite meant for them.
+    # Federated providers (Google) come back already verified, so this only
+    # gates the password provider. Tokens without an email claim are unaffected.
+    if not _email_is_verified(decoded):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before continuing.",
+        )
 
     return _find_or_create_user(
         db,

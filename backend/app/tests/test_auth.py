@@ -7,6 +7,7 @@ once a real Firebase token lands in the Authorization header.
 
 from contextlib import contextmanager
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import get_current_user, grant_plan_membership
@@ -183,6 +184,17 @@ def test_token_verification_checks_revocation(monkeypatch):
         assert captured["kwargs"].get("check_revoked") is True
 
 
+def test_startup_fails_fast_on_firebase_misconfig(monkeypatch):
+    """Prod mode with no service-account path must crash at boot, not per-request."""
+    monkeypatch.setattr("app.main.DEV_AUTH", False)
+    monkeypatch.setattr("app.auth.DEV_AUTH", False)
+    monkeypatch.setattr("app.auth._firebase_initialised", False)
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT_PATH", raising=False)
+    with pytest.raises(RuntimeError):
+        with TestClient(app):
+            pass
+
+
 def test_email_is_verified_gate():
     """Unverified email tokens are rejected; verified / email-less pass."""
     from app.auth import _email_is_verified
@@ -196,3 +208,39 @@ def test_email_is_verified_gate():
     # No email claim (e.g. phone auth) → not our concern, allowed.
     assert _email_is_verified({"email_verified": False}) is True
     assert _email_is_verified({}) is True
+
+
+def test_find_or_create_user_recovers_from_concurrent_insert(monkeypatch):
+    """Simulate two parallel first requests for the same UID: the loser hits the
+    unique constraint and must adopt the winner's row instead of raising 500."""
+    import app.auth as auth_mod
+
+    uid = "race-uid"
+    # A concurrent request already created the row and committed it.
+    with SessionLocal() as other:
+        other.add(User(firebase_uid=uid, email="old@example.com"))
+        other.commit()
+
+    # Force our first lookup to miss (stale snapshot) so we take the INSERT path
+    # and collide on the unique constraint; later lookups behave normally.
+    real_lookup = auth_mod._lookup_user
+    calls = {"n": 0}
+
+    def flaky_lookup(db, firebase_uid):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None
+        return real_lookup(db, firebase_uid)
+
+    monkeypatch.setattr(auth_mod, "_lookup_user", flaky_lookup)
+
+    with SessionLocal() as db:
+        user = auth_mod._find_or_create_user(db, uid, "new@example.com", "Racer")
+        assert user.firebase_uid == uid
+        # Adopted the existing row and refreshed the profile from the new token.
+        assert user.email == "new@example.com"
+
+    # Exactly one row exists — no duplicate was created.
+    with SessionLocal() as db:
+        rows = db.query(User).filter(User.firebase_uid == uid).all()
+        assert len(rows) == 1

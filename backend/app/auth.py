@@ -29,6 +29,7 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -68,24 +69,47 @@ def _ensure_firebase_initialised() -> None:
     _firebase_initialised = True
 
 
+def _lookup_user(db: Session, firebase_uid: str) -> User | None:
+    return db.execute(
+        select(User).where(User.firebase_uid == firebase_uid)
+    ).scalar_one_or_none()
+
+
+def _refresh_profile(db: Session, user: User, email: str | None, display_name: str | None) -> User:
+    """Sync email / display name from Firebase if they've changed, then commit."""
+    if email and user.email != email:
+        user.email = email
+    if display_name and user.display_name != display_name:
+        user.display_name = display_name
+    db.commit()
+    return user
+
+
 def _find_or_create_user(
     db: Session,
     firebase_uid: str,
     email: str | None = None,
     display_name: str | None = None,
 ) -> User:
-    user = db.execute(select(User).where(User.firebase_uid == firebase_uid)).scalar_one_or_none()
+    user = _lookup_user(db, firebase_uid)
     if user is not None:
-        # Refresh email / display name if Firebase has newer values.
-        if email and user.email != email:
-            user.email = email
-        if display_name and user.display_name != display_name:
-            user.display_name = display_name
-        db.commit()
-        return user
+        return _refresh_profile(db, user, email, display_name)
+
     user = User(firebase_uid=firebase_uid, email=email, display_name=display_name)
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent first request for the same Firebase UID inserted the row
+        # between our lookup and commit (the `firebase_uid` unique constraint
+        # fired). A fresh sign-in fans out into several parallel API calls, so
+        # this is a real race, not a theoretical one. Roll back and adopt the
+        # row the other request created.
+        db.rollback()
+        existing = _lookup_user(db, firebase_uid)
+        if existing is None:
+            raise
+        return _refresh_profile(db, existing, email, display_name)
     db.refresh(user)
     return user
 

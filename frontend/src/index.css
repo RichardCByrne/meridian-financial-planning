@@ -759,6 +759,14 @@ th {
   background: #fef2f2;
 }
 
+/* Recharts 3 marks internal chart layers tabindex="-1"; tapping a chart
+   focuses whichever layer is hit and paints a differently-sized focus ring
+   each time. Suppress pointer-focus rings but keep keyboard (:focus-visible)
+   ones for accessibility. */
+.recharts-wrapper :focus:not(:focus-visible) {
+  outline: none;
+}
+
 @media print {
   /* Strip the app chrome so only the report prints. */
   .sidebar,

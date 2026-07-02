@@ -9,6 +9,7 @@ import {
   usePlans,
 } from "../api/hooks";
 import { confirmDialog } from "../components/ConfirmDialog";
+import { RowActions } from "../components/RowActions";
 import { TableSkeleton } from "../components/Skeleton";
 import { emitToast } from "../components/Toast";
 import { buildSampleHouseholdPayload } from "../lib/sampleHousehold";
@@ -163,36 +164,36 @@ export function PlansListPage() {
                   <td>{p.projection_years}</td>
                   <td className="muted">{new Date(p.created_at).toLocaleDateString()}</td>
                   <td style={{ textAlign: "right" }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ marginRight: 6 }}
-                      onClick={() => clonePlan.mutate({ id: p.id })}
-                      disabled={clonePlan.isPending}
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ marginRight: 6 }}
-                      onClick={() => onExport(p.id, p.name)}
-                      disabled={busyId === p.id}
-                    >
-                      {busyId === p.id ? "…" : "Export"}
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={async () => {
-                        const ok = await confirmDialog({
-                          title: "Delete plan?",
-                          message: `Delete plan "${p.name}"? This is permanent.`,
-                          confirmLabel: "Delete",
-                          danger: true,
-                        });
-                        if (ok) deletePlan.mutate(p.id);
-                      }}
-                    >
-                      Delete
-                    </button>
+                    <RowActions always>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => clonePlan.mutate({ id: p.id })}
+                        disabled={clonePlan.isPending}
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => onExport(p.id, p.name)}
+                        disabled={busyId === p.id}
+                      >
+                        {busyId === p.id ? "…" : "Export"}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: "Delete plan?",
+                            message: `Delete plan "${p.name}"? This is permanent.`,
+                            confirmLabel: "Delete",
+                            danger: true,
+                          });
+                          if (ok) deletePlan.mutate(p.id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </RowActions>
                   </td>
                 </tr>
               ))}

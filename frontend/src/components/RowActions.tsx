@@ -5,13 +5,14 @@ import { useIsMobile } from "../hooks/useIsMobile";
 /**
  * Collapses a row's action buttons (Edit / Duplicate / Remove …) into a single
  * "⋯" overflow menu when screen space is limited (mobile). On wider screens the
- * buttons render inline, unchanged.
+ * buttons render inline, unchanged — unless `always` is set, in which case the
+ * menu is used at every screen size.
  *
  * Wraps whatever `renderActions` already returns — the same buttons keep their
  * own handlers, they just move into a popover on mobile — so no per-pane change
  * is needed beyond the table doing the wrapping.
  */
-export function RowActions({ children }: { children: ReactNode }) {
+export function RowActions({ children, always = false }: { children: ReactNode; always?: boolean }) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -30,7 +31,7 @@ export function RowActions({ children }: { children: ReactNode }) {
     };
   }, [open]);
 
-  if (!isMobile) return <>{children}</>;
+  if (!always && !isMobile) return <>{children}</>;
 
   return (
     <div ref={ref} style={{ position: "relative", marginLeft: "auto" }}>

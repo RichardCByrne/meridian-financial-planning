@@ -206,10 +206,18 @@ export function LetsSeePane({ planId }: { planId: number }) {
     setLockedYear((cur) => (cur === y ? null : y));
   };
 
+  // Tapping an event/goal chip pins its year (tap again to unpin) — same
+  // semantics as clicking that year on the chart.
+  const pinYear = (y: number) => setLockedYear((cur) => (cur === y ? null : y));
+
   // Clicking anywhere outside the chart clears the pin, reverting to default.
+  // Event/goal chips pin a year themselves, so mousedown on one must not
+  // clear the pin first (it would defeat tapping the pinned chip to unpin).
   useEffect(() => {
     if (lockedYear === null) return;
     const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest?.("[data-year-chip]")) return;
       if (chartBoxRef.current && !chartBoxRef.current.contains(e.target as Node)) {
         setLockedYear(null);
       }
@@ -563,13 +571,14 @@ export function LetsSeePane({ planId }: { planId: number }) {
         />
 
         {showEvents && goals && goals.length > 0 && (
-          <GoalStrip goals={goals} years={data.years} hoverYear={highlightYear} />
+          <GoalStrip goals={goals} years={data.years} hoverYear={highlightYear} onSelect={pinYear} />
         )}
 
         {showEvents && events.some((e) => e.source === "event") && (
           <EventLegend
             events={events.filter((e) => e.source === "event")}
             hoverYear={highlightYear}
+            onSelect={pinYear}
           />
         )}
 
@@ -779,7 +788,15 @@ export function LetsSeePane({ planId }: { planId: number }) {
   );
 }
 
-function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: number | null }) {
+function EventLegend({
+  events,
+  hoverYear,
+  onSelect,
+}: {
+  events: ChartEvent[];
+  hoverYear: number | null;
+  onSelect: (year: number) => void;
+}) {
   return (
     <div
       className="row"
@@ -797,15 +814,18 @@ function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: n
       >
         Timeline events
         <span style={{ textTransform: "none", marginLeft: 6, opacity: 0.7 }}>
-          — hover to preview a year, click to pin it
+          — hover to preview a year, click or tap a chip to pin it
         </span>
       </div>
       {events.map((e, i) => {
         const active = e.year === hoverYear;
         return (
-          <span
+          <button
             key={`${e.year}-${i}`}
+            type="button"
+            data-year-chip
             title={`${e.label} — ${e.year}`}
+            onClick={() => onSelect(e.year)}
             style={{
               display: "inline-flex",
               gap: 6,
@@ -820,19 +840,31 @@ function EventLegend({ events, hoverYear }: { events: ChartEvent[]; hoverYear: n
               color: e.color,
               fontSize: 12,
               fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: "pointer",
             }}
           >
             <span aria-hidden>{e.icon}</span>
             <span>{e.label}</span>
             <span style={{ opacity: 0.7, fontWeight: 400 }}>· {e.year}</span>
-          </span>
+          </button>
         );
       })}
     </div>
   );
 }
 
-function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[]; hoverYear: number | null }) {
+function GoalStrip({
+  goals,
+  years,
+  hoverYear,
+  onSelect,
+}: {
+  goals: Goal[];
+  years: YearRow[];
+  hoverYear: number | null;
+  onSelect: (year: number) => void;
+}) {
   return (
     <div
       className="row"
@@ -853,9 +885,12 @@ function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[
         const meta = goalStatusMeta(status);
         const active = g.target_year === hoverYear;
         return (
-          <span
+          <button
             key={g.id}
+            type="button"
+            data-year-chip
             title={`${g.name} — target ${g.target_year}`}
+            onClick={() => onSelect(g.target_year)}
             style={{
               display: "inline-flex",
               gap: 6,
@@ -866,6 +901,9 @@ function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[
               color: meta.fg,
               fontSize: 12,
               fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              border: "none",
               // boxShadow only — no size change, so hover never reflows the page.
               boxShadow: active ? `0 0 0 2px ${meta.fg}` : "none",
             }}
@@ -873,7 +911,7 @@ function GoalStrip({ goals, years, hoverYear }: { goals: Goal[]; years: YearRow[
             <span>{meta.icon}</span>
             <span>{g.name}</span>
             <span style={{ opacity: 0.7, fontWeight: 400 }}>· {g.target_year}</span>
-          </span>
+          </button>
         );
       })}
     </div>
